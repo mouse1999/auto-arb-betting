@@ -1,0 +1,38 @@
+flowchart TD
+
+%% Odds Flow
+    SA[Scraper A ] --> OSA[Odds Service A]
+SB[Scraper B ] --> OSB[Odds Service B]
+SC[Scraper C ] --> OSC[Odds Service C]
+
+OSA --> EC[Event Cache]
+OSB --> EC
+OSC --> EC
+
+EC --> AD[Arb Detector]
+AD --> AF[Arb Filter]
+AF --> AC[Arb Cache]
+
+%% Bet Flow
+AC --> BE[Bet Engine]
+BE --> WM[Wallet Manager / Service]
+
+%% Failed Bet Handling
+BE -->|on fail| FBS[Failed Bet Store per bookie]
+FBS --> RP[Retry Bet Processor]
+RP --> BE
+
+%% Retry listens to Odds
+OSA --> RP
+OSB --> RP
+OSC --> RP
+
+%% Logs
+BE --> EL[Execution Log Service]
+RP --> EL
+AD --> AL[Arbitrage Log Service]
+
+%% Metrics + Dashboard
+EL --> MS[Metrics Service]
+AL --> MS
+MS --> DB[Monitoring Dashboard]

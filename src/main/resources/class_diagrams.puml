@@ -1,0 +1,91 @@
+@startuml
+
+interface OddService {
+    +fetchOdds(): List<Odds>
+}
+
+class ScraperA {
+    +scrapeOdds()
+    +monitorEvents()
+}
+
+class ScraperB {
+    +scrapeOdds()
+    +monitorEvents()
+}
+
+class ScraperC {
+    +scrapeOdds()
+    +monitorEvents()
+}
+
+class ArbDetector {
+    +detectArbitrage(odds: List<Odds>): List<ArbitrageOpportunity>
+}
+
+class ArbCache {
+    +store(opportunity: ArbitrageOpportunity)
+    +getAll(): List<ArbitrageOpportunity>
+}
+
+class BetExecutionEngine {
+    +execute(opportunity: ArbitrageOpportunity)
+}
+
+class BettingContext {
+    +login()
+    +placeBet(opportunity: ArbitrageOpportunity)
+}
+
+class HumanService {
+    +simulateUserBehaviour()
+}
+
+class FailedBetStore {
+    +saveFailedBet(bet: Bet)
+    +getFailedBets(bookie: String): List<Bet>
+    +checkAndRetry(bookie: String, odds: Odds)
+}
+
+class BetRetryProcessor {
+    +retryFailedBets()
+    +checkOddsAndRetry()
+}
+
+class MetricService {
+    +recordMetric(name: String, value: Number)
+}
+
+class ArbitrageLogService {
+    +logArb(opportunity: ArbitrageOpportunity)
+}
+
+class ExecutionLogService {
+    +logExecution(bet: Bet, status: String)
+}
+
+' Relationships
+OddService <-- ScraperA
+OddService <-- ScraperB
+OddService <-- ScraperC
+
+ArbDetector --> ArbCache
+ArbDetector --> OddService
+ArbCache --> BetExecutionEngine
+BetExecutionEngine --> BettingContext
+BettingContext --> HumanService
+
+BetExecutionEngine --> FailedBetStore
+BetRetryProcessor --> FailedBetStore
+BetRetryProcessor --> OddService
+BetRetryProcessor --> BettingContext
+
+ScraperA --> FailedBetStore : monitor events
+ScraperB --> FailedBetStore : monitor events
+ScraperC --> FailedBetStore : monitor events
+
+MetricService ..> ArbDetector
+ArbitrageLogService ..> ArbDetector
+ExecutionLogService ..> BetExecutionEngine
+
+@enduml
