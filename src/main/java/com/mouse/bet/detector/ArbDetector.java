@@ -1,20 +1,279 @@
 package com.mouse.bet.detector;
 
+import com.mouse.bet.entity.Arb;
+import com.mouse.bet.enums.Status;
 import com.mouse.bet.finance.WalletService;
+import com.mouse.bet.interfaces.NormalizedEvent;
+import com.mouse.bet.logservice.ArbitrageLogService;
+import com.mouse.bet.service.ArbService;
+import com.mouse.bet.utils.ArbCalculator;
+import com.mouse.bet.utils.ArbFactory;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
 
 /**
- * This class holds cached events that is passed to it in the event-pool
- * it is use as a tool to detect an arbitrage opportunity from the pool of events
- * it  uses a calculator to detect an opportunity and a wallet service to check if
- * the bookies involved has sufficient balance to execute or bet on the arb.
- * if balance not sufficient, indicate not able to bet...
- *
+ * Detects arbitrage opportunities from incoming events and validates wallet balances.
+ * Automatically cleans up events older than 3-5 seconds to maintain performance.
  */
+@Slf4j
+@Component
+@RequiredArgsConstructor
 public class ArbDetector {
+
+    private final Map<String, ConcurrentLinkedQueue<NormalizedEvent>> eventCache = new ConcurrentHashMap<>();
+    private final BlockingQueue<Arb> arbQueue = new LinkedBlockingQueue<>();
+    private final ConcurrentHashMap<String, Object> eventLocks = new ConcurrentHashMap<>();
+
+    private final ExecutorService detectionExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);;
+    private final ExecutorService arbProcessorExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean running = true;
+
     private final WalletService walletService;
+    private final ArbitrageLogService arbitrageLogService;
+    private final ArbFactory arbFactory;
+    private final ArbService arbService;
 
+    private static final int EVENT_EXPIRY_SECONDS = 5;
+    private static final int MAX_EVENTS_PER_GROUP = 50;
 
-    public ArbDetector(WalletService walletService) {
-        this.walletService = walletService;
+    @PostConstruct
+    public void init() {
+        startArbProcessor();
+        arbitrageLogService.logInfo("ArbDetector started", null);
+        log.info("ArbDetector started");
+    }
+
+    /**
+     * Add event to cache and trigger arbitrage detection
+     */
+    public void addEventToPool(NormalizedEvent event) {
+        if (event == null || event.getEventId() == null) {
+            log.warn("Cannot add null event or event without eventId");
+            return;
+        }
+
+        event.setLastUpdated(Instant.now());
+        String eventId = event.getEventId();
+
+        log.debug("Adding event from {} for eventId={}", event.getBookie(), eventId);
+
+        // Add to cache with size limit
+        eventCache.compute(eventId, (key, queue) -> {
+            if (queue == null) {
+                queue = new ConcurrentLinkedQueue<>();
+            }
+
+            // Remove oldest if queue is full
+            if (queue.size() >= MAX_EVENTS_PER_GROUP) {
+                queue.poll();
+            }
+
+            queue.add(event);
+
+            // Immediate cleanup of old events from this queue
+            Instant cutoff = Instant.now().minusSeconds(EVENT_EXPIRY_SECONDS);
+            queue.removeIf(e -> e.getLastUpdated().isBefore(cutoff));
+
+            return queue.isEmpty() ? null : queue;
+        });
+
+        detectArbitrage(eventId);
+    }
+
+    /**
+     * Detect arbitrage opportunities for a specific event
+     */
+    private void detectArbitrage(String eventId) {
+        detectionExecutor.submit(() -> {
+            Object lock = eventLocks.computeIfAbsent(eventId, k -> new Object());
+
+            synchronized (lock) {
+                try {
+                    ConcurrentLinkedQueue<NormalizedEvent> events = eventCache.get(eventId);
+
+                    if (events == null || events.size() < 2) {
+                        return;
+                    }
+
+                    List<NormalizedEvent> eventList = new ArrayList<>(events);
+                    log.debug("Analyzing {} events for arbitrage (eventId={})", eventList.size(), eventId);
+
+                    List<Arb> opportunities = arbFactory.findOpportunities(eventList);
+
+                    if (!opportunities.isEmpty()) {
+                        log.info("Found {} arbs for eventId={}", opportunities.size(), eventId);
+                        opportunities.forEach(arbQueue::offer);
+
+                        for (Arb opportunity : opportunities) {
+                            arbitrageLogService.logArb(opportunity);
+                        }
+
+                    }
+
+                } catch (Exception e) {
+                    log.error("Detection error for eventId={}", eventId, e);
+                    arbitrageLogService.logError("Error detected while trying to detect arb for an event", e);
+                }
+            }
+        });
+    }
+
+    /**
+     * Process detected arbitrage opportunities
+     */
+    private void startArbProcessor() {
+        arbProcessorExecutor.execute(() -> {
+            log.info("Arb processor started");
+
+            while (running || !arbQueue.isEmpty()) {
+                try {
+                    Arb arb = arbQueue.poll(100, TimeUnit.MILLISECONDS);
+
+                    if (arb != null) {
+                        processArb(arb);
+                    }
+
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Arb processor interrupted");
+                    break;
+                } catch (Exception e) {
+                    log.error("Error in arb processor", e);
+                }
+            }
+
+            log.info("Arb processor stopped");
+        });
+    }
+
+    /**
+     * Process individual arbitrage opportunity
+     */
+    private void processArb(Arb arb) {
+        try {
+            log.debug("Processing arb eventId={}, profit={}", arb.getEventId(), arb.getProfitPercentage());
+
+            boolean hasSufficientBalance = checkBalance(arb);
+            arb.setShouldBet(hasSufficientBalance);
+            arb.setStatus(hasSufficientBalance ? Status.ACTIVE : Status.INSUFFICIENT_BALANCE);
+            arb.markSeen(Instant.now());
+
+            if (!hasSufficientBalance) {
+                log.warn("Insufficient balance for eventId={}", arb.getEventId());
+                arbitrageLogService.logInsufficientFunds(arb);
+            }
+
+            arbService.saveArb(arb);
+            log.info("Saved arb eventId={}, shouldBet={}", arb.getEventId(), arb.isShouldBet());
+
+        } catch (Exception e) {
+            log.error("Error processing arb eventId={}", arb.getEventId(), e);
+            arbitrageLogService.logError("ArbDetector", "Processing error: " + arb.getEventId(), e);
+        }
+    }
+
+    /**
+     * Check if bookmaker wallets have sufficient balance
+     */
+    private boolean checkBalance(Arb arb) {
+        if (arb.getLegA() == null || arb.getLegB() == null) {
+            return false;
+        }
+
+        String bookmakerA = arb.getLegA().getBookmaker();
+        String bookmakerB = arb.getLegB().getBookmaker();
+
+        BigDecimal balanceA = walletService.getBalance(bookmakerA);
+        BigDecimal balanceB = walletService.getBalance(bookmakerB);
+
+        boolean sufficientA = balanceA.compareTo(arb.getStakeA()) >= 0;
+        boolean sufficientB = balanceB.compareTo(arb.getStakeB()) >= 0;
+
+        log.debug("Balance check - {}: {}/{}, {}: {}/{}",
+                bookmakerA, balanceA, arb.getStakeA(),
+                bookmakerB, balanceB, arb.getStakeB());
+
+        return sufficientA && sufficientB;
+    }
+
+    /**
+     * Cleanup old events every 3 seconds
+     */
+    @Scheduled(fixedRate = 3000)
+    public void cleanupOldEvents() {
+        Instant cutoff = Instant.now().minusSeconds(EVENT_EXPIRY_SECONDS);
+        int removedQueues = 0;
+
+        try {
+            Iterator<Map.Entry<String, ConcurrentLinkedQueue<NormalizedEvent>>> iterator =
+                    eventCache.entrySet().iterator();
+
+            while (iterator.hasNext()) {
+                Map.Entry<String, ConcurrentLinkedQueue<NormalizedEvent>> entry = iterator.next();
+                ConcurrentLinkedQueue<NormalizedEvent> queue = entry.getValue();
+
+                queue.removeIf(event -> event.getLastUpdated().isBefore(cutoff));
+
+                if (queue.isEmpty()) {
+                    iterator.remove();
+                    eventLocks.remove(entry.getKey());
+                    removedQueues++;
+                }
+            }
+
+            if (removedQueues > 0) {
+                log.debug("Cleanup removed {} empty queues", removedQueues);
+            }
+
+        } catch (Exception e) {
+            log.error("Error during cleanup", e);
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        log.info("Shutting down ArbDetector...");
+        running = false;
+
+        detectionExecutor.shutdown();
+        arbProcessorExecutor.shutdown();
+
+        try {
+            if (!detectionExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                detectionExecutor.shutdownNow();
+            }
+            if (!arbProcessorExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                arbProcessorExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            detectionExecutor.shutdownNow();
+            arbProcessorExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        arbitrageLogService.logInfo("ArbDetector shutdown complete", null);
+        log.info("ArbDetector shutdown complete");
+    }
+
+    // Monitoring methods
+    public int getCacheSize() {
+        return eventCache.size();
+    }
+
+    public long getTotalEvents() {
+        return eventCache.values().stream().mapToInt(Queue::size).sum();
+    }
+
+    public int getPendingArbs() {
+        return arbQueue.size();
     }
 }

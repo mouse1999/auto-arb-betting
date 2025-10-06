@@ -1,9 +1,9 @@
 package com.mouse.bet.interfaces;
 
-import com.mouse.bet.model.NormalizedEvent;
 
-public interface OddService {
-    NormalizedEvent convertToNormalEvent(Object object);
+
+public interface OddService<T> {
+    NormalizedEvent convertToNormalEvent(T object);
 
     /**
      * This adds an event to event-pool that will be used to search for an Arb

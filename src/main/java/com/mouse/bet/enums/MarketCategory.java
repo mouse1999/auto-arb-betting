@@ -1,0 +1,14 @@
+package com.mouse.bet.enums;
+
+public enum MarketCategory {
+    MATCH_RESULT,
+    DOUBLE_CHANCE,
+    OVER_UNDER_TOTAL,
+    BTTS,
+    ODD_EVEN,
+    ASIAN_HANDICAP_FULLTIME,
+    DRAW_NO_BET,
+    OVER_UNDER_1STHALF,
+    OVER_UNDER_2NDHALF,
+    CORNERS_OVER_UNDER_FULLTIME;
+}

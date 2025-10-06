@@ -1,4 +1,4 @@
 package com.mouse.bet.model;
 
-public class NormalizedEvent {
+public class MSportEvent {
 }
