@@ -1,6 +1,7 @@
 package com.mouse.bet.interfaces;
 
 
+import com.mouse.bet.model.NormalizedEvent;
 
 public interface OddService<T> {
     NormalizedEvent convertToNormalEvent(T object);

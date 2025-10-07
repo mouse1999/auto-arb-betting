@@ -2,7 +2,7 @@ package com.mouse.bet.service;
 
 import com.mouse.bet.detector.ArbDetector;
 import com.mouse.bet.enums.*;
-import com.mouse.bet.interfaces.NormalizedEvent;
+import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.interfaces.OddService;
 import com.mouse.bet.model.NormalizedMarket;
 import com.mouse.bet.model.NormalizedOutcome;
@@ -13,8 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;

@@ -2,7 +2,7 @@ package com.mouse.bet.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mouse.bet.models.TeamAlias;
+import com.mouse.bet.model.profile.TeamAlias;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;

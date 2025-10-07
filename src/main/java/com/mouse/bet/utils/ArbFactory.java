@@ -8,7 +8,7 @@ import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.enums.MarketCategory;
 import com.mouse.bet.enums.OutcomeType;
 import com.mouse.bet.finance.WalletService;
-import com.mouse.bet.interfaces.NormalizedEvent;
+import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.model.NormalizedMarket;
 import com.mouse.bet.model.NormalizedOutcome;
 import lombok.RequiredArgsConstructor;

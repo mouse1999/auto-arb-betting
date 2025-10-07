@@ -1,7 +1,8 @@
-package com.mouse.bet.interfaces;
+package com.mouse.bet.model;
 
 import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.enums.Sport;
+import com.mouse.bet.interfaces.Event;
 import com.mouse.bet.model.NormalizedMarket;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

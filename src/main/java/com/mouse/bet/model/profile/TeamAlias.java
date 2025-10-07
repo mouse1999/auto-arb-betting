@@ -1,4 +1,4 @@
-package com.mouse.bet.models;
+package com.mouse.bet.model.profile;
 
 import lombok.Data;
 import lombok.Getter;
