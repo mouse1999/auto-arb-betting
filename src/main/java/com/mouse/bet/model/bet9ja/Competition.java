@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @NoArgsConstructor
 @AllArgsConstructor
-class Competition {
+public class Competition {
     @JsonProperty("SPORT") private String sportName;     // "Soccer"
     @JsonProperty("SGID") private String sportGroupKey;  // "3000001_43143"
     @JsonProperty("G_PRIORITY") private int groupPriority;

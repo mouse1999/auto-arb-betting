@@ -2,7 +2,6 @@ package com.mouse.bet.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mouse.bet.model.MSportEvent;
 import com.mouse.bet.model.sporty.SportyEvent;
 import lombok.extern.slf4j.Slf4j;
 

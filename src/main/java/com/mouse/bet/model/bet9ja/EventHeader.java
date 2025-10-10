@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @NoArgsConstructor
 @AllArgsConstructor
-class EventHeader {
+public class EventHeader {
     @JsonProperty("INCTYPE") private int incrementType;
     @JsonProperty("ST") private int stateCode;
     @JsonProperty("GID") private long groupId;

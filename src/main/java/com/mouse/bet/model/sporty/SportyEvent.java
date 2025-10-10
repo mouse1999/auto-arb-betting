@@ -19,11 +19,11 @@ public class SportyEvent implements Event {
     private String gameId;
     private String productStatus;
     private long estimateStartTime;
-    private int status;
+    private int status; //meaning
     private String setScore;
     private List<String> gameScore;
     private String period;
-    private String matchStatus;
+    private String matchStatus; //meaning
     private String playedSeconds;
     private String homeTeamId;
     private String homeTeamName;

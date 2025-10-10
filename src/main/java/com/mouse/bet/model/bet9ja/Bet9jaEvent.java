@@ -14,6 +14,6 @@ import java.util.Map;
 @AllArgsConstructor
 public class Bet9jaEvent {
     @JsonProperty("A")  private LiveInplayState liveInplayState; // formerly ASection
-    @JsonProperty("O")  private Map<String, OddsValue> odds;    // key: market code, value: {v}
+    @JsonProperty("O")  private Map<String, String> odds;    // key: market code, value: {v}
     @JsonProperty("AA") private EventHeader eventHeader;
 }

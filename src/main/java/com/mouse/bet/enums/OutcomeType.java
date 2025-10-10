@@ -131,7 +131,42 @@ public enum OutcomeType {
 
     CORNERS_OVER_125("CORNERS_OVER_12.5", MarketCategory.CORNERS_OVER_UNDER_FULLTIME),
     CORNERS_UNDER_125("CORNERS_UNDER_12.5", MarketCategory.CORNERS_OVER_UNDER_FULLTIME),
-    UNKNOWN("UNKNOWN", null);
+    UNKNOWN("UNKNOWN", null),
+
+
+
+    //BASKETBALL
+    OVER_169_5("OVER_169.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_169_5("UNDER_169.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_170_5("OVER_170.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_170_5("UNDER_170.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_171_5("OVER_171.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_171_5("UNDER_171.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_172_5("OVER_172.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_172_5("UNDER_172.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_173_5("OVER_173.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_173_5("UNDER_173.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_174_5("OVER_174.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_174_5("UNDER_174.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_175_5("OVER_175.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_175_5("UNDER_175.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_176_5("OVER_176.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_176_5("UNDER_176.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_177_5("OVER_177.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_177_5("UNDER_177.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_178_5("OVER_178.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_178_5("UNDER_178.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_179_5("OVER_179.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_179_5("UNDER_179.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_180_5("OVER_180.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_180_5("UNDER_180.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_181_5("OVER_181.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_181_5("UNDER_181.5", MarketCategory.OVER_UNDER_TOTAL),
+
+    BASKETBALL_1H_OVER_84_5("UNDER_84.5", MarketCategory.OVER_UNDER_1STHALF)
+
+
+
 
     private final String normalizedName;
     private final MarketCategory category;

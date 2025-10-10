@@ -1,13 +1,11 @@
 package com.mouse.bet.service;
 
-import com.mouse.bet.enums.Bet9jaMarketType;
-import com.mouse.bet.enums.BookMaker;
-import com.mouse.bet.enums.MarketCategory;
-import com.mouse.bet.enums.OutcomeStatus;
+import com.mouse.bet.enums.*;
 import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.interfaces.OddService;
 import com.mouse.bet.model.NormalizedMarket;
 import com.mouse.bet.model.NormalizedOutcome;
+import com.mouse.bet.model.bet9ja.Bet9jaEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,16 +28,16 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
         log.info("Normalizing Bet9jaEvent: {}", event);
 
         if (event == null) {
-            throw new Bet9jaNormalizingException("Event cannot be null");
+            throw new RuntimeException("");
         }
 
 
-            String league = normalizeLeague(event.getGroupNameOrLeagueName());
-            String[] teams = parseTeams(event.getMatchName());
+            String league = normalizeLeague(event.getEventHeader().getCompetition().getDisplayName());
+            String[] teams = parseTeams(event.getEventHeader().getDisplayName());
             String homeTeam = teamAliasService.canonicalOrSelf(normalizeTeamName(teams[0]));
             String awayTeam = teamAliasService.canonicalOrSelf(normalizeTeamName(teams[1]));
-            Instant eventStartTime = normalizeTimestamp(event.getStartDate());
-            String eventId = generateEventId(eventStartTime, homeTeam, awayTeam);
+
+            String eventId = generateEventId(homeTeam, awayTeam);
 
             log.info("Normalized - league: '{}', home: '{}', away: '{}', eventId: '{}'",
                     league, homeTeam, awayTeam, eventId);
@@ -74,7 +72,6 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
                     .awayTeam(awayTeam)
                     .league(league)
                     .sport(determineSport(event))
-                    .estimateStartTime(eventStartTime.toEpochMilli())
                     .bookie(BookMaker.BET9JA)
                     .markets(markets)
                     .build();
@@ -115,7 +112,7 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
             return Map.of();
         }
 
-        // Bet9ja specific: if odds exist and valid, assume active (1), else suspended (0)
+        // if odds exist and valid, assume active (1), else suspended (0)
         Map<String, Integer> statusMap = rawOdds.entrySet().stream()
                 .filter(entry -> Bet9jaMarketType.safeFromProviderKey(entry.getKey()).isPresent())
                 .collect(Collectors.toMap(
@@ -305,11 +302,10 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
                 .bookmaker(BookMaker.BET9JA)
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
-                .eventName(homeTeam + " vs " + awayTeam)
+                .eventName(event.getEventHeader().getDisplayName())
                 .outcomeDescription(marketType.getNormalizedName())
                 .isActive(status == 1)
                 .marketName(marketType.getNormalizedName())
-                .eventStartTime(event.getStartDate())
                 .sport(determineSport(event))
                 .outcomeStatus(outcomeStatus)
                 .cashOutAvailable(cashOut)
@@ -348,15 +344,10 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
         return teamName.trim();
     }
 
-    private Instant normalizeTimestamp(Long timestamp) {
-        if (timestamp == null) {
-            return Instant.now();
-        }
-        return Instant.ofEpochMilli(timestamp).truncatedTo(ChronoUnit.MINUTES);
-    }
 
-    private String generateEventId(Instant time, String home, String away) {
-        return String.format("%s|%s|%s", time.toString(), home, away);
+
+    private String generateEventId(String home, String away) {
+        return String.format("%s|%s", home, away);
     }
 
     private boolean isValidOdds(String odds) {
@@ -380,14 +371,18 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
                 MarketCategory.OVER_UNDER_1STHALF,
                 MarketCategory.OVER_UNDER_2NDHALF,
                 MarketCategory.ODD_EVEN,
-                MarketCategory.MATCH_RESULT
+                MarketCategory.MATCH_RESULT,
+                MarketCategory.BASKETBALL_MATCH_WINNER
         ).contains(category);
     }
 
     private Sport determineSport(Bet9jaEvent event) {
-        // Implement sport detection logic based on Bet9ja event data
-        // For now, default to FOOTBALL
-        return Sport.FOOTBALL;
+
+        return switch (event.getEventHeader().getCompetition().getSportName()) {
+            case "Basketball" -> Sport.BASKETBALL;
+            case "Table Tennis" -> Sport.TABLE_TENNIS;
+            default -> Sport.FOOTBALL;
+        };
     }
 
     @Override
