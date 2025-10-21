@@ -1,9 +1,8 @@
 package com.mouse.bet.model;
 
 import com.mouse.bet.enums.BookMaker;
-import com.mouse.bet.enums.Sport;
+import com.mouse.bet.enums.SportEnum;
 import com.mouse.bet.interfaces.Event;
-import com.mouse.bet.model.NormalizedMarket;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,7 +23,7 @@ public class NormalizedEvent {
     private Instant startTime;
     private String eventName;
     private Event event;
-    private Sport sport;
+    private SportEnum sportEnum;
     private long estimateStartTime;
     private Instant lastUpdated = Instant.now();
     private BookMaker bookie;

@@ -3,6 +3,7 @@ package com.mouse.bet.model.bet9ja;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class EventHeader {
     @JsonProperty("INCTYPE") private int incrementType;
     @JsonProperty("ST") private int stateCode;

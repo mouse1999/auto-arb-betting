@@ -1,0 +1,797 @@
+[
+  {
+    "name": "BAYERN_MUNICH",
+    "aliases": ["Bayern Munich", "Bayern Munich"]
+  },
+  {
+    "name": "RB_LEIPZIG",
+    "aliases": ["RB Leipzig", "Leipzig"]
+  },
+  {
+    "name": "BAYER_LEVERKUSEN",
+    "aliases": ["Bayer Leverkusen", "Bayer Leverkusen"]
+  },
+  {
+    "name": "HOFFENHEIM",
+    "aliases": ["Hoffenheim", "Hoffenheim"]
+  },
+  {
+    "name": "EINTRACHT_FRANKFURT",
+    "aliases": ["Eintracht Frankfurt", "Eintracht Frankfurt"]
+  },
+  {
+    "name": "WERDER_BREMEN",
+    "aliases": ["Werder Bremen", "Werder Bremen"]
+  },
+  {
+    "name": "FREIBURG",
+    "aliases": ["Freiburg", "Freiburg"]
+  },
+  {
+    "name": "AUGSBURG",
+    "aliases": ["Augsburg", "Augsburg"]
+  },
+  {
+    "name": "HEIDENHEIM",
+    "aliases": ["Heidenheim", "Heidenheim"]
+  },
+  {
+    "name": "WOLFSBURG",
+    "aliases": ["Wolfsburg", "Wolfsburg"]
+  },
+  {
+    "name": "UNION_BERLIN",
+    "aliases": ["Union Berlin", "Union Berlin"]
+  },
+  {
+    "name": "STUTTGART",
+    "aliases": ["Stuttgart", "Stuttgart"]
+  },
+  {
+    "name": "FC_ST_PAULI",
+    "aliases": ["FC St. Pauli", "St. Pauli"]
+  },
+  {
+    "name": "BORUSSIA_DORTMUND",
+    "aliases": ["Borussia Dortmund", "Borussia Dortmund"]
+  },
+  {
+    "name": "MAINZ",
+    "aliases": ["Mainz", "Mainz"]
+  },
+  {
+    "name": "COLOGNE",
+    "aliases": ["Cologne", "Cologne"]
+  },
+  {
+    "name": "BORUSSIA_MGLADBACH",
+    "aliases": ["Borussia M´gladbach", "Monchengladbach"]
+  },
+  {
+    "name": "HAMBURGER_SV",
+    "aliases": ["Hamburger SV", "Hamburg"]
+  },
+  {
+    "name": "AFC_BOURNEMOUTH",
+    "aliases": [
+      "AFC Bournemouth",
+      "Bournemouth",
+      "Bournemouth FC",
+      "BOU",
+      "Cherries"
+    ]
+  },
+  {
+    "name": "ARSENAL",
+    "aliases": [
+      "Arsenal",
+      "Arsenal FC",
+      "AFC",
+      "Gunners"
+    ]
+  },
+  {
+    "name": "ASTON_VILLA",
+    "aliases": [
+      "Aston Villa",
+      "Villa",
+      "AVFC",
+      "Villans"
+    ]
+  },
+  {
+    "name": "BRENTFORD",
+    "aliases": [
+      "Brentford",
+      "Brentford FC",
+      "Bees",
+      "BFC"
+    ]
+  },
+  {
+    "name": "BRIGHTON_HOVE_ALBION",
+    "aliases": [
+      "Brighton",
+      "Brighton & Hove Albion",
+      "BHA",
+      "Seagulls"
+    ]
+  },
+  {
+    "name": "BURNLEY",
+    "aliases": [
+      "Burnley",
+      "Burnley FC",
+      "Clarets",
+      "The Clarets"
+    ]
+  },
+  {
+    "name": "CHELSEA",
+    "aliases": [
+      "Chelsea",
+      "Chelsea FC",
+      "Blues"
+    ]
+  },
+  {
+    "name": "CRYSTAL_PALACE",
+    "aliases": [
+      "Crystal Palace",
+      "Palace",
+      "CPFC",
+      "Eagles"
+    ]
+  },
+  {
+    "name": "EVERTON",
+    "aliases": [
+      "Everton",
+      "Everton FC",
+      "Toffees",
+      "The Toffees"
+    ]
+  },
+  {
+    "name": "FULHAM",
+    "aliases": [
+      "Fulham",
+      "Fulham FC",
+      "Cottagers",
+      "The Cottagers"
+    ]
+  },
+  {
+    "name": "LEEDS_UNITED",
+    "aliases": [
+      "Leeds United",
+      "Leeds Utd",
+      "LUFC",
+      "Peacocks",
+      "Whites"
+    ]
+  },
+  {
+    "name": "LIVERPOOL",
+    "aliases": [
+      "Liverpool",
+      "Liverpool FC",
+      "LFC",
+      "Reds"
+    ]
+  },
+  {
+    "name": "MANCHESTER_CITY",
+    "aliases": [
+      "Manchester City",
+      "Man City",
+      "MCFC",
+      "Citizens"
+    ]
+  },
+  {
+    "name": "MANCHESTER_UNITED",
+    "aliases": [
+      "Manchester United",
+      "Man Utd",
+      "MUFC",
+      "Red Devils"
+    ]
+  },
+  {
+    "name": "NEWCASTLE_UNITED",
+    "aliases": [
+      "Newcastle United",
+      "Newcastle",
+      "NUFC",
+      "Magpies"
+    ]
+  },
+  {
+    "name": "NOTTINGHAM_FOREST",
+    "aliases": [
+      "Nottingham Forest",
+      "Forest",
+      "NFFC",
+      "Tricky Trees"
+    ]
+  },
+  {
+    "name": "SUNDERLAND",
+    "aliases": [
+      "Sunderland",
+      "Sunderland AFC",
+      "SAFC",
+      "Black Cats"
+    ]
+  },
+  {
+    "name": "TOTTENHAM_HOTSPUR",
+    "aliases": [
+      "Tottenham Hotspur",
+      "Tottenham",
+      "Spurs",
+      "THFC",
+      "Lilywhites"
+    ]
+  },
+  {
+    "name": "WEST_HAM_UNITED",
+    "aliases": [
+      "West Ham United",
+      "West Ham",
+      "Hammers",
+      "WHU",
+      "Irons"
+    ]
+  },
+  {
+    "name": "WOLVERHAMPTON_WANDERERS",
+    "aliases": [
+      "Wolverhampton Wanderers",
+      "Wolves",
+      "WWFC",
+      "Wolves FC"
+    ]
+  },
+  {
+    "name": "BORUSSIA_DORTMUND",
+    "aliases": [
+      "Borussia Dortmund",
+      "BVB",
+      "BVB 09",
+      "Die Schwarzgelben",
+      "Dortmund"
+    ]
+  },
+  {
+    "name": "BORUSSIA_MOENCHENGLADBACH",
+    "aliases": [
+      "Borussia Mönchengladbach",
+      "Borussia Monchengladbach",
+      "Gladbach",
+      "BMG",
+      "Die Fohlen"
+    ]
+  },
+  {
+    "name": "EINTRACHT_FRANKFURT",
+    "aliases": [
+      "Eintracht Frankfurt",
+      "SGE",
+      "The Eagles",
+      "Frankfurt"
+    ]
+  },
+  {
+    "name": "FC_AUGSBURG",
+    "aliases": [
+      "FC Augsburg",
+      "FCA",
+      "Augsburg"
+    ]
+  },
+  {
+    "name": "FC_COLOGNE",
+    "aliases": [
+      "FC Cologne",
+      "FC Köln",
+      "Köln",
+      "Cologne",
+      "Effzeh"
+    ]
+  },
+  {
+    "name": "HAMBURG_SV",
+    "aliases": [
+      "Hamburg SV",
+      "HSV",
+      "Hamburger SV",
+      "Die Rothosen"
+    ]
+  },
+  {
+    "name": "MAINZ_05",
+    "aliases": [
+      "1. FSV Mainz 05",
+      "Mainz",
+      "Mainz 05",
+      "FSV Mainz"
+    ]
+  },
+
+  {
+    "name": "Arema_Indonesia",
+    "aliases": ["Arema Indonesia", "Arema FC", "Arema", "Singo Edan"]
+  },
+  {
+    "name": "Bali_United",
+    "aliases": ["Bali United", "Bali United FC", "Serdadu Tridatu"]
+  },
+  {
+    "name": "Bhayangkara_Surabaya",
+    "aliases": ["Bhayangkara Surabaya", "Bhayangkara FC", "The Guardians"]
+  },
+  {
+    "name": "Borneo_FC",
+    "aliases": ["Borneo FC", "Borneo Samarinda", "Pesut Etam"]
+  },
+  {
+    "name": "Dewa_United",
+    "aliases": ["Dewa United", "Dewa United FC", "Tangsel Warriors"]
+  },
+  {
+    "name": "Madura_United",
+    "aliases": ["Madura United", "Madura United FC", "Laskar Sape Kerrab"]
+  },
+  {
+    "name": "Malut_United",
+    "aliases": ["Malut United", "Maluku Utara United"]
+  },
+  {
+    "name": "PSBS_Biak",
+    "aliases": ["PSBS Biak", "PSBS", "Badai Pasifik"]
+  },
+  {
+    "name": "PSIM_Yogyakarta",
+    "aliases": ["PSIM Yogyakarta", "PSIM", "Laskar Mataram"]
+  },
+  {
+    "name": "PSM_Makassar",
+    "aliases": ["PSM Makassar", "PSM", "Juku Eja"]
+  },
+  {
+    "name": "Persebaya_Surabaya",
+    "aliases": ["Persebaya Surabaya", "Persebaya", "Bajul Ijo"]
+  },
+  {
+    "name": "Persib",
+    "aliases": ["Persib", "Persib Bandung", "Maung Bandung"]
+  },
+  {
+    "name": "Persija",
+    "aliases": ["Persija", "Persija Jakarta", "Macan Kemayoran"]
+  },
+  {
+    "name": "Persijap",
+    "aliases": ["Persijap", "Persijap Jepara", "Laskar Kalinyamat"]
+  },
+  {
+    "name": "Persik_Kediri",
+    "aliases": ["Persik Kediri", "Persik", "Macan Putih"]
+  },
+  {
+    "name": "Persis_Solo",
+    "aliases": ["Persis Solo", "Persis", "Laskar Sambernyawa"]
+  },
+  {
+    "name": "Persita_Tangerang",
+    "aliases": ["Persita Tangerang", "Persita", "Pendekar Cisadane"]
+  },
+  {
+    "name": "Semen_Padang",
+    "aliases": ["Semen Padang", "Semen Padang FC", "Kabau Sirah"]
+  },
+
+  {
+    "name": "Accra_Lions",
+    "aliases": ["Accra Lions", "Accra Lions FC", "Lions"]
+  },
+  {
+    "name": "Aduana_Stars",
+    "aliases": ["Aduana Stars", "Aduana Stars FC", "Ogya Boys"]
+  },
+  {
+    "name": "Asante_Kotoko",
+    "aliases": ["Asante Kotoko", "Asante Kotoko SC", "Porcupine Warriors"]
+  },
+  {
+    "name": "Basake_Holy_Stars",
+    "aliases": ["Basake Holy Stars", "Holy Stars"]
+  },
+  {
+    "name": "Bechem_United",
+    "aliases": ["Bechem United", "Bechem United FC", "Hunters"]
+  },
+  {
+    "name": "Berekum_Chelsea",
+    "aliases": ["Berekum Chelsea", "Berekum Chelsea FC", "The Blues"]
+  },
+  {
+    "name": "Bibiani_Gold_Stars",
+    "aliases": ["Bibiani Gold Stars", "Gold Stars", "Bibiani Gold Stars FC"]
+  },
+  {
+    "name": "Dreams_FC",
+    "aliases": ["Dreams FC", "Dreams"]
+  },
+  {
+    "name": "Heart_of_Lions",
+    "aliases": ["Heart of Lions", "Heart of Lions FC", "Lions"]
+  },
+  {
+    "name": "Hearts_of_Oak",
+    "aliases": ["Hearts of Oak", "Accra Hearts of Oak", "Phobians"]
+  },
+  {
+    "name": "Karela",
+    "aliases": ["Karela", "Karela United", "Pride and Passion"]
+  },
+  {
+    "name": "Legon_Cities",
+    "aliases": ["Legon Cities", "Legon Cities FC", "The Royals"]
+  },
+  {
+    "name": "Nations",
+    "aliases": ["Nations", "Nations FC"]
+  },
+  {
+    "name": "Nsoatreman",
+    "aliases": ["Nsoatreman", "Nsoatreman FC"]
+  },
+  {
+    "name": "Samartex",
+    "aliases": ["Samartex", "FC Samartex", "Timber Giants"]
+  },
+  {
+    "name": "Young_Apostles",
+    "aliases": ["Young Apostles", "Young Apostles FC"]
+  },
+
+  {
+    "name": "ABB",
+    "aliases": ["ABB", "Academia del Balompié Boliviano"]
+  },
+  {
+    "name": "Always_Ready",
+    "aliases": ["Always Ready", "Club Always Ready", "Millonario"]
+  },
+  {
+    "name": "Aurora",
+    "aliases": ["Aurora", "Club Aurora", "Equipo del Pueblo"]
+  },
+  {
+    "name": "Blooming",
+    "aliases": ["Blooming", "Club Blooming", "La Academia Cruceña"]
+  },
+  {
+    "name": "Bolivar",
+    "aliases": ["Bolívar", "Club Bolívar", "La Academia Paceña"]
+  },
+  {
+    "name": "GV_San_Jose",
+    "aliases": ["GV San José", "San José", "Santo"]
+  },
+  {
+    "name": "Guabira",
+    "aliases": ["Guabirá", "Club Guabirá", "Azucareros"]
+  },
+  {
+    "name": "Independiente_Petrolero",
+    "aliases": ["Independiente Petrolero", "Club Independiente Petrolero", "Matador"]
+  },
+  {
+    "name": "Jorge_Wilstermann",
+    "aliases": ["Jorge Wilstermann", "Club Jorge Wilstermann", "Aviadores"]
+  },
+  {
+    "name": "Nacional_Potosi",
+    "aliases": ["Nacional Potosí", "Club Nacional Potosí", "Rancho Guitarras"]
+  },
+  {
+    "name": "Oriente_Petrolero",
+    "aliases": ["Oriente Petrolero", "Club Oriente Petrolero", "Refineros"]
+  },
+  {
+    "name": "Real_Oruro",
+    "aliases": ["Real Oruro", "CDT Real Oruro"]
+  },
+  {
+    "name": "Real_Tomayapo",
+    "aliases": ["Real Tomayapo", "Club Real Tomayapo", "Verdolagas"]
+  },
+  {
+    "name": "San_Antonio_Bulo_Bulo",
+    "aliases": ["San Antonio Bulo Bulo", "Club San Antonio Bulo Bulo"]
+  },
+  {
+    "name": "The_Strongest",
+    "aliases": ["The Strongest", "Club The Strongest", "Tigre"]
+  },
+  {
+    "name": "Universitario_de_Vinto",
+    "aliases": ["Universitario de Vinto", "FC Universitario de Vinto"]
+  },
+
+  {
+    "name": "2_de_Mayo",
+    "aliases": ["2 de Mayo", "Club 2 de Mayo"]
+  },
+  {
+    "name": "Cerro_Porteno",
+    "aliases": ["Cerro Porteño", "Club Cerro Porteño", "Ciclón"]
+  },
+  {
+    "name": "Club_Atletico_Tembetary",
+    "aliases": ["Club Atlético Tembetary", "Tembetary"]
+  },
+  {
+    "name": "Deportivo_Recoleta",
+    "aliases": ["Deportivo Recoleta", "Club Deportivo Recoleta"]
+  },
+  {
+    "name": "General_Caballero_JLM",
+    "aliases": ["General Caballero JLM", "Club General Caballero JLM"]
+  },
+  {
+    "name": "Guarani",
+    "aliases": ["Guaraní", "Club Guaraní", "Aborigen"]
+  },
+  {
+    "name": "Libertad",
+    "aliases": ["Libertad", "Club Libertad", "Gumarelo"]
+  },
+  {
+    "name": "Nacional",
+    "aliases": ["Nacional", "Club Nacional", "Tricolor"]
+  },
+  {
+    "name": "Olimpia",
+    "aliases": ["Olimpia", "Club Olimpia", "Decano"]
+  },
+  {
+    "name": "Sportivo_Ameliano",
+    "aliases": ["Sportivo Ameliano", "Club Sportivo Ameliano"]
+  },
+  {
+    "name": "Sportivo_Luqueno",
+    "aliases": ["Sportivo Luqueño", "Club Sportivo Luqueño", "Auriazules"]
+  },
+  {
+    "name": "Trinidense",
+    "aliases": ["Trinidense", "Sportivo Trinidense"]
+  },
+
+  {
+    "name": "Bari",
+    "aliases": ["Bari", "SSC Bari", "Galletti"]
+  },
+  {
+    "name": "Carrarese",
+    "aliases": ["Carrarese", "Carrarese Calcio", "Apuani"]
+  },
+  {
+    "name": "Catanzaro",
+    "aliases": ["Catanzaro", "US Catanzaro", "Aquile"]
+  },
+  {
+    "name": "Cesena",
+    "aliases": ["Cesena", "AC Cesena", "Cavallucci Marini"]
+  },
+  {
+    "name": "Empoli",
+    "aliases": ["Empoli", "Empoli FC", "Azzurri"]
+  },
+  {
+    "name": "Frosinone",
+    "aliases": ["Frosinone", "Frosinone Calcio", "Canarini"]
+  },
+  {
+    "name": "Juve_Stabia",
+    "aliases": ["Juve Stabia", "SS Juve Stabia", "Vespe"]
+  },
+  {
+    "name": "Mantova",
+    "aliases": ["Mantova", "Mantova 1911", "Virgiliani"]
+  },
+  {
+    "name": "Modena",
+    "aliases": ["Modena", "Modena FC", "Canarini"]
+  },
+  {
+    "name": "Monza",
+    "aliases": ["Monza", "AC Monza", "Biancorossi"]
+  },
+  {
+    "name": "Padova",
+    "aliases": ["Padova", "Calcio Padova", "Biancoscudati"]
+  },
+  {
+    "name": "Palermo",
+    "aliases": ["Palermo", "Palermo FC", "Rosanero"]
+  },
+  {
+    "name": "Pescara",
+    "aliases": ["Pescara", "Delfino Pescara", "Delfini"]
+  },
+  {
+    "name": "Reggiana",
+    "aliases": ["Reggiana", "AC Reggiana", "Granata"]
+  },
+  {
+    "name": "Sampdoria",
+    "aliases": ["Sampdoria", "UC Sampdoria", "Blucerchiati"]
+  },
+  {
+    "name": "Spezia",
+    "aliases": ["Spezia", "Spezia Calcio", "Aquile"]
+  },
+  {
+    "name": "Suditrol",
+    "aliases": ["Südtirol", "FC Südtirol", "Biancorossi"]
+  },
+  {
+    "name": "US_Avellino",
+    "aliases": ["US Avellino", "US Avellino 1912", "Lupi"]
+  },
+  {
+    "name": "Virtus_Entella",
+    "aliases": ["Virtus Entella", "Virtus Entella Chiavari", "Diavoli Neri"]
+  },
+
+  {
+    "name": "Beijing_Guoan",
+    "aliases": ["Beijing Guoan", "Beijing Guoan FC", "Imperial Guards"]
+  },
+  {
+    "name": "Changchun_Yatai",
+    "aliases": ["Changchun Yatai", "Changchun Yatai FC", "Yatai"]
+  },
+  {
+    "name": "Chengdu_Rongcheng",
+    "aliases": ["Chengdu Rongcheng", "Chengdu Rongcheng FC", "Phoenixes"]
+  },
+  {
+    "name": "Dalian_Yingbo",
+    "aliases": ["Dalian Yingbo", "Dalian Pro", "Dalian Professional FC"]
+  },
+  {
+    "name": "Henan_Songshan_Longmen",
+    "aliases": ["Henan Songshan Longmen", "Henan SSLM", "Henan FC"]
+  },
+  {
+    "name": "Meizhou_Hakka",
+    "aliases": ["Meizhou Hakka", "Meizhou Hakka FC", "Hakka"]
+  },
+  {
+    "name": "Qingdao_Hainiu",
+    "aliases": ["Qingdao Hainiu", "Qingdao Hainiu FC", "Sea Bulls"]
+  },
+  {
+    "name": "Qingdao_West_Coast",
+    "aliases": ["Qingdao West Coast", "Qingdao West Coast FC"]
+  },
+  {
+    "name": "Shandong_Taishan",
+    "aliases": ["Shandong Taishan", "Shandong Taishan FC", "Team of Mount Tai"]
+  },
+  {
+    "name": "Shanghai_Port",
+    "aliases": ["Shanghai Port", "Shanghai Port FC", "Red Eagles"]
+  },
+  {
+    "name": "Shanghai_Shenhua",
+    "aliases": ["Shanghai Shenhua", "Shanghai Shenhua FC", "Flower of Shanghai"]
+  },
+  {
+    "name": "Shenzhen_Xinpengcheng",
+    "aliases": ["Shenzhen Xinpengcheng", "Shenzhen FC"]
+  },
+  {
+    "name": "Tianjin_Jinmen_Tiger",
+    "aliases": ["Tianjin Jinmen Tiger", "Tianjin Jinmen Tiger FC", "Tianjin Tigers"]
+  },
+  {
+    "name": "Wuhan_Three_Towns",
+    "aliases": ["Wuhan Three Towns", "Wuhan Three Towns FC"]
+  },
+  {
+    "name": "Yunnan_Yukun",
+    "aliases": ["Yunnan Yukun", "Yunnan Yukun FC"]
+  },
+  {
+    "name": "Zhejiang_Professional_FC",
+    "aliases": ["Zhejiang Professional FC", "Zhejiang FC", "Green Giants"]
+  },
+
+  {
+    "name": "Albirex_Niigata",
+    "aliases": ["Albirex Niigata", "Albirex Niigata FC"]
+  },
+  {
+    "name": "Avispa_Fukuoka",
+    "aliases": ["Avispa Fukuoka", "Avispa Fukuoka FC", "Hornets"]
+  },
+  {
+    "name": "Cerezo_Osaka",
+    "aliases": ["Cerezo Osaka", "Cerezo Osaka FC", "Sakura"]
+  },
+  {
+    "name": "FC_Tokyo",
+    "aliases": ["FC Tokyo", "Tokyo FC"]
+  },
+  {
+    "name": "Fagiano_Okayama",
+    "aliases": ["Fagiano Okayama", "Fagiano Okayama FC"]
+  },
+  {
+    "name": "Gamba_Osaka",
+    "aliases": ["Gamba Osaka", "Gamba Osaka FC", "Nerazzurri"]
+  },
+  {
+    "name": "Kashima_Antlers",
+    "aliases": ["Kashima Antlers", "Kashima Antlers FC", "Antlers"]
+  },
+  {
+    "name": "Kashiwa_Reysol",
+    "aliases": ["Kashiwa Reysol", "Kashiwa Reysol FC", "Reysol"]
+  },
+  {
+    "name": "Kawasaki_Frontale",
+    "aliases": ["Kawasaki Frontale", "Kawasaki Frontale FC", "Frontale"]
+  },
+  {
+    "name": "Kyoto_Sanga",
+    "aliases": ["Kyoto Sanga", "Kyoto Sanga FC", "Sanga"]
+  },
+  {
+    "name": "Machida_Zelvia",
+    "aliases": ["Machida Zelvia", "FC Machida Zelvia", "Zelvia"]
+  },
+  {
+    "name": "Nagoya_Grampus",
+    "aliases": ["Nagoya Grampus", "Nagoya Grampus Eight", "Grampus"]
+  },
+  {
+    "name": "Sanfrecce_Hiroshima",
+    "aliases": ["Sanfrecce Hiroshima", "Sanfrecce Hiroshima FC", "Sanfrecce"]
+  },
+  {
+    "name": "Shimizu_S_Pulse",
+    "aliases": ["Shimizu S-Pulse", "Shimizu S-Pulse FC", "S-Pulse"]
+  },
+  {
+    "name": "Shonan_Bellmare",
+    "aliases": ["Shonan Bellmare", "Shonan Bellmare FC", "Bellmare"]
+  },
+  {
+    "name": "Tokyo_Verdy_1969",
+    "aliases": ["Tokyo Verdy 1969", "Tokyo Verdy", "Verdy"]
+  },
+  {
+    "name": "Urawa_Red_Diamonds",
+    "aliases": ["Urawa Red Diamonds", "Urawa Reds", "Reds"]
+  },
+  {
+    "name": "Vissel_Kobe",
+    "aliases": ["Vissel Kobe", "Vissel Kobe FC"]
+  },
+  {
+    "name": "Yokohama_F_Marinos",
+    "aliases": ["Yokohama F. Marinos", "Yokohama Marinos", "Marinos"]
+  },
+  {
+    "name": "Yokohama_FC",
+    "aliases": ["Yokohama FC", "Yokohama Football Club"]
+  }
+]

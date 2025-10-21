@@ -8,5 +8,8 @@ public enum Status {
     STALE,
     EXPIRED,
     EXECUTED,
-    FAILED
+    FAILED,
+    INSUFFICIENT_BALANCE,
+    COMPLETED,
+    IN_PROGRESS
 }

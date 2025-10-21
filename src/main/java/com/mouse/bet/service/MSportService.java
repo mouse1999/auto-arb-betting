@@ -3,15 +3,14 @@ package com.mouse.bet.service;
 import com.mouse.bet.detector.ArbDetector;
 
 import com.mouse.bet.enums.*;
+import com.mouse.bet.model.MarketMeta;
 import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.interfaces.OddService;
 import com.mouse.bet.model.NormalizedMarket;
 import com.mouse.bet.model.NormalizedOutcome;
 import com.mouse.bet.model.msport.MSportEvent;
 import com.mouse.bet.model.msport.MsMarket;
-import com.mouse.bet.model.sporty.Market;
-import com.mouse.bet.model.sporty.Outcome;
-import com.mouse.bet.model.sporty.SportyEvent;
+import com.mouse.bet.model.msport.MsOutcome;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +29,8 @@ public class MSportService implements OddService<MSportEvent> {
 
     private final ArbDetector arbDetector;
     private final TeamAliasService teamAliasService;
+
+
     @Override
     public NormalizedEvent convertToNormalEvent(MSportEvent event) {
         if (event == null) {
@@ -39,7 +40,7 @@ public class MSportService implements OddService<MSportEvent> {
 
         String homeTeam = teamAliasService.canonicalOrSelf(event.getHomeTeam());
         String awayTeam = teamAliasService.canonicalOrSelf(event.getAwayTeam());
-        String eventId = generateEventId(event); // Implement this based on your logic
+        String eventId = generateEventId(homeTeam, awayTeam, determineSport(event)); // Implement this based on your logic
         String league = event.getTournament();
 
         log.info("Converting SportyEvent - league: '{}', home: '{}', away: '{}'", league, homeTeam, awayTeam);
@@ -47,15 +48,16 @@ public class MSportService implements OddService<MSportEvent> {
         // Get all three maps: odds, status, and cashout
         Map<String, String> rawOddsMap = convertMarketsToOddsMap(event.getMarkets());
         Map<String, Integer> statusMap = mapOutcomeStatus(event.getMarkets());
+        Map<String, MarketMeta> metaMap = buildMetaMap(event.getMarkets());
 
 
-        log.info("Converted maps - odds and status");
+        log.info("Converted maps - odds={}, status={}, meta={}", rawOddsMap.size(), statusMap.size(), metaMap.size());
 
-        // Pass all three maps to normalization
         List<NormalizedMarket> markets = normalizeMarkets(
                 rawOddsMap,
                 statusMap,
-                BookMaker.SPORTY_BET,
+                metaMap,
+                BookMaker.M_SPORT,
                 eventId,
                 homeTeam,
                 awayTeam,
@@ -68,7 +70,7 @@ public class MSportService implements OddService<MSportEvent> {
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
                 .league(league)
-                .sport(determineSport(event))
+                .sportEnum(determineSport(event))
                 .bookie(BookMaker.SPORTY_BET)
                 .markets(markets)
                 .build();
@@ -124,12 +126,31 @@ public class MSportService implements OddService<MSportEvent> {
         return statusMap;
     }
 
+
+    /** Build meta map keyed by providerKey (marketId + specifiers + outcomeDesc). */
+    public Map<String, MarketMeta> buildMetaMap(List<MsMarket> markets) {
+        if (markets == null) return Map.of();
+        return markets.stream()
+                .flatMap(market -> market.getOutcomes().stream().map(outcome -> {
+                    String key = generateProviderKey(market, outcome);
+                    return Map.entry(key, new MarketMeta(
+                            market.getName(),
+                            market.getTitle(),
+                            market.getGroup(),
+                            market.getSpecifiers(),
+                            market.getId()+""
+                    ));
+                }))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+    }
+
     /**
      * Updated method signature to accept all three maps
      */
     public List<NormalizedMarket> normalizeMarkets(
             Map<String, String> rawOdds,
             Map<String, Integer> statusMap,
+            Map<String, MarketMeta> metaMap,
             BookMaker bookmaker,
             String eventId,
             String homeTeam,
@@ -140,35 +161,22 @@ public class MSportService implements OddService<MSportEvent> {
         log.info("Normalizing markets - bookmaker='{}', eventId='{}', league='{}', home='{}', away='{}'",
                 bookmaker, eventId, league, homeTeam, awayTeam);
 
-        if (rawOdds == null || rawOdds.isEmpty()) {
-            log.info("Raw odds map is empty or null, returning empty list");
-            return List.of();
-        }
+        if (rawOdds == null || rawOdds.isEmpty()) return List.of();
 
-        // Group by category
-        Map<MarketCategory, List<String>> groupedByCategory = rawOdds.keySet()
-                .stream()
+        // Group by category from MSportMarketType (NOT SportyMarketType)
+        Map<MarketCategory, List<String>> groupedByCategory = rawOdds.keySet().stream()
                 .filter(key -> MSportMarketType.safeFromProviderKey(key).isPresent())
-                .collect(Collectors.groupingBy(key ->
-                        SportyMarketType.fromProviderKey(key).getCategory()
-                ));
+                .collect(Collectors.groupingBy(key -> MSportMarketType.fromProviderKey(key).getCategory()));
 
         log.info("Grouped markets into {} categories", groupedByCategory.size());
 
-        // Create normalized markets
         List<NormalizedMarket> normalizedMarkets = groupedByCategory.entrySet().stream()
-                .flatMap(categoryEntry -> {
-                    MarketCategory category = categoryEntry.getKey();
-                    List<String> marketKeys = categoryEntry.getValue();
-                    log.info("Processing category '{}', keys count: {}", category, marketKeys.size());
-
+                .flatMap(entry -> {
+                    MarketCategory category = entry.getKey();
+                    List<String> marketKeys = entry.getValue();
                     return (shouldGroupMarket(category)
-                            ? createGroupedMarket(
-                            category, marketKeys, rawOdds, statusMap,
-                            eventId, league, event)
-                            : createIndividualMarkets(
-                            marketKeys, rawOdds, statusMap,
-                            eventId, league, event)
+                            ? createGroupedMarket(category, marketKeys, rawOdds, statusMap, metaMap, eventId, league, event)
+                            : createIndividualMarkets(marketKeys, rawOdds, statusMap, metaMap, eventId, league, event)
                     ).stream();
                 })
                 .collect(Collectors.toList());
@@ -184,36 +192,23 @@ public class MSportService implements OddService<MSportEvent> {
             List<String> marketKeys,
             Map<String, String> rawOdds,
             Map<String, Integer> statusMap,
+            Map<String, MarketMeta> metaMap,
             String eventId,
             String leagueName,
-
             MSportEvent event) {
 
-        log.info("Creating individual markets, keys count: {}", marketKeys.size());
+        return marketKeys.stream().map(key -> {
+            MSportMarketType marketType = MSportMarketType.fromProviderKey(key);
+            String odds  = rawOdds.get(key);
+            Integer st   = statusMap.getOrDefault(key, 0);
+            MarketMeta mm = metaMap.get(key);
 
-        List<NormalizedMarket> markets = marketKeys.stream()
-                .map(key -> {
-                    SportyMarketType marketType = SportyMarketType.fromProviderKey(key);
-                    String odds = rawOdds.get(key);
-                    Integer status = statusMap.getOrDefault(key, 0);
+            NormalizedOutcome outcome = createNormalizedOutcome(
+                    marketType, key, odds, st, eventId, leagueName, event, mm
+            );
 
-                    log.debug("Creating individual market - key: '{}', odds: '{}', status: {}",
-                            key, odds, status);
-
-                    NormalizedOutcome outcome = createNormalizedOutcome(
-                            marketType, key, odds, status,
-                            eventId, leagueName, event
-                    );
-
-                    return new NormalizedMarket(
-                            marketType.getCategory(),
-                            List.of(outcome)
-                    );
-                })
-                .collect(Collectors.toList());
-
-        log.info("Created {} individual markets", markets.size());
-        return markets;
+            return new NormalizedMarket(marketType.getCategory(), List.of(outcome));
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -224,27 +219,21 @@ public class MSportService implements OddService<MSportEvent> {
             List<String> marketKeys,
             Map<String, String> rawOdds,
             Map<String, Integer> statusMap,
+            Map<String, MarketMeta> metaMap,
             String eventId,
             String leagueName,
             MSportEvent event) {
 
-        log.info("Creating grouped market for category '{}', keys count: {}", category, marketKeys.size());
+        List<NormalizedOutcome> outcomes = marketKeys.stream().map(key -> {
+            MSportMarketType marketType = MSportMarketType.fromProviderKey(key);
+            String odds  = rawOdds.get(key);
+            Integer st   = statusMap.getOrDefault(key, 0);
+            MarketMeta mm = metaMap.get(key);
 
-        List<NormalizedOutcome> outcomes = marketKeys.stream()
-                .map(key -> {
-                    SportyMarketType marketType = SportyMarketType.fromProviderKey(key);
-                    String odds = rawOdds.get(key);
-                    Integer status = statusMap.getOrDefault(key, 0);
-
-                    log.debug("Adding grouped outcome - key: '{}', odds: '{}', status: {}",
-                            key, odds, status);
-
-                    return createNormalizedOutcome(
-                            marketType, key, odds, status,
-                            eventId, leagueName, event
-                    );
-                })
-                .collect(Collectors.toList());
+            return createNormalizedOutcome(
+                    marketType, key, odds, st, eventId, leagueName, event, mm
+            );
+        }).collect(Collectors.toList());
 
         return List.of(new NormalizedMarket(category, outcomes));
     }
@@ -253,15 +242,15 @@ public class MSportService implements OddService<MSportEvent> {
      * Helper method to create a fully populated NormalizedOutcome
      */
     private NormalizedOutcome createNormalizedOutcome(
-            SportyMarketType marketType,
+            MSportMarketType marketType,
             String providerKey,
             String odds,
             Integer status,
             String eventId,
             String leagueName,
-            MSportEvent event) {
+            MSportEvent event,
+            MarketMeta meta) {
 
-        // Parse odds safely
         BigDecimal oddsValue;
         try {
             oddsValue = new BigDecimal(odds);
@@ -270,39 +259,39 @@ public class MSportService implements OddService<MSportEvent> {
             oddsValue = BigDecimal.ZERO;
         }
 
-
-        OutcomeStatus outcomeStatus = (status == 1)
+        OutcomeStatus outcomeStatus = (status != null && status == 1)
                 ? OutcomeStatus.AVAILABLE
                 : OutcomeStatus.SUSPENDED;
 
-        // Extract outcome description from provider key
         String outcomeDesc = extractOutcomeDescription(providerKey, marketType);
 
         return NormalizedOutcome.builder()
-                // Core identifiers
                 .outcomeId(providerKey)
-                .eventId(eventId)
+                .eventId(event.getEventId())
+                .normalEventId(eventId)
                 .marketType(marketType)
                 .league(leagueName)
                 .odds(oddsValue)
                 .bookmaker(BookMaker.M_SPORT)
                 .homeTeam(event.getHomeTeam())
                 .awayTeam(event.getAwayTeam())
-                .outcomeDescription(outcomeDesc) // Winning Team (Away)
+                .outcomeDescription(outcomeDesc)
                 .isActive(true)
-                .marketName(marketType.getNormalizedName())
-                .sport(determineSport(event))
+                .sportEnum(determineSport(event))
                 .outcomeStatus(outcomeStatus)
                 .matchStatus(extractMatchStatus(event))
                 .setScore(String.valueOf(event.getAllScores()))
                 .gameScore(extractScore(event))
                 .period(extractPeriod(event))
                 .playedSeconds(event.getPlayedTime())
+                .providerMarketName(meta != null ? meta.name()  : null)
+                .providerMarketTitle(meta != null ? meta.title() : null)
+                .marketId(String.valueOf(meta != null ? meta.marketId() : null))
                 .build();
     }
 
     private String extractPeriod(MSportEvent event) {
-        return event.getAllScores().size() + "";
+        return event.getAllScores() == null ? "": event.getAllScores().size()+"";
     }
 
     /**
@@ -314,7 +303,7 @@ public class MSportService implements OddService<MSportEvent> {
      */
     private String extractMatchStatus(MSportEvent event) {
         List<List<String>> gameScoreList = event.getAllScores();
-        
+
         if (gameScoreList == null || gameScoreList.isEmpty()) {
             return null;
         }
@@ -384,7 +373,7 @@ public class MSportService implements OddService<MSportEvent> {
     /**
      * Extract outcome description from provider key
      */
-    private String extractOutcomeDescription(String providerKey, SportyMarketType marketType) {
+    private String extractOutcomeDescription(String providerKey, MSportMarketType marketType) {
         return  marketType.getNormalizedName();
         //TODO
     }
@@ -392,8 +381,8 @@ public class MSportService implements OddService<MSportEvent> {
     /**
      * Generate event ID based on your business logic
      */
-    private String generateEventId(SportyEvent event) {
-        return null;
+    private String generateEventId(String homeTeam, String awayTeam, SportEnum sportEnum) {
+        return sportEnum.getName() + "|" + homeTeam + "|" + awayTeam;
 
     }
 
@@ -409,11 +398,11 @@ public class MSportService implements OddService<MSportEvent> {
         }
     }
 
-    private String generateProviderKey(Market market, Outcome outcome) {
-        String key = SportyMarketType.generateProviderKey(
-                market.getId(),
-                market.getSpecifier(),
-                outcome.getDesc().trim().toUpperCase().replaceAll("\\s+", "_")
+    private String generateProviderKey(MsMarket market, MsOutcome outcome) {
+        String key = MSportMarketType.generateProviderKey(
+                market.getId()+"",
+                market.getSpecifiers(),
+                outcome.getDescription().trim().toUpperCase().replaceAll("\\s+", "_")
         );
         log.debug("Generated provider key: {}", key);
         return key;
@@ -438,12 +427,12 @@ public class MSportService implements OddService<MSportEvent> {
         return shouldGroup;
     }
 
-    private Sport determineSport(MSportEvent event) {
+    private SportEnum determineSport(MSportEvent event) {
 
         return switch (event.getSport()) {
-            case "Basketball" -> Sport.BASKETBALL;
-            case "Table Tennis" -> Sport.TABLE_TENNIS;
-            default -> Sport.FOOTBALL;
+            case "Basketball" -> SportEnum.BASKETBALL;
+            case "Table Tennis" -> SportEnum.TABLE_TENNIS; //TODO
+            default -> SportEnum.FOOTBALL;
         };
     }
 
@@ -452,6 +441,12 @@ public class MSportService implements OddService<MSportEvent> {
 
     @Override
     public void addNormalizedEventToPool(NormalizedEvent normalizedEvent) {
+
+        if (normalizedEvent == null) {
+            throw new IllegalArgumentException("");
+        }
+        arbDetector.addEventToPool(normalizedEvent);
+
 
     }
 

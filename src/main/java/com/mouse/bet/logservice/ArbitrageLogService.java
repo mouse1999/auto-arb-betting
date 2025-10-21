@@ -17,8 +17,8 @@ public class ArbitrageLogService {
      * Called when a new arbitrage candidate is produced by the detector.
      */
     public void logArb(Arb arb) {
-        log.info("ARB DETECTED | eventId={} league={} market={} selection={} profitPercentage={} lastSeen={} shouldBet={}",
-                arb.getEventId(), arb.getLeague(), arb.getMarketType(), arb.getSelectionKey(),
+        log.info("ARB DETECTED | eventId={} league={} selection={} profitPercentage={} lastSeen={} shouldBet={}",
+                arb.getArbId(), arb.getLeague(), arb.getSelectionKey(),
                 arb.getPeakProfitPercentage(), arb.getLastSeenAt(), arb.isShouldBet());
 
         metricService.recordMetric("arb.detected.count", 1);
@@ -32,7 +32,7 @@ public class ArbitrageLogService {
      */
     public void logFiltered(Arb arb, String reason) {
         log.debug("ARB FILTERED | reason={} eventId={} market={} ",
-                reason, arb.getEventId(), arb.getMarketType());
+                reason, arb.getArbId());
         metricService.recordMetric("arb.filtered.count", 1);
     }
 
@@ -40,10 +40,10 @@ public class ArbitrageLogService {
      * Called when an Arb cannot be funded across bookies.
      */
     public void logInsufficientFunds(Arb arb) {
-        log.warn("Insufficient Fund in one or both Bookmaker | eventId={} legA={} legB={} requiredAStake={} requiredBStake={}",
-                arb.getEventId(),
-                safeLeg(arb.getLegA()), safeLeg(arb.getLegB()),
-                arb.getStakeA(), arb.getStakeB());
+//        log.warn("Insufficient Fund in one or both Bookmaker | eventId={} legA={} legB={} requiredAStake={} requiredBStake={}",
+//                arb.getNormalEventId(),
+//                safeLeg(arb.getLegA()), safeLeg(arb.getLegB()),
+//                arb.getStakeA(), arb.getStakeB());
         metricService.recordMetric("arb.unfunded.count", 1);
     }
 

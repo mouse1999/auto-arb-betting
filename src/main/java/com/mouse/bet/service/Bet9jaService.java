@@ -1,8 +1,10 @@
 package com.mouse.bet.service;
 
+import com.mouse.bet.detector.ArbDetector;
 import com.mouse.bet.enums.*;
-import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.interfaces.OddService;
+import com.mouse.bet.model.MarketMeta;
+import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.model.NormalizedMarket;
 import com.mouse.bet.model.NormalizedOutcome;
 import com.mouse.bet.model.bet9ja.Bet9jaEvent;
@@ -10,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -21,103 +22,83 @@ import java.util.stream.Collectors;
 @Slf4j
 public class Bet9jaService implements OddService<Bet9jaEvent> {
 
+    private final ArbDetector arbDetector;
+
     private final TeamAliasService teamAliasService;
-    private static final Pattern TEAM_SPLIT_PATTERN = Pattern.compile("\\s+vs\\.?\\s+", Pattern.CASE_INSENSITIVE);
+
+    /** e.g. "Team A vs Team B" or "Team A vs. Team B" */
+    private static final Pattern TEAM_SPLIT_PATTERN = Pattern.compile("\\s+-\\.?\\s+", Pattern.CASE_INSENSITIVE);
+
     @Override
     public NormalizedEvent convertToNormalEvent(Bet9jaEvent event) {
         log.info("Normalizing Bet9jaEvent: {}", event);
+        if (event == null) throw new RuntimeException("Bet9jaEvent cannot be null");
 
-        if (event == null) {
-            throw new RuntimeException("");
-        }
+        String leagueRaw = event.getEventHeader().getCompetition().getDisplayName();
+        String league = normalizeLeague(leagueRaw);
+
+        String[] teams = parseTeams(event.getEventHeader().getDisplayName());
+        String homeTeam = teamAliasService.canonicalOrSelf(normalizeTeamName(teams[0]));
+        String awayTeam = teamAliasService.canonicalOrSelf(normalizeTeamName(teams[1]));
+
+        SportEnum sportEnum = determineSport(event);
+        String eventId = generateEventId(homeTeam, awayTeam, sportEnum);
+
+        log.info("Normalized - league='{}', home='{}', away='{}', eventId='{}'", league, homeTeam, awayTeam, eventId);
 
 
-            String league = normalizeLeague(event.getEventHeader().getCompetition().getDisplayName());
-            String[] teams = parseTeams(event.getEventHeader().getDisplayName());
-            String homeTeam = teamAliasService.canonicalOrSelf(normalizeTeamName(teams[0]));
-            String awayTeam = teamAliasService.canonicalOrSelf(normalizeTeamName(teams[1]));
+        Map<String, String> rawOddsMap = convertToOddsMap(event.getOdds());
+        Map<String, Integer> statusMap = mapOutcomeStatus(event.getOdds());
+        Map<String, Integer> cashOutMap = mapOutcomeCashOut(event.getOdds());
+        Map<String, MarketMeta> metaMap = buildMetaMapFromKeys(rawOddsMap);
 
-            String eventId = generateEventId(homeTeam, awayTeam);
+        log.info("Converted maps - odds: {}, status: {}, cashout: {}, meta: {}",
+                rawOddsMap.size(), statusMap.size(), cashOutMap.size(), metaMap.size());
 
-            log.info("Normalized - league: '{}', home: '{}', away: '{}', eventId: '{}'",
-                    league, homeTeam, awayTeam, eventId);
+        List<NormalizedMarket> markets = normalizeMarkets(
+                rawOddsMap, statusMap, cashOutMap, metaMap,
+                BookMaker.BET9JA, eventId, league, homeTeam, awayTeam, event
+        );
+        log.info("Normalized {} markets for Bet9jaEvent", markets.size());
 
-            // Convert raw odds to maps
-            Map<String, String> rawOddsMap = convertToOddsMap(event.getOdds());
-            Map<String, Integer> statusMap = mapOutcomeStatus(event.getOdds());
-            Map<String, Integer> cashOutMap = mapOutcomeCashOut(event.getOdds());
-
-            log.info("Converted maps - odds: {}, status: {}, cashout: {}",
-                    rawOddsMap.size(), statusMap.size(), cashOutMap.size());
-
-            // Normalize markets with all data
-            List<NormalizedMarket> markets = normalizeMarkets(
-                    rawOddsMap,
-                    statusMap,
-                    cashOutMap,
-                    BookMaker.BET9JA,
-                    eventId,
-                    league,
-                    homeTeam,
-                    awayTeam,
-                    event
-            );
-
-            log.info("Normalized {} markets for Bet9jaEvent", markets.size());
-
-            return NormalizedEvent.builder()
-                    .eventId(eventId)
-                    .eventName(homeTeam + " vs " + awayTeam)
-                    .homeTeam(homeTeam)
-                    .awayTeam(awayTeam)
-                    .league(league)
-                    .sport(determineSport(event))
-                    .bookie(BookMaker.BET9JA)
-                    .markets(markets)
-                    .build();
-
+        return NormalizedEvent.builder()
+                .eventId(eventId)
+                .eventName(homeTeam + " vs " + awayTeam)
+                .homeTeam(homeTeam)
+                .awayTeam(awayTeam)
+                .league(league)
+                .sportEnum(sportEnum)
+                .bookie(BookMaker.BET9JA)
+                .markets(markets)
+                .build();
     }
 
-    /**
-     * Convert raw odds to map of provider keys to odds values
-     */
+
+
+    /** Convert raw Bet9ja odds map to a cleaned odds map (valid odds + known provider keys). */
     private Map<String, String> convertToOddsMap(Map<String, String> rawOdds) {
         log.info("Converting odds to map...");
-
-        if (rawOdds == null || rawOdds.isEmpty()) {
-            log.info("Raw odds is null or empty, returning empty map");
-            return Map.of();
-        }
+        if (rawOdds == null || rawOdds.isEmpty()) return Map.of();
 
         Map<String, String> oddsMap = rawOdds.entrySet().stream()
-                .filter(entry -> isValidOdds(entry.getValue()))
-                .filter(entry -> Bet9jaMarketType.safeFromProviderKey(entry.getKey()).isPresent())
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (a, b) -> a
-                ));
+                .filter(e -> isValidOdds(e.getValue()))
+                .filter(e -> Bet9jaMarketType.safeFromProviderKey(e.getKey()).isPresent())
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
 
         log.info("Converted odds map size: {}", oddsMap.size());
         return oddsMap;
     }
 
-    /**
-     * Map outcome status (active/suspended)
-     */
+    /** Map outcome status for keys we can parse; valid odds → 1 (ACTIVE), else 0 (SUSPENDED). */
     private Map<String, Integer> mapOutcomeStatus(Map<String, String> rawOdds) {
         log.info("Mapping outcome status...");
+        if (rawOdds == null || rawOdds.isEmpty()) return Map.of();
 
-        if (rawOdds == null) {
-            return Map.of();
-        }
-
-        // if odds exist and valid, assume active (1), else suspended (0)
         Map<String, Integer> statusMap = rawOdds.entrySet().stream()
-                .filter(entry -> Bet9jaMarketType.safeFromProviderKey(entry.getKey()).isPresent())
+                .filter(e -> Bet9jaMarketType.safeFromProviderKey(e.getKey()).isPresent())
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        entry -> isValidOdds(entry.getValue()) ? 1 : 0,
+                        e -> isValidOdds(e.getValue()) ? 1 : 0,
                         (a, b) -> a
                 ));
 
@@ -125,150 +106,133 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
         return statusMap;
     }
 
-    /**
-     * Map cashout availability
-     */
+    /** Map cashout availability (Bet9ja: default 0 unless you later add a source for it). */
     private Map<String, Integer> mapOutcomeCashOut(Map<String, String> rawOdds) {
         log.info("Mapping cashout availability...");
+        if (rawOdds == null || rawOdds.isEmpty()) return Map.of();
 
-        if (rawOdds == null) {
-            return Map.of();
-        }
-
-        // Bet9ja specific: default cashout to 0 (not available) unless specified
         Map<String, Integer> cashOutMap = rawOdds.keySet().stream()
                 .filter(key -> Bet9jaMarketType.safeFromProviderKey(key).isPresent())
-                .collect(Collectors.toMap(
-                        key -> key,
-                        key -> 0, // Default: cashout not available
-                        (a, b) -> a
-                ));
+                .collect(Collectors.toMap(key -> key, key -> 0, (a, b) -> a));
 
         log.info("Mapped cashout for {} outcomes", cashOutMap.size());
         return cashOutMap;
     }
 
     /**
-     * Normalize markets with full outcome data
+     * Build a minimal MarketMeta per provider key. We infer name/group from Bet9jaMarketType since
+     * Bet9ja odds arrive as flat keys (no Market objects).
      */
+    private Map<String, MarketMeta> buildMetaMapFromKeys(Map<String, String> oddsMap) {
+        if (oddsMap == null || oddsMap.isEmpty()) return Map.of();
+
+        return oddsMap.keySet().stream()
+                .map(key -> {
+                    Bet9jaMarketType mt = Bet9jaMarketType.fromProviderKey(key);
+                    // name/title from normalized market type; group is category name; no specifier/marketId known here
+                    MarketMeta meta = new MarketMeta(
+                            mt.getNormalizedName(),
+                            mt.getNormalizedName(),
+                            mt.getCategory().name(),
+                            null,
+                            null
+                    );
+                    return Map.entry(key, meta);
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+    }
+
     private List<NormalizedMarket> normalizeMarkets(
             Map<String, String> rawOdds,
             Map<String, Integer> statusMap,
             Map<String, Integer> cashOutMap,
+            Map<String, MarketMeta> metaMap,
             BookMaker bookmaker,
             String eventId,
             String leagueName,
             String homeTeam,
             String awayTeam,
-            Bet9jaEvent event) {
+            Bet9jaEvent event
+    ) {
+        log.info("Normalizing markets - bookmaker='{}', eventId='{}', league='{}'", bookmaker, eventId, leagueName);
+        if (rawOdds == null || rawOdds.isEmpty()) return List.of();
 
-        log.info("Normalizing markets - bookmaker='{}', eventId='{}', league='{}'",
-                bookmaker, eventId, leagueName);
-
-        if (rawOdds == null || rawOdds.isEmpty()) {
-            log.info("Raw odds empty, returning empty list");
-            return List.of();
-        }
-
-        // Group by market category
         Map<MarketCategory, List<String>> groupedByCategory = rawOdds.keySet().stream()
                 .filter(key -> Bet9jaMarketType.safeFromProviderKey(key).isPresent())
-                .collect(Collectors.groupingBy(key ->
-                        Bet9jaMarketType.fromProviderKey(key).getCategory()
-                ));
+                .collect(Collectors.groupingBy(key -> Bet9jaMarketType.fromProviderKey(key).getCategory()));
 
         log.info("Grouped into {} categories", groupedByCategory.size());
 
-        // Create normalized markets
-        List<NormalizedMarket> markets = groupedByCategory.entrySet().stream()
+        return groupedByCategory.entrySet().stream()
                 .flatMap(entry -> {
                     MarketCategory category = entry.getKey();
-                    List<String> marketKeys = entry.getValue();
-                    log.debug("Processing category '{}' with {} keys", category, marketKeys.size());
-
+                    List<String> keys = entry.getValue();
                     return (shouldGroupMarket(category)
-                            ? createGroupedMarket(category, marketKeys, rawOdds, statusMap,
-                            cashOutMap, eventId, leagueName, homeTeam, awayTeam, event)
-                            : createIndividualMarkets(marketKeys, rawOdds, statusMap,
-                            cashOutMap, eventId, leagueName, homeTeam, awayTeam, event)
+                            ? createGroupedMarket(category, keys, rawOdds, statusMap, cashOutMap,
+                            metaMap, eventId, leagueName, homeTeam, awayTeam, event)
+                            : createIndividualMarkets(keys, rawOdds, statusMap, cashOutMap,
+                            metaMap, eventId, leagueName, homeTeam, awayTeam, event)
                     ).stream();
                 })
                 .collect(Collectors.toList());
-
-        log.info("Normalized {} markets", markets.size());
-        return markets;
     }
 
-    /**
-     * Create grouped market (multiple outcomes in one market)
-     */
     private List<NormalizedMarket> createGroupedMarket(
             MarketCategory category,
             List<String> marketKeys,
             Map<String, String> rawOdds,
             Map<String, Integer> statusMap,
             Map<String, Integer> cashOutMap,
+            Map<String, MarketMeta> metaMap,
             String eventId,
             String leagueName,
             String homeTeam,
             String awayTeam,
-            Bet9jaEvent event) {
-
-        log.info("Creating grouped market for category '{}'", category);
-
+            Bet9jaEvent event
+    ) {
         List<NormalizedOutcome> outcomes = marketKeys.stream()
                 .map(key -> {
-                    Bet9jaMarketType marketType = Bet9jaMarketType.fromProviderKey(key);
+                    Bet9jaMarketType mt = Bet9jaMarketType.fromProviderKey(key);
                     String odds = rawOdds.get(key);
-                    Integer status = statusMap.getOrDefault(key, 0);
-                    Integer cashOut = cashOutMap.getOrDefault(key, 0);
-
-                    return createNormalizedOutcome(
-                            marketType, key, odds, status, cashOut,
-                            eventId, leagueName, homeTeam, awayTeam, event
-                    );
+                    Integer st = statusMap.getOrDefault(key, 0);
+                    Integer cash = cashOutMap.getOrDefault(key, 0);
+                    MarketMeta meta = metaMap.get(key);
+                    return createNormalizedOutcome(mt, key, odds, st, cash,
+                            eventId, leagueName, homeTeam, awayTeam, event, meta);
                 })
                 .collect(Collectors.toList());
 
         return List.of(new NormalizedMarket(category, outcomes));
     }
 
-    /**
-     * Create individual markets (one outcome per market)
-     */
     private List<NormalizedMarket> createIndividualMarkets(
             List<String> marketKeys,
             Map<String, String> rawOdds,
             Map<String, Integer> statusMap,
             Map<String, Integer> cashOutMap,
+            Map<String, MarketMeta> metaMap,
             String eventId,
             String leagueName,
             String homeTeam,
             String awayTeam,
-            Bet9jaEvent event) {
-
-        log.info("Creating individual markets, count: {}", marketKeys.size());
-
+            Bet9jaEvent event
+    ) {
         return marketKeys.stream()
                 .map(key -> {
-                    Bet9jaMarketType marketType = Bet9jaMarketType.fromProviderKey(key);
+                    Bet9jaMarketType mt = Bet9jaMarketType.fromProviderKey(key);
                     String odds = rawOdds.get(key);
-                    Integer status = statusMap.getOrDefault(key, 0);
-                    Integer cashOut = cashOutMap.getOrDefault(key, 0);
+                    Integer st = statusMap.getOrDefault(key, 0);
+                    Integer cash = cashOutMap.getOrDefault(key, 0);
+                    MarketMeta meta = metaMap.get(key);
 
                     NormalizedOutcome outcome = createNormalizedOutcome(
-                            marketType, key, odds, status, cashOut,
-                            eventId, leagueName, homeTeam, awayTeam, event
+                            mt, key, odds, st, cash, eventId, leagueName, homeTeam, awayTeam, event, meta
                     );
-
-                    return new NormalizedMarket(marketType.getCategory(), List.of(outcome));
+                    return new NormalizedMarket(mt.getCategory(), List.of(outcome));
                 })
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Create fully populated NormalizedOutcome
-     */
     private NormalizedOutcome createNormalizedOutcome(
             Bet9jaMarketType marketType,
             String providerKey,
@@ -279,19 +243,23 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
             String leagueName,
             String homeTeam,
             String awayTeam,
-            Bet9jaEvent event) {
-
+            Bet9jaEvent event,
+            MarketMeta meta
+    ) {
         BigDecimal oddsValue;
         try {
             oddsValue = new BigDecimal(odds);
-        } catch (NumberFormatException e) {
+        } catch (Exception e) {
             log.error("Failed to parse odds '{}' for key '{}'", odds, providerKey);
             oddsValue = BigDecimal.ZERO;
         }
 
-        OutcomeStatus outcomeStatus = (status == 1)
+        OutcomeStatus outcomeStatus = (status != null && status == 1)
                 ? OutcomeStatus.AVAILABLE
                 : OutcomeStatus.SUSPENDED;
+
+        // For Bet9ja, the outcome description usually lives inside the provider key; we present normalized name.
+        String outcomeDesc = marketType.getNormalizedName();
 
         return NormalizedOutcome.builder()
                 .outcomeId(providerKey)
@@ -303,57 +271,55 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
                 .eventName(event.getEventHeader().getDisplayName())
-                .outcomeDescription(marketType.getNormalizedName())
-                .isActive(status == 1)
-                .marketName(marketType.getNormalizedName())
-                .sport(determineSport(event))
+                .outcomeDescription(outcomeDesc)
+                .isActive(status != null && status == 1)
+                .sportEnum(determineSport(event))
                 .outcomeStatus(outcomeStatus)
                 .cashOutAvailable(cashOut)
+
+                .matchStatus(event.getLiveInplayState().getEventStatus())
+                .setScore(event.getLiveInplayState().getScore().getScoreline())
+                .gameScore(event.getLiveInplayState().getScore().getPeriodScores())
+//                .period(event.getPeriod())
+                .playedSeconds(String.valueOf(event.getLiveInplayState().getClockMinutes()))
+                // Provider meta (best-effort for Bet9ja)
+                .providerMarketName(meta != null ? meta.name() : null)
+                .providerMarketTitle(meta != null ? meta.title() : null)
+                .marketId(meta != null ? String.valueOf(meta.marketId()) : null)
                 .build();
     }
 
-    // Helper methods
 
     private String[] parseTeams(String matchName) {
         if (matchName == null || matchName.trim().isEmpty()) {
             throw new IllegalArgumentException("Match name cannot be null or empty");
         }
-
-        log.info("Parsing teams from: '{}'", matchName);
         String[] teams = TEAM_SPLIT_PATTERN.split(matchName.trim());
-
         if (teams.length != 2) {
             throw new IllegalArgumentException("Invalid match name format: " + matchName);
         }
-
-        log.info("Parsed teams: '{}' vs '{}'", teams[0], teams[1]);
         return teams;
     }
 
     private String normalizeLeague(String leagueName) {
-        if (leagueName == null) {
-            return "UNKNOWN_LEAGUE";
-        }
+        if (leagueName == null) return "UNKNOWN_LEAGUE";
         return leagueName.trim().toUpperCase().replaceAll("\\s+", "_");
     }
 
     private String normalizeTeamName(String teamName) {
-        if (teamName == null) {
-            return "UNKNOWN_TEAM";
-        }
+        if (teamName == null) return "UNKNOWN_TEAM";
         return teamName.trim();
     }
 
-
-
-    private String generateEventId(String home, String away) {
-        return String.format("%s|%s", home, away);
+    /** SPORT|HOME|AWAY (keeps your Bet9ja signature but more informative). */
+    private String generateEventId(String home, String away, SportEnum sportEnum) {
+        return sportEnum.getName() + "|" + home + "|" + away;
     }
 
     private boolean isValidOdds(String odds) {
         try {
-            BigDecimal value = new BigDecimal(odds);
-            return value.compareTo(BigDecimal.ZERO) > 0;
+            BigDecimal v = new BigDecimal(odds);
+            return v.compareTo(BigDecimal.ZERO) > 0;
         } catch (Exception e) {
             log.warn("Invalid odds '{}': {}", odds, e.getMessage());
             return false;
@@ -376,17 +342,23 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
         ).contains(category);
     }
 
-    private Sport determineSport(Bet9jaEvent event) {
-
-        return switch (event.getEventHeader().getCompetition().getSportName()) {
-            case "Basketball" -> Sport.BASKETBALL;
-            case "Table Tennis" -> Sport.TABLE_TENNIS;
-            default -> Sport.FOOTBALL;
+    private SportEnum determineSport(Bet9jaEvent event) {
+        String sportName = event.getEventHeader().getCompetition().getSportName();
+        return switch (sportName) {
+            case "Basketball" -> SportEnum.BASKETBALL;
+            case "Table Tennis" -> SportEnum.TABLE_TENNIS;
+            default -> SportEnum.FOOTBALL;
         };
     }
 
+
     @Override
     public void addNormalizedEventToPool(NormalizedEvent normalizedEvent) {
+        if(normalizedEvent == null) {
+            throw new IllegalArgumentException("");
+        }
+        arbDetector.addEventToPool(normalizedEvent);
+        //check if the event was missed in the previous execution
 
     }
 }

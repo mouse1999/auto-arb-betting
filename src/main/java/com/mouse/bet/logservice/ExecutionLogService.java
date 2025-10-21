@@ -22,10 +22,10 @@ public class ExecutionLogService {
 
     /** Call when you begin trying to place an arb's legs. */
     public Instant logExecutionStart(Arb arb, BookMaker bookMaker) {
-        log.info("EXECUTION START | eventId={} market={} selection={} Bookmaker={} stake={}",
-                arb.getEventId(), arb.getMarketType(), arb.getSelectionKey(),
-                bookMaker, arb.getLegA().getBookmaker() == bookMaker ?
-                        arb.getLegA().getStake() : arb.getLegB().getStake());
+//        log.info("EXECUTION START | eventId={} market={} selection={} Bookmaker={} stake={}",
+//                arb.getNormalEventId(), arb.getSelectionKey(),
+//                bookMaker, arb.getLegA().getBookmaker() == bookMaker ?
+//                        arb.getLegA().getStake() : arb.getLegB().getStake());
         metricService.recordMetric("arb.exec."+bookMaker+".start.count", 1);
         return Instant.now();
     }
@@ -35,8 +35,7 @@ public class ExecutionLogService {
         long ms = startedAt == null ? 0 : Duration.between(startedAt, Instant.now()).toMillis();
         log.info("EXECUTION {} |  eventId={} market={} tookMs={} expectedProfit={}",
                 success ? BetLegStatus.PLACED : BetLegStatus.FAILED,
-                arb.getEventId(),
-                arb.getMarketType(),
+                arb.getArbId(),
                 ms,
                 safe(arb.getProfitPercentage()));
 
@@ -50,22 +49,20 @@ public class ExecutionLogService {
         log.info("LEG ATTEMPT | bookMaker={} odds={} plannedStake={} marketCategory={} selection={} eventId={}",
                 safeBookie(leg), leg == null ? null : leg.getOdds(),
                 safe(plannedStake),
-                leg == null ? null : leg.getMarketType().getCategory(),
-                leg == null ? null : leg.getMarketType(),
-                arb.getEventId());
+                arb.getArbId());
         metricService.recordMetric("arb.exec."+leg.getBookmaker()+".leg.attempt.count", 1);
     }
 
     public void logLegSuccess(Arb arb, BetLeg leg, String betId, long latencyMs, BigDecimal stakedAmount) {
         log.info("LEG SUCCESS | bookie={} betId={} latencyMs={} eventId={} stakedAmount={}",
-                leg.getBookmaker(), betId, latencyMs, arb.getEventId(), stakedAmount);
+                leg.getBookmaker(), betId, latencyMs, arb.getArbId(), stakedAmount);
         metricService.recordMetric("arb.exec"+leg.getBookmaker()+".leg.success.count", 1);
         metricService.recordMetric("arb.exec"+leg.getBookmaker()+".leg.stake_amount", stakedAmount);
         metricService.recordMetric("arb.exec"+leg.getBookmaker()+".leg.latency_ms", latencyMs);
     }
 
     public void logLegFailure(Arb arb, BetLeg leg, String reason, Throwable t) {
-        log.warn("LEG FAIL | bookie={} reason={} eventId={}", leg.getBookmaker(), reason, arb.getEventId(), t);
+        log.warn("LEG FAIL | bookie={} reason={} eventId={}", leg.getBookmaker(), reason, arb.getArbId(), t);
         metricService.recordMetric("arb.exec"+leg.getBookmaker()+".leg.fail.count", 1);
     }
 

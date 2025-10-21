@@ -1,12 +1,10 @@
 package com.mouse.bet.utils;
 
 import com.mouse.bet.config.ArbConfig;
+import com.mouse.bet.converter.ModelConverter;
 import com.mouse.bet.entity.Arb;
 import com.mouse.bet.entity.BetLeg;
-import com.mouse.bet.enums.BetLegStatus;
-import com.mouse.bet.enums.BookMaker;
-import com.mouse.bet.enums.MarketCategory;
-import com.mouse.bet.enums.OutcomeType;
+import com.mouse.bet.enums.*;
 import com.mouse.bet.finance.WalletService;
 import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.model.NormalizedMarket;
@@ -158,11 +156,12 @@ public class ArbFactory {
             NormalizedOutcome oppositeOutcome
     ) {
         BigDecimal profit = calculateProfitPercent(mainOutcome.getOdds(), oppositeOutcome.getOdds());
-        String eventId = mainOutcome.getEventId();
+        String eventId = mainOutcome.getNormalEventId();
         String leagueName = mainOutcome.getLeague();
-        BigDecimal stakeA = ArbCalculator.stakeForBookieA(mainOutcome.getOdds(), oppositeOutcome.getOdds(), arbConfig.getTOTAL_STAKE());
-        BigDecimal stakeB = ArbCalculator.stakeForBookieB(mainOutcome.getOdds(), oppositeOutcome.getOdds(), arbConfig.getTOTAL_STAKE());
-        boolean shouldBet = checkBothBookMakerFunds(mainOutcome.getBookmaker(), oppositeOutcome.getBookmaker(), stakeA, stakeB);
+        BigDecimal rawStakeA = ArbCalculator.stakeForBookieA(mainOutcome.getOdds(), oppositeOutcome.getOdds(), arbConfig.getTOTAL_STAKE());
+        BigDecimal rawStakeB = ArbCalculator.stakeForBookieB(mainOutcome.getOdds(), oppositeOutcome.getOdds(), arbConfig.getTOTAL_STAKE());
+        boolean shouldBet = checkBothBookMakerFunds(mainOutcome.getBookmaker(), oppositeOutcome.getBookmaker(), rawStakeA, rawStakeB);
+
 
 
         log.debug("Creating arb for eventId={} league={} category={} between {}@{} and {}@{} profit={}%",
@@ -173,77 +172,26 @@ public class ArbFactory {
                 oppositeOutcome.getBookmaker(), oppositeOutcome.getOdds(),
                 profit);
 
-        BetLeg legA = BetLeg.builder()
-                .sport(mainOutcome.getSport())
-                .attemptCount(0)
-                .balanceBeforeBet(walletService.getBalance(mainOutcome.getBookmaker()))
-                .isPrimaryLeg(true)
-                .stake(ArbCalculator.roundStakeForAntiDetection(stakeA))
-                .rawStake(stakeA)
-                .potentialPayout(mainOutcome.getOdds().multiply(stakeA))
-                .awayTeam(mainOutcome.getAwayTeam())
-                .bookmaker(mainOutcome.getBookmaker())
-                .odds(mainOutcome.getOdds())
-                .marketType(mainOutcome.getMarketType())
-                .eventId(eventId)
-                .homeTeam(mainOutcome.getHomeTeam())
-                .league(leagueName)
-                .status(BetLegStatus.PENDING)
-                .cashOutAvailable(mainOutcome.getCashOutAvailable())
-                .outcomeDescription(mainOutcome.getOutcomeDescription())
-                .outcomeId(mainOutcome.getOutcomeId())
-                .period(mainOutcome.getPeriod())
-                .matchStatus(mainOutcome.getMatchStatus())
-                .profitPercent(profit)
-                .build();
-
-        BetLeg legB = BetLeg.builder()
-                .sport(oppositeOutcome.getSport())
-                .attemptCount(0)
-                .balanceBeforeBet(walletService.getBalance(oppositeOutcome.getBookmaker()))
-                .isPrimaryLeg(false)
-                .stake(ArbCalculator.roundStakeForAntiDetection(stakeB))
-                .rawStake(stakeB)
-                .potentialPayout(oppositeOutcome.getOdds().multiply(stakeB))
-                .awayTeam(oppositeOutcome.getAwayTeam())
-                .bookmaker(oppositeOutcome.getBookmaker())
-                .odds(oppositeOutcome.getOdds())
-                .marketType(oppositeOutcome.getMarketType())
-                .eventId(eventId)
-                .homeTeam(oppositeOutcome.getHomeTeam())
-                .league(leagueName)
-                .status(BetLegStatus.PENDING)
-                .cashOutAvailable(oppositeOutcome.getCashOutAvailable())
-                .outcomeDescription(oppositeOutcome.getOutcomeDescription())
-                .outcomeId(oppositeOutcome.getOutcomeId())
-                .period(oppositeOutcome.getPeriod())
-                .matchStatus(oppositeOutcome.getMatchStatus())
-                .profitPercent(profit)
-                .build();
+        BetLeg legA = ModelConverter.fromOutcome(mainOutcome, null, rawStakeA, true);
+        BetLeg legB = ModelConverter.fromOutcome(oppositeOutcome, null, rawStakeB, false);
 
 
         return  Arb.builder()
-                .sport(mainOutcome.getSport() == oppositeOutcome.getSport()
-                        ? mainOutcome.getSport():
-                        oppositeOutcome.getSport())
+                .sportEnum(mainOutcome.getSportEnum())
                 .league(leagueName)
-                .eventId(eventId)
-                .homeTeam(mainOutcome.getHomeTeam())
-                .awayTeam(mainOutcome.getAwayTeam())
-                .marketType(mainOutcome.getMarketType())
+                .arbId(createArbId(category, eventId))
                 .period(mainOutcome.getPeriod())
+                .status(shouldBet ? Status.ACTIVE: Status.INSUFFICIENT_BALANCE)
                 .eventStartTime(Instant.ofEpochMilli(mainOutcome.getEventStartTime()))
-
                 .setScore(mainOutcome.getSetScore())
                 .gameScore(mainOutcome.getGameScore())
                 .matchStatus(mainOutcome.getMatchStatus())
                 .playedSeconds(mainOutcome.getPlayedSeconds())
-                .stakeA(stakeA)
-                .stakeB(stakeB)
+                .stakeA(rawStakeA)
+                .stakeB(rawStakeB)
+                .legs(List.of(legA, legB))
                 .profitPercentage(profit)
                 .shouldBet(shouldBet)
-                .legA(legA)
-                .legB(legB)
                 .build();
     }
 
@@ -274,5 +222,9 @@ public class ArbFactory {
         return walletService.canAfford(bookMakerA, stakeA) && walletService.canAfford(bookMakerB, stakeB);
 
 
+    }
+
+    private String createArbId(MarketCategory category, String eventId) {
+        return eventId + category.name();
     }
 }

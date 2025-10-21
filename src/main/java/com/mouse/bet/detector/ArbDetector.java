@@ -60,7 +60,7 @@ public class ArbDetector {
             return;
         }
 
-        event.setLastUpdated(Instant.now());
+//        event.setLastUpdated(Instant.now());
         String eventId = event.getEventId();
 
         log.debug("Adding event from {} for eventId={}", event.getBookie(), eventId);
@@ -159,55 +159,27 @@ public class ArbDetector {
      */
     private void processArb(Arb arb) {
         try {
-            log.debug("Processing arb eventId={}, profit={}", arb.getEventId(), arb.getProfitPercentage());
+            log.debug("Processing arb arbId={}, profit={}", arb.getArbId(), arb.getProfitPercentage());
 
-            boolean hasSufficientBalance = checkBalance(arb);
-            arb.setShouldBet(hasSufficientBalance);
-            arb.setStatus(hasSufficientBalance ? Status.ACTIVE : Status.INSUFFICIENT_BALANCE);
-            arb.markSeen(Instant.now());
 
-            if (!hasSufficientBalance) {
-                log.warn("Insufficient balance for eventId={}", arb.getEventId());
+            if (arb.getStatus() == Status.INSUFFICIENT_BALANCE) {
+                log.warn("Insufficient balance for arbId={}", arb.getArbId());
                 arbitrageLogService.logInsufficientFunds(arb);
             }
 
             arbService.saveArb(arb);
-            log.info("Saved arb eventId={}, shouldBet={}", arb.getEventId(), arb.isShouldBet());
+            log.info("Saved arb arbId={}, status={}", arb.getArbId(), arb.getStatus());
 
         } catch (Exception e) {
-            log.error("Error processing arb eventId={}", arb.getEventId(), e);
-            arbitrageLogService.logError("ArbDetector", "Processing error: " + arb.getEventId(), e);
+            log.error("Error processing arb eventId={}", arb.getArbId(), e);
+            arbitrageLogService.logError("ArbDetector Processing error: " + arb.getArbId(), e);
         }
     }
 
     /**
-     * Check if bookmaker wallets have sufficient balance
+     * Cleanup old events every 3 minute
      */
-    private boolean checkBalance(Arb arb) {
-        if (arb.getLegA() == null || arb.getLegB() == null) {
-            return false;
-        }
-
-        String bookmakerA = arb.getLegA().getBookmaker();
-        String bookmakerB = arb.getLegB().getBookmaker();
-
-        BigDecimal balanceA = walletService.getBalance(bookmakerA);
-        BigDecimal balanceB = walletService.getBalance(bookmakerB);
-
-        boolean sufficientA = balanceA.compareTo(arb.getStakeA()) >= 0;
-        boolean sufficientB = balanceB.compareTo(arb.getStakeB()) >= 0;
-
-        log.debug("Balance check - {}: {}/{}, {}: {}/{}",
-                bookmakerA, balanceA, arb.getStakeA(),
-                bookmakerB, balanceB, arb.getStakeB());
-
-        return sufficientA && sufficientB;
-    }
-
-    /**
-     * Cleanup old events every 3 seconds
-     */
-    @Scheduled(fixedRate = 3000)
+    @Scheduled(fixedRate = 30000)
     public void cleanupOldEvents() {
         Instant cutoff = Instant.now().minusSeconds(EVENT_EXPIRY_SECONDS);
         int removedQueues = 0;

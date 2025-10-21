@@ -8,12 +8,12 @@ import java.util.Optional;
 
 @Getter
 @RequiredArgsConstructor
-public enum Sport {
+public enum SportEnum {
     FOOTBALL("Football"),
 
     BASKETBALL("Basketball"),
 
-    TABLE_TENNIS("TableTennis");
+    TABLE_TENNIS("Table Tennis");
 
     private final String name;
     /**
@@ -21,12 +21,12 @@ public enum Sport {
      * @param name the sport name
      * @return Optional containing the Sport if found
      */
-    public static Optional<Sport> fromName(String name) {
+    public static Optional<SportEnum> fromName(String name) {
         if (name == null || name.isBlank()) {
             return Optional.empty();
         }
 
-        return Arrays.stream(Sport.values())
+        return Arrays.stream(SportEnum.values())
                 .filter(sport -> sport.getName().equalsIgnoreCase(name.trim()))
                 .findFirst();
     }

@@ -48,5 +48,6 @@ class ArbSnapshot {
     private Status status;
 
     @Column(length = 256)
+    @Enumerated(EnumType.STRING)
     private ChangeReason changeReason;
 }

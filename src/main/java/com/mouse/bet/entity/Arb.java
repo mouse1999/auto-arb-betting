@@ -1,13 +1,10 @@
 package com.mouse.bet.entity;
-// ... (imports remain the same) ...
 
 import com.mouse.bet.converter.OddsHistoryConverter;
 import com.mouse.bet.converter.StringListConverter;
 import com.mouse.bet.enums.ChangeReason;
-import com.mouse.bet.enums.MarketCategory;
-import com.mouse.bet.enums.Sport;
+import com.mouse.bet.enums.SportEnum;
 import com.mouse.bet.enums.Status;
-import com.mouse.bet.interfaces.MarketType;
 import com.mouse.bet.model.OddsChange;
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,6 +15,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -25,37 +23,33 @@ import java.util.*;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 @Entity
+@Table(
+        name = "arb",
+        indexes = {
+                @Index(name = "idx_arb_sport", columnList = "sportEnum"),
+                @Index(name = "idx_arb_status_active", columnList = "status,active"),
+                @Index(name = "idx_arb_expires_at", columnList = "expiresAt")
+        }
+)
 @EntityListeners(AuditingEntityListener.class)
 public class Arb {
-
-    @Id
-    @Column(nullable = false, updatable = false)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
-    private Long id;
 
     @Version
     private Integer version;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 64)
-    private Sport sport;
+    private SportEnum sportEnum;
 
     @Column(length = 128)
     private String league;
 
+    /** Business key that already existed in your model */
+    @Id
     @Column(length = 128)
-    private String eventId;
+    private String arbId;
 
-    @Column(length = 128)
-    private String homeTeam;
-
-
-    @Column(length = 128)
-    private String awayTeam;
-
-    @Column(length = 64)
-    private MarketType marketType;
-
+    /** Period/phase (kept on Arb; legs also store period for their own context) */
     @Column(length = 64)
     private String period;
 
@@ -64,29 +58,20 @@ public class Arb {
 
     private Instant eventStartTime;
 
-    /**
-     * Current set/match score (e.g., "0:2" for football/tennis)
-     */
+    /** Current set/match score (e.g., "0:2") */
     @Column(length = 24)
     private String setScore;
 
-    /**
-     * List of scores for each period/half (e.g., ["0:0", "0:2"])
-     * Uses a custom converter to store the list in a single TEXT column.
-     */
-    @Convert(converter =  StringListConverter.class)
-    @Column(columnDefinition = "TEXT") // Use TEXT for potentially long strings of scores
-    private List<String> gameScore; // Field remains List<String> in Java
+    /** Period scores stored as TEXT via converter */
+    @Convert(converter = StringListConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private List<String> gameScore;
 
-    /**
-     * Current match status code (e.g., "H2" for second half)
-     */
+    /** Match status (e.g., "H2") */
     @Column(length = 24)
     private String matchStatus;
 
-    /**
-     * Time elapsed in the current period (e.g., "82:45")
-     */
+    /** Time elapsed in current period */
     @Column(length = 24)
     private String playedSeconds;
 
@@ -103,7 +88,6 @@ public class Arb {
 
     private Instant expiresAt;
     private Integer predictedHoldUpMs;
-
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
@@ -124,114 +108,98 @@ public class Arb {
     private BigDecimal stakeA;
     private BigDecimal stakeB;
 
-    /**
-     * Profit percentage of the arb
-     */
+    /** Profit percentage of the arb */
     private BigDecimal profitPercentage;
 
+    /** Legs (A=primary, B=secondary) */
+    @Builder.Default
+    @OneToMany(
+            mappedBy = "arb",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    @OrderBy("isPrimaryLeg DESC, id ASC")
+    private List<BetLeg> legs = new ArrayList<>();
 
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "bookmaker", column = @Column(name = "leg_a_bookmaker")),
-            @AttributeOverride(name = "odds", column = @Column(name = "leg_a_odds")),
-            @AttributeOverride(name = "rawStake", column = @Column(name = "leg_a_raw_stake")),
-            @AttributeOverride(name = "stake", column = @Column(name = "leg_a_stake")),
-            @AttributeOverride(name = "potentialPayout", column = @Column(name = "leg_a_payout"))
-    })
-    private BetLeg legA;
-
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "bookmaker", column = @Column(name = "leg_b_bookmaker")),
-            @AttributeOverride(name = "odds", column = @Column(name = "leg_b_odds")),
-            @AttributeOverride(name = "rawStake", column = @Column(name = "leg_b_raw_stake")),
-            @AttributeOverride(name = "stake", column = @Column(name = "leg_b_stake")),
-            @AttributeOverride(name = "potentialPayout", column = @Column(name = "leg_b_payout"))
-    })
-    private BetLeg legB;
-
-    private Integer executionAttempts;
-    private Instant lastExecutionAt;
-
-    @Column(length = 24)
-    private String lastExecutionStatus;
-
-    @Column(length = 256)
-    private String lastExecutionMessage;
-
-    /**
-     * Stores historical snapshots of this arbitrage opportunity
-     * Each snapshot captures the complete state when odds changed
-     */
+    /** Historical snapshots */
     @OneToMany(mappedBy = "arb", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("capturedAt DESC")
     @Builder.Default
     private List<ArbSnapshot> history = new ArrayList<>();
 
-    /**
-     * Quick access to odds changes over time
-     * Key: timestamp (epoch millis), Value: OddsChange object
-     * Stored as JSON in a single column for performance
-     */
+    /** Odds changes timeline (JSON) */
     @Column(columnDefinition = "TEXT")
     @Convert(converter = OddsHistoryConverter.class)
     @Builder.Default
     private Map<Long, OddsChange> oddsHistory = new TreeMap<>();
 
-    /**
-     * Count of how many times odds have changed
-     */
+    /** Count of how many times odds have changed */
     @Builder.Default
     @Column(nullable = false)
     private Integer oddsChangeCount = 0;
 
-    /**
-     * Maximum odds observed for leg A
-     */
+    /** Min/Max tracking */
     private BigDecimal maxOddsLegA;
-
-    /**
-     * Minimum odds observed for leg A
-     */
     private BigDecimal minOddsLegA;
-
-    /**
-     * Maximum odds observed for leg B
-     */
     private BigDecimal maxOddsLegB;
-
-    /**
-     * Minimum odds observed for leg B
-     */
     private BigDecimal minOddsLegB;
 
-    /**
-     * Best profit percentage seen during this arb's lifetime
-     */
+    /** Peak profit tracking */
     private BigDecimal peakProfitPercentage;
-
-    /**
-     * Timestamp when peak profit was observed
-     */
     private Instant peakProfitAt;
 
+    /* -------------------- Helpers for legs -------------------- */
 
+    @Transient
+    public Optional<BetLeg> getLegA() {
+        return legs.stream().filter(BetLeg::isPrimaryLeg).findFirst();
+    }
 
-    /**
-     * Capture current state before updating odds
-     * Creates a snapshot and records odds change
-     */
+    @Transient
+    public Optional<BetLeg> getLegB() {
+        return legs.stream().filter(l -> !l.isPrimaryLeg()).findFirst();
+    }
+
+    public void setLegA(BetLeg legA) {
+        legA.setPrimaryLeg(true);
+        attachLeg(legA);
+    }
+
+    public void setLegB(BetLeg legB) {
+        legB.setPrimaryLeg(false);
+        attachLeg(legB);
+    }
+
+    public void attachLeg(BetLeg leg) {
+        if (leg.getArb() != null && leg.getArb() != this) {
+            throw new IllegalStateException("Leg is already attached to another Arb");
+        }
+        leg.setArb(this);
+        // replace existing A/B by role
+        if (leg.isPrimaryLeg()) {
+            getLegA().ifPresent(existing -> legs.remove(existing));
+        } else {
+            getLegB().ifPresent(existing -> legs.remove(existing));
+        }
+        legs.add(leg);
+    }
+
+    /* -------------------- Business logic (adapted) -------------------- */
+
+    /** Capture current state before updating odds */
     public void captureSnapshot(String changeReason) {
-        if (legA == null || legB == null) {
+        Optional<BetLeg> legA = getLegA();
+        Optional<BetLeg> legB = getLegB();
+        if (legA.isEmpty() || legB.isEmpty()) {
             return;
         }
 
-        // Create snapshot
         ArbSnapshot snapshot = ArbSnapshot.builder()
                 .arb(this)
                 .capturedAt(Instant.now())
-                .oddsLegA(legA.getOdds())
-                .oddsLegB(legB.getOdds())
+                .oddsLegA(legA.get().getOdds())
+                .oddsLegB(legB.get().getOdds())
                 .stakeA(stakeA)
                 .stakeB(stakeB)
                 .expectedProfit(profitPercentage)
@@ -245,18 +213,12 @@ public class Arb {
         history.add(snapshot);
     }
 
-
-
-    /**
-     * Update odds and track the change
-     */
+    /** Update odds for both legs and track the change */
     public void updateOdds(BigDecimal newOddsA, BigDecimal newOddsB, String changeReason) {
-        // Capture current state before updating
         captureSnapshot(changeReason);
 
-        // Track odds change
-        BigDecimal oldOddsA = legA != null ? legA.getOdds() : null;
-        BigDecimal oldOddsB = legB != null ? legB.getOdds() : null;
+        BigDecimal oldOddsA = getLegA().map(BetLeg::getOdds).orElse(null);
+        BigDecimal oldOddsB = getLegB().map(BetLeg::getOdds).orElse(null);
 
         OddsChange change = OddsChange.builder()
                 .timestamp(Instant.now())
@@ -272,41 +234,27 @@ public class Arb {
         oddsHistory.put(System.currentTimeMillis(), change);
         oddsChangeCount++;
 
-        // Update current odds
-        if (legA != null) {
-            legA.setOdds(newOddsA);
-        }
-        if (legB != null) {
-            legB.setOdds(newOddsB);
-        }
+        getLegA().ifPresent(leg -> { leg.setOdds(newOddsA); leg.updatePotentialPayout(); });
+        getLegB().ifPresent(leg -> { leg.setOdds(newOddsB); leg.updatePotentialPayout(); });
 
-        // Update min/max tracking
         updateMinMaxOdds(newOddsA, newOddsB);
     }
 
-    /**
-     * Update odds for a single leg
-     */
+    /** Update one leg at a time (A) */
     public void updateLegAOdds(BigDecimal newOdds, String changeReason) {
-        BigDecimal oddsB = legB != null ? legB.getOdds() : BigDecimal.ZERO;
-        updateOdds(newOdds, oddsB, changeReason);
+        BigDecimal other = getLegB().map(BetLeg::getOdds).orElse(BigDecimal.ZERO);
+        updateOdds(newOdds, other, changeReason);
     }
 
-    /**
-     * Update odds for a single leg
-     */
+    /** Update one leg at a time (B) */
     public void updateLegBOdds(BigDecimal newOdds, String changeReason) {
-        BigDecimal oddsA = legA != null ? legA.getOdds() : BigDecimal.ZERO;
-        updateOdds(oddsA, newOdds, changeReason);
+        BigDecimal other = getLegA().map(BetLeg::getOdds).orElse(BigDecimal.ZERO);
+        updateOdds(other, newOdds, changeReason);
     }
 
-    /**
-     * Track peak profit if current profit is higher
-     */
+    /** Track peak profit if current profit is higher */
     public void updatePeakProfit(BigDecimal currentProfitPercentage) {
-        if (currentProfitPercentage == null) {
-            return;
-        }
+        if (currentProfitPercentage == null) return;
 
         if (peakProfitPercentage == null ||
                 currentProfitPercentage.compareTo(peakProfitPercentage) > 0) {
@@ -315,105 +263,70 @@ public class Arb {
         }
     }
 
-    /**
-     * Get the most recent snapshot
-     */
+    /** Most recent snapshot */
     public Optional<ArbSnapshot> getLatestSnapshot() {
-        if (history == null || history.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(history.get(0)); // Already ordered by capturedAt DESC
+        if (history == null || history.isEmpty()) return Optional.empty();
+        return Optional.of(history.get(0)); // ordered DESC
     }
 
-    /**
-     * Get snapshots within a time range
-     */
+    /** Snapshots within time range */
     public List<ArbSnapshot> getSnapshotsBetween(Instant start, Instant end) {
-
-        if (history == null) {
-            return Collections.emptyList();
-        }
-
+        if (history == null || history.isEmpty()) return Collections.emptyList();
         return history.stream()
-                .filter(snapshot -> !snapshot.getCapturedAt().isBefore(start) &&
-                        !snapshot.getCapturedAt().isAfter(end))
-                .toList();
+                .filter(s -> !s.getCapturedAt().isBefore(start) && !s.getCapturedAt().isAfter(end))
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Get recent odds changes (last N)
-     */
-    public List<OddsChange> getRecentOddsChanges(int limit) {
-        if (oddsHistory == null || oddsHistory.isEmpty()) {
-            return Collections.emptyList();
-        }
-
+    /** Recent odds changes (last N) */
+    public List<com.mouse.bet.model.OddsChange> getRecentOddsChanges(int limit) {
+        if (oddsHistory == null || oddsHistory.isEmpty()) return Collections.emptyList();
         return oddsHistory.values().stream()
-                .sorted(Comparator.comparing(OddsChange::getTimestamp).reversed())
+                .sorted(Comparator.comparing(com.mouse.bet.model.OddsChange::getTimestamp).reversed())
                 .limit(limit)
                 .toList();
     }
 
-    /**
-     * Get odds changes within a time range
-     */
-    public List<OddsChange> getOddsChangesBetween(Instant start, Instant end) {
-        if (oddsHistory == null || oddsHistory.isEmpty()) {
-            return Collections.emptyList();
-        }
-
+    /** Odds changes within time range */
+    public List<com.mouse.bet.model.OddsChange> getOddsChangesBetween(Instant start, Instant end) {
+        if (oddsHistory == null || oddsHistory.isEmpty()) return Collections.emptyList();
         long startMillis = start.toEpochMilli();
         long endMillis = end.toEpochMilli();
 
         return oddsHistory.entrySet().stream()
-                .filter(entry -> entry.getKey() >= startMillis && entry.getKey() <= endMillis)
+                .filter(e -> e.getKey() >= startMillis && e.getKey() <= endMillis)
                 .map(Map.Entry::getValue)
-                .sorted(Comparator.comparing(OddsChange::getTimestamp).reversed())
+                .sorted(Comparator.comparing(com.mouse.bet.model.OddsChange::getTimestamp).reversed())
                 .toList();
     }
 
-    /**
-     * Calculate average odds velocity over recent window
-     */
+    /** Average odds velocity over recent window */
     public Double calculateAverageVelocity(int windowMinutes) {
         Instant cutoff = Instant.now().minusSeconds(windowMinutes * 60L);
-        List<OddsChange> recentChanges = getOddsChangesBetween(cutoff, Instant.now());
+        List<com.mouse.bet.model.OddsChange> recent = getOddsChangesBetween(cutoff, Instant.now());
+        if (recent.isEmpty()) return 0.0;
 
-        if (recentChanges.isEmpty()) {
-            return 0.0;
-        }
-
-        double totalDelta = recentChanges.stream()
-                .mapToDouble(change -> {
-                    double deltaA = change.getDeltaA() != null ?
-                            Math.abs(change.getDeltaA().doubleValue()) : 0.0;
-                    double deltaB = change.getDeltaB() != null ?
-                            Math.abs(change.getDeltaB().doubleValue()) : 0.0;
-                    return (deltaA + deltaB) / 2;
+        double totalDelta = recent.stream()
+                .mapToDouble(ch -> {
+                    double dA = ch.getDeltaA() != null ? ch.getDeltaA().abs().doubleValue() : 0.0;
+                    double dB = ch.getDeltaB() != null ? ch.getDeltaB().abs().doubleValue() : 0.0;
+                    return (dA + dB) / 2.0;
                 })
                 .sum();
 
-        long timeSpanSeconds = recentChanges.get(0).getTimestamp().getEpochSecond() -
-                recentChanges.get(recentChanges.size() - 1).getTimestamp().getEpochSecond();
-
-        return timeSpanSeconds > 0 ? totalDelta / timeSpanSeconds : 0.0;
+        long span = recent.get(0).getTimestamp().getEpochSecond()
+                - recent.get(recent.size() - 1).getTimestamp().getEpochSecond();
+        return span > 0 ? totalDelta / span : 0.0;
     }
 
-    /**
-     * Check if odds are trending favorably (increasing)
-     */
+    /** Simple “uptrend” check */
     public boolean isOddsTrendingUp() {
         List<OddsChange> recent = getRecentOddsChanges(3);
-        if (recent.size() < 2) {
-            return false;
-        }
+        if (recent.size() < 2) return false;
 
         return recent.stream()
-                .filter(change -> change.getDeltaA() != null && change.getDeltaB() != null)
-                .allMatch(change ->
-                        change.getDeltaA().compareTo(BigDecimal.ZERO) >= 0 ||
-                                change.getDeltaB().compareTo(BigDecimal.ZERO) >= 0
-                );
+                .filter(ch -> ch.getDeltaA() != null && ch.getDeltaB() != null)
+                .allMatch(ch -> ch.getDeltaA().compareTo(BigDecimal.ZERO) >= 0
+                        || ch.getDeltaB().compareTo(BigDecimal.ZERO) >= 0);
     }
 
     public void markSeen(Instant when) {
@@ -425,32 +338,21 @@ public class Arb {
         return expiresAt != null && now.isAfter(expiresAt);
     }
 
+    /* -------------------- Private helpers -------------------- */
+
     private BigDecimal calculateDelta(BigDecimal oldValue, BigDecimal newValue) {
-        if (oldValue == null || newValue == null) {
-            return BigDecimal.ZERO;
-        }
+        if (oldValue == null || newValue == null) return BigDecimal.ZERO;
         return newValue.subtract(oldValue);
     }
 
     private void updateMinMaxOdds(BigDecimal oddsA, BigDecimal oddsB) {
         if (oddsA != null) {
-            if (maxOddsLegA == null || oddsA.compareTo(maxOddsLegA) > 0) {
-                maxOddsLegA = oddsA;
-            }
-            if (minOddsLegA == null || oddsA.compareTo(minOddsLegA) < 0) {
-                minOddsLegA = oddsA;
-            }
+            if (maxOddsLegA == null || oddsA.compareTo(maxOddsLegA) > 0) maxOddsLegA = oddsA;
+            if (minOddsLegA == null || oddsA.compareTo(minOddsLegA) < 0) minOddsLegA = oddsA;
         }
-
         if (oddsB != null) {
-            if (maxOddsLegB == null || oddsB.compareTo(maxOddsLegB) > 0) {
-                maxOddsLegB = oddsB;
-            }
-            if (minOddsLegB == null || oddsB.compareTo(minOddsLegB) < 0) {
-                minOddsLegB = oddsB;
-            }
+            if (maxOddsLegB == null || oddsB.compareTo(maxOddsLegB) > 0) maxOddsLegB = oddsB;
+            if (minOddsLegB == null || oddsB.compareTo(minOddsLegB) < 0) minOddsLegB = oddsB;
         }
     }
-
-
 }

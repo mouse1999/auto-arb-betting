@@ -2,10 +2,7 @@ package com.mouse.bet.model.sporty;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.mouse.bet.interfaces.Event;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.List;
 
@@ -14,6 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Builder
 public class SportyEvent implements Event {
     private String eventId;
     private String gameId;

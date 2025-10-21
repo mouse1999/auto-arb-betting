@@ -3,6 +3,7 @@ package com.mouse.bet.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mouse.bet.model.profile.TeamAlias;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -18,6 +19,7 @@ import java.util.regex.Pattern; // Use Pattern for efficiency
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class TeamAliasService {
 
     private static final String ALIASES_PATH_DEFAULT = "classpath:static/team_aliases.json";
@@ -31,10 +33,7 @@ public class TeamAliasService {
     private volatile Map<String, String> aliasToCanonicalMap = Map.of(); // Initialize to empty immutable map
     private volatile Set<String> allCanonicalNames = Set.of(); // Initialize to empty immutable set
 
-    public TeamAliasService(ObjectMapper objectMapper, ResourceLoader resourceLoader) {
-        this.objectMapper = objectMapper;
-        this.resourceLoader = resourceLoader;
-    }
+
 
     @PostConstruct
     public void init() {

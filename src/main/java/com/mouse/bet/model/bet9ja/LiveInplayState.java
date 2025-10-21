@@ -3,6 +3,7 @@ package com.mouse.bet.model.bet9ja;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,7 +11,8 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @NoArgsConstructor
 @AllArgsConstructor
-class LiveInplayState {
+@Builder
+public class LiveInplayState {
     @JsonProperty("A")  private boolean active;
     @JsonProperty("E")  private boolean enabled;
     @JsonProperty("MKNUM") private int marketCount;

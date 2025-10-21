@@ -3,6 +3,7 @@ package com.mouse.bet.model.bet9ja;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,7 +13,8 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @NoArgsConstructor
 @AllArgsConstructor
-class MatchScore {
+@Builder
+public class MatchScore {
     @JsonProperty("SS") private List<String> periodScores; // empty in sample
     @JsonProperty("S")  private String scoreline;          // "0-0"
     @JsonProperty("EXTRA") private String extraInfo;
