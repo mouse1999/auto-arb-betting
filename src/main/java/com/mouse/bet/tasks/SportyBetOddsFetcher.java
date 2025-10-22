@@ -1,13 +1,19 @@
 package com.mouse.bet.tasks;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.*;
 import com.mouse.bet.config.ScraperConfig;
+import com.mouse.bet.detector.ArbDetector;
+import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.manager.ProfileManager;
+import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.model.sporty.SportyEvent;
 import com.mouse.bet.service.BetLegRetryService;
 import com.mouse.bet.service.SportyBetService;
+import com.mouse.bet.utils.JsonParser;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +33,8 @@ public class SportyBetOddsFetcher implements Runnable {
     private final ProfileManager profileManager;
     private final SportyBetService sportyBetService;
     private final BetLegRetryService betLegRetryService;
+    private final ArbDetector arbDetector;
+    private final ObjectMapper objectMapper;
     private final Map<String, APIRequestContext> apiClients = new ConcurrentHashMap<>();
     private final AtomicReference<Playwright> playwrightRef = new AtomicReference<>();
 
@@ -38,9 +46,11 @@ public class SportyBetOddsFetcher implements Runnable {
     private static final String KEY_FB  = "sport:1";
     private static final String KEY_BB  = "sport:2";
     private static final String KEY_TT  = "sport:20";
+    private static final BookMaker SCRAPER_BOOKMAKER = BookMaker.SPORTY_BET;
 
     // Schedulers
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
+    private final ExecutorService retryExecutor = Executors.newFixedThreadPool(2);
 
     // Collected headers/tokens after a successful nav
     private final Map<String, String> harvestedHeaders = new ConcurrentHashMap<>();
@@ -58,8 +68,9 @@ public class SportyBetOddsFetcher implements Runnable {
                 try (Browser browser = launchBrowser(pw)) {
                     profile = profileManager.getNextProfile();
                     try (BrowserContext context = newContext(browser, profile)) {
+                        attachAntiDetection(context, profile);
                         Page page = context.newPage();
-                        attachAntiDetection(page, profile);
+//                        attachAntiDetection(page, profile);
                         attachNetworkTaps(page, harvestedHeaders);
                         performInitialNavigationWithRetry(page);
 
@@ -85,6 +96,7 @@ public class SportyBetOddsFetcher implements Runnable {
             log.error("Fatal error in fetcher: ", fatal);
         } finally {
             scheduler.shutdownNow();
+            retryExecutor.shutdown();
             apiClients.values().forEach(APIRequestContext::dispose);
             Playwright pw = playwrightRef.getAndSet(null);
             if (pw != null) pw.close();
@@ -111,25 +123,364 @@ public class SportyBetOddsFetcher implements Runnable {
         Browser.NewContextOptions opts = new Browser.NewContextOptions()
                 .setUserAgent(profile.getUserAgent())
                 .setViewportSize(viewportSize)
-                .setExtraHTTPHeaders(createExtraHeaders(profile));
+                .setExtraHTTPHeaders(getAllHeaders(profile));
 
         return browser.newContext(opts);
     }
 
-    private Map<String, String> createExtraHeaders(UserAgentProfile profile) {
-        log.info("Creating headers.....");
-        return Map.of(
-                "X-Geo-Location", String.format("%f,%f", profile.getGeolocation().getLongitude(), profile.getGeolocation().getLatitude()),
-                "X-Time-Zone", profile.getTimeZone(),
-                "X-City-Code", profile.getCityCode()
-        );
+    public Map<String, String> getAllHeaders(UserAgentProfile profile) {
+        Map<String, String> allHeaders = new HashMap<>();
+        Map<String, String> standardHeaders = profile.getHeaders().getStandardHeaders();
+        Map<String, String> clientHintsHeaders = profile.getHeaders().getClientHintsHeaders();
+        if (standardHeaders != null) {
+            allHeaders.putAll(standardHeaders);
+        }
+        if (clientHintsHeaders != null) {
+            allHeaders.putAll(clientHintsHeaders);
+        }
+        return allHeaders;
     }
 
-    private void attachAntiDetection(Page page, UserAgentProfile profile) {
-        // minimal anti-detect; extend with your full script
-        page.addInitScript("""
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-        """);
+
+    private void attachAntiDetection(BrowserContext context, UserAgentProfile profile) {
+        String stealthScript = String.format("""
+        // === Profile Configuration ===
+        const profile = %s;
+
+        // === Remove Automation Indicators ===
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,
+            configurable: true
+        });
+        
+        delete navigator.__proto__.webdriver;
+        window.chrome = { runtime: {} };
+
+        // === Override Client Hints ===
+        Object.defineProperty(navigator, 'userAgentData', {
+            get: () => ({
+                brands: %s,
+                mobile: %s,
+                platform: "%s",
+                platformVersion: "%s",
+                architecture: "%s",
+                bitness: "%s",
+                model: "%s",
+                uaFullVersion: "%s",
+                getHighEntropyValues: function(hints) {
+                    return new Promise((resolve) => {
+                        const result = {};
+                        if (hints.includes('architecture')) result.architecture = profile.clientHints.architecture;
+                        if (hints.includes('bitness')) result.bitness = profile.clientHints.bitness;
+                        if (hints.includes('model')) result.model = profile.clientHints.model;
+                        if (hints.includes('platformVersion')) result.platformVersion = profile.clientHints.platformVersion;
+                        if (hints.includes('uaFullVersion')) result.uaFullVersion = profile.clientHints.uaFullVersion;
+                        if (hints.includes('fullVersionList')) {
+                            result.fullVersionList = profile.clientHints.brands.map(brand => ({
+                                brand: brand.brand,
+                                version: brand.version + ".0.0.0"
+                            }));
+                        }
+                        resolve(result);
+                    });
+                }
+            }),
+            configurable: true
+        });
+
+        // === Canvas Fingerprinting Protection ===
+        const originalGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(contextType, ...args) {
+            if (contextType === '2d') {
+                const context = originalGetContext.call(this, contextType, ...args);
+                if (context) {
+                    // Set fill style from profile
+                    context.fillStyle = profile.canvasFillStyle;
+                    
+                    // Override toDataURL to add noise
+                    const originalToDataURL = context.canvas.toDataURL;
+                    context.canvas.toDataURL = function(type, quality) {
+                        const imageData = context.getImageData(0, 0, this.width, this.height);
+                        // Add minimal random noise to fingerprint
+                        for (let i = 0; i < imageData.data.length; i += 10) {
+                            imageData.data[i] = imageData.data[i] + Math.floor(Math.random() * 2);
+                        }
+                        context.putImageData(imageData, 0, 0);
+                        return originalToDataURL.call(this, type, quality);
+                    };
+                    
+                    // Override getImageData
+                    const originalGetImageData = context.getImageData;
+                    context.getImageData = function(...args) {
+                        const imageData = originalGetImageData.call(this, ...args);
+                        // Add slight variation
+                        for (let i = 0; i < imageData.data.length; i += 100) {
+                            imageData.data[i] = imageData.data[i] ^ 1;
+                        }
+                        return imageData;
+                    };
+                }
+                return context;
+            }
+            return originalGetContext.call(this, contextType, ...args);
+        };
+
+        // === WebGL Fingerprinting Protection ===
+        const getParameterProxy = function(originalFunction) {
+            return function(parameter) {
+                // Return WebGL values from profile
+                if (parameter === 37445) { // UNMASKED_VENDOR_WEBGL
+                    return profile.webglVendor;
+                }
+                if (parameter === 37446) { // UNMASKED_RENDERER_WEBGL
+                    return profile.webglRenderer;
+                }
+                if (parameter === 7936) { // VENDOR
+                    return profile.webgl.vendor;
+                }
+                if (parameter === 7937) { // RENDERER
+                    return profile.webgl.renderer;
+                }
+                if (parameter === 7938) { // VERSION
+                    return profile.webgl.version;
+                }
+                return originalFunction.call(this, parameter);
+            };
+        };
+
+        const getExtensionProxy = function(originalFunction) {
+            return function(extensionName) {
+                const result = originalFunction.call(this, extensionName);
+                if (result && typeof result.getParameter === 'function') {
+                    result.getParameter = getParameterProxy(result.getParameter);
+                }
+                return result;
+            };
+        };
+
+        Object.defineProperty(WebGLRenderingContext.prototype, 'getParameter', {
+            value: getParameterProxy(WebGLRenderingContext.prototype.getParameter),
+            configurable: true
+        });
+
+        Object.defineProperty(WebGLRenderingContext.prototype, 'getExtension', {
+            value: getExtensionProxy(WebGLRenderingContext.prototype.getExtension),
+            configurable: true
+        });
+
+        // === Audio Context Fingerprinting ===
+        const originalCreateOscillator = OfflineAudioContext.prototype.createOscillator;
+        OfflineAudioContext.prototype.createOscillator = function() {
+            const oscillator = originalCreateOscillator.call(this);
+            // Use frequency from profile
+            oscillator.frequency.value = profile.audioFrequency;
+            
+            const originalStart = oscillator.start;
+            oscillator.start = function(when) {
+                return originalStart.call(this, when + (Math.random() * 0.0001));
+            };
+            return oscillator;
+        };
+
+        // === Hardware Concurrency & Device Memory ===
+        Object.defineProperty(navigator, 'hardwareConcurrency', {
+            get: () => profile.hardwareConcurrency,
+            configurable: true
+        });
+
+        Object.defineProperty(navigator, 'deviceMemory', {
+            get: () => profile.deviceMemory,
+            configurable: true
+        });
+
+        // === Platform & Language Spoofing ===
+        Object.defineProperty(navigator, 'platform', {
+            get: () => profile.platform,
+            configurable: true
+        });
+
+        Object.defineProperty(navigator, 'language', {
+            get: () => profile.languages[0],
+            configurable: true
+        });
+
+        Object.defineProperty(navigator, 'languages', {
+            get: () => profile.languages,
+            configurable: true
+        });
+
+        // === Plugin Spoofing ===
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => profile.plugins,
+            configurable: true
+        });
+
+        Object.defineProperty(navigator, 'mimeTypes', {
+            get: () => profile.plugins.map(plugin => ({
+                type: 'application/' + plugin.name.toLowerCase().replace(/\\s+/g, ''),
+                suffixes: plugin.name.toLowerCase().includes('pdf') ? 'pdf' : 'exe',
+                description: plugin.description,
+                enabledPlugin: plugin
+            })),
+            configurable: true
+        });
+
+        // === Screen Resolution Spoofing ===
+        Object.defineProperty(screen, 'width', {
+            get: () => profile.viewport.width,
+            configurable: true
+        });
+
+        Object.defineProperty(screen, 'height', {
+            get: () => profile.viewport.height,
+            configurable: true
+        });
+
+        Object.defineProperty(screen, 'availWidth', {
+            get: () => profile.screen.availWidth,
+            configurable: true
+        });
+
+        Object.defineProperty(screen, 'availHeight', {
+            get: () => profile.screen.availHeight,
+            configurable: true
+        });
+
+        Object.defineProperty(screen, 'colorDepth', {
+            get: () => profile.screen.colorDepth,
+            configurable: true
+        });
+
+        Object.defineProperty(screen, 'pixelDepth', {
+            get: () => profile.screen.pixelDepth,
+            configurable: true
+        });
+
+        // === Connection API Spoofing ===
+        if ('connection' in navigator) {
+            Object.defineProperty(navigator.connection, 'downlink', {
+                get: () => profile.connection.downlink,
+                configurable: true
+            });
+
+            Object.defineProperty(navigator.connection, 'effectiveType', {
+                get: () => profile.connection.effectiveType,
+                configurable: true
+            });
+
+            Object.defineProperty(navigator.connection, 'rtt', {
+                get: () => profile.connection.rtt,
+                configurable: true
+            });
+        }
+
+        // === Battery API Spoofing ===
+        if ('getBattery' in navigator) {
+            const originalGetBattery = navigator.getBattery;
+            navigator.getBattery = function() {
+                return Promise.resolve(profile.battery);
+            };
+        }
+
+        // === Timezone Spoofing ===
+        const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+        Date.prototype.getTimezoneOffset = function() {
+            // Calculate offset based on profile timezone
+            const now = new Date();
+            const tzString = now.toLocaleString('en-US', { timeZone: profile.timeZone });
+            const localDate = new Date(tzString);
+            const diff = (now.getTime() - localDate.getTime()) / 60000;
+            return Math.round(diff);
+        };
+
+        // === Geolocation Spoofing ===
+        if ('geolocation' in navigator) {
+            const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
+            navigator.geolocation.getCurrentPosition = function(success, error, options) {
+                if (success) {
+                    success({
+                        coords: {
+                            latitude: profile.geolocation.latitude,
+                            longitude: profile.geolocation.longitude,
+                            accuracy: profile.geolocation.accuracy,
+                            altitude: null,
+                            altitudeAccuracy: null,
+                            heading: null,
+                            speed: null
+                        },
+                        timestamp: Date.now()
+                    });
+                }
+            };
+        }
+
+        // === Permissions API Spoofing ===
+        const originalPermissionsQuery = navigator.permissions.query;
+        navigator.permissions.query = function(parameters) {
+            if (parameters.name === 'notifications') {
+                return Promise.resolve({ state: profile.permissions.notifications });
+            }
+            if (parameters.name === 'geolocation') {
+                return Promise.resolve({ state: profile.permissions.geolocation });
+            }
+            return originalPermissionsQuery.call(this, parameters);
+        };
+
+        // === Media Devices Spoofing ===
+        if ('mediaDevices' in navigator) {
+            const originalEnumerateDevices = navigator.mediaDevices.enumerateDevices;
+            navigator.mediaDevices.enumerateDevices = function() {
+                return Promise.resolve(profile.mediaDevices);
+            };
+        }
+
+        // === Font Detection Protection ===
+        if (window.queryLocalFonts) {
+            window.queryLocalFonts = function() {
+                return Promise.resolve(profile.fonts.map(font => ({ 
+                    family: font,
+                    fullName: font,
+                    postscriptName: font.replace(/\\\\s+/g, '')
+                })));
+            };
+        }
+
+        // === Storage Quota Spoofing ===
+        if ('storage' in navigator && 'estimate' in navigator.storage) {
+            const originalEstimate = navigator.storage.estimate;
+            navigator.storage.estimate = function() {
+                return Promise.resolve({
+                    quota: profile.storage.quota,
+                    usage: profile.storage.usage,
+                    usageDetails: {}
+                });
+            };
+        }
+
+        // === Notification API Spoofing ===
+        if ('Notification' in window) {
+            Object.defineProperty(Notification, 'permission', {
+                get: () => profile.permissions.notifications,
+                configurable: true
+            });
+        }
+
+        // Final cleanup
+        delete window.$cdc_;
+        delete window._Selenium_IDE_Recorder;
+    """,
+                new Gson().toJson(profile), // Full profile object
+                new Gson().toJson(profile.getClientHints().getBrands()),
+                profile.getClientHints().getMobile(),
+                profile.getClientHints().getPlatform(),
+                profile.getClientHints().getPlatformVersion(),
+                profile.getClientHints().getArchitecture(),
+                profile.getClientHints().getBitness(),
+                profile.getClientHints().getModel(),
+                profile.getClientHints().getUaFullVersion()
+        );
+
+        context.addInitScript(stealthScript);
     }
 
     private void attachNetworkTaps(Page page, Map<String,String> store) {
@@ -231,7 +582,7 @@ public class SportyBetOddsFetcher implements Runnable {
             }
 
             // Fan-out with bounded parallelism to avoid bursts
-            // You can reuse your existing scheduler or make a small thread pool here
+
             int parallelism = Math.min(12, Math.max(4, eventIds.size() / 2));
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
             try {
@@ -368,7 +719,7 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private List<String> extractEventIds(String body) {
-        return null;
+        return JsonParser.extractEventIds(body);
     }
 
     /** Second API call: per-event detail JSON -> parse -> normalize -> dispatch */
@@ -394,22 +745,17 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private SportyEvent parseEventDetail(String detailJson) {
-        // If you already have a parser, use it here:
-        // return sportyBetService.parseEventDetail(detailJson);
-        //
-        return null;
+        return JsonParser.deserializeSportyEvent(detailJson, objectMapper);
     }
 
     /** If Sporty has a different detail endpoint, change here (kept centralized). */
     private String buildEventDetailUrl(String eventId) {
-        // Common patterns are:
-        //   /api/ng/factsCenter/eventDetail?eventId=...&_t=...
-        //   /api/ng/factsCenter/events?eventId=...&_t=...
-        // Adjust to the exact one you need or expose via ScraperConfig.
-        String base = BASE_URL + "/api/ng/factsCenter/eventDetail";
-        return buildUrl(base, Map.of(
-                "eventId", eventId,
-                "_t", String.valueOf(System.currentTimeMillis())
+
+        String base = BASE_URL + "/api/ng/factsCenter/event";
+        return buildUrl(base,Map.of(
+                        "eventId", eventId,
+                        "productId", "1",
+                        "_t", String.valueOf(System.currentTimeMillis())
         ));
     }
 
@@ -492,15 +838,54 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     /** Normalize + route to downstream systems (ArbDetector, caches, retries, etc.). */
-    private void processParsedEvent(Object eventObj) {
-        // Example wiring:
-        // NormalizedEvent ne = sportyBetService.convertToNormalEvent((SportyEvent) eventObj);
-        // arbDetector.addEventToPool(ne);
-        // betLegRetryService.updateFailedBetLeg(ne); // if that’s your flow
-        //
-        // For now, just log:
-        log.debug("Processed event: {}", eventObj != null ? eventObj.getClass().getSimpleName() : "null");
+    // === Completed method ===
+    private void processParsedEvent(SportyEvent event) {
+        if (event == null) {
+            log.debug("processParsedEvent: event is null, skipping.");
+            return;
+        }
+
+        try {
+            // 1) Normalize (sync)
+            NormalizedEvent normalizedEvent = sportyBetService.convertToNormalEvent(event);
+            if (normalizedEvent == null) {
+                log.warn("convertToNormalEvent returned null for eventId={}", event.getEventId());
+                return;
+            }
+
+            // 2) Process bet-retry info (async, separate thread)
+            CompletableFuture
+                    .runAsync(() -> processBetRetryInfo(normalizedEvent), retryExecutor)
+                    .exceptionally(ex -> {
+                        log.error("processBetRetryInfo failed for eventId={}, err={}",
+                                normalizedEvent.getEventId(), ex.getMessage(), ex);
+                        return null;
+                    });
+
+            // 3) Send to arb detector (sync)
+            if (arbDetector != null) {
+                arbDetector.addEventToPool(normalizedEvent);
+            } else {
+                log.warn("arbDetector is null; skipping addEventToPool for eventId={}", normalizedEvent.getEventId());
+            }
+
+            log.debug("Processed event: {}", event.getEventId());
+        } catch (Exception e) {
+            log.error("processParsedEvent failed: {}", e.getMessage(), e);
+        }
     }
+
+    private void processBetRetryInfo(NormalizedEvent normalizedEvent) {
+        try {
+
+            betLegRetryService.updateFailedBetLeg(normalizedEvent, SCRAPER_BOOKMAKER);
+        } catch (Exception e) {
+            log.error("BetLegRetry processing failed for eventId={}, err={}",
+                    normalizedEvent.getEventId(), e.getMessage(), e);
+        }
+    }
+
+
 
     private String safeBody(APIResponse res) {
         try {

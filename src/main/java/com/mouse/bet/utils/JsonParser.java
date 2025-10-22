@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mouse.bet.model.bet9ja.Bet9jaEvent;
 import com.mouse.bet.model.msport.MSportEvent;
 import com.mouse.bet.model.sporty.SportyEvent;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
+@NoArgsConstructor
 public class JsonParser {
 
     private static final Pattern ID_PATTERN = Pattern.compile(
@@ -33,32 +35,26 @@ public class JsonParser {
     );
 
 
-    public static List<SportyEvent> deserializeSportyEvents(String jsonString, ObjectMapper objectMapper){
-        List<SportyEvent> events = new ArrayList<>();
+    public static SportyEvent deserializeSportyEvent(String jsonString, ObjectMapper objectMapper) {
+        SportyEvent event = null;
 
         try {
             JsonNode rootNode = objectMapper.readTree(jsonString);
             JsonNode dataNode = rootNode.get("data");
 
-            if (dataNode != null && dataNode.isArray()) {
-                for (JsonNode tournamentNode : dataNode) {
-                    JsonNode eventsNode = tournamentNode.get("events");
-                    if (eventsNode != null && eventsNode.isArray()) {
-                        for (JsonNode eventNode : eventsNode) {
-                            SportyEvent event = objectMapper.treeToValue(eventNode, SportyEvent.class);
-                            events.add(event);
-                        }
-                    }
-                }
+            if (dataNode == null || dataNode.isNull()) {
+                log.warn("No 'data' node found in JSON");
+                return event;
             }
+            event = objectMapper.treeToValue(dataNode, SportyEvent.class);
+
         } catch (Exception e) {
-            e.printStackTrace();
-            log.error("Error deserializing JSON: " + e.getMessage());
+            log.error("Error deserializing JSON: {}", e.getMessage(), e);
         }
 
-        return events;
-
+        return event;
     }
+
 
     public static Bet9jaEvent deserializeBet9jaEvent(){
         return null;
@@ -90,7 +86,7 @@ public class JsonParser {
         return ids;
     }
 
-    private List<String> extractEventIdsForSporty(String json) {
+    public static List<String> extractEventIds(String json) {
         if (json == null || json.isBlank())
             return List.of();
 
