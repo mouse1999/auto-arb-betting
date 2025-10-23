@@ -1,13 +1,18 @@
 package com.mouse.bet;
 
+import com.mouse.bet.tasks.SportyBetOddsFetcher;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
 @SpringBootApplication
 public class AutoArbBettingApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(AutoArbBettingApplication.class, args);
+		ConfigurableApplicationContext context = SpringApplication.run(AutoArbBettingApplication.class, args);
+		SportyBetOddsFetcher fetcher = context.getBean(SportyBetOddsFetcher.class);
+
+		fetcher.run();
 	}
 
 }

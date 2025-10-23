@@ -16,9 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -103,17 +101,34 @@ public class SportyBetService implements OddService<SportyEvent> {
 
     public Map<String, Integer> mapOutcomeCashOutIndicator(List<Market> markets) {
         log.info("Mapping each outcomeCashOutIndicator...");
-        if (markets == null) return Map.of();
+        if (markets == null || markets.isEmpty()) return Map.of();
 
         Map<String, Integer> cashoutMap = markets.stream()
-                .flatMap(market -> market.getOutcomes().stream()
-                        .filter(outcome -> isValidOdds(outcome.getOdds()))
-                        .map(outcome -> Map.entry(generateProviderKey(market, outcome), outcome.getCashOutIsActive())))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+                .filter(Objects::nonNull)
+                .filter(m -> m.getOutcomes() != null && !m.getOutcomes().isEmpty())
+                .flatMap(m -> m.getOutcomes().stream()
+                        .filter(Objects::nonNull)
+                        .filter(o -> isValidOdds(o.getOdds()))
+                        .map(o -> {
+                            String key = generateProviderKey(m, o);
+                            if (key == null) return null;                     // no null keys
+                            Integer flag = o.getCashOutIsActive();             // may be null
+                            return new java.util.AbstractMap.SimpleEntry<>(
+                                    key, flag == null ? 0 : flag               // default missing to 0
+                            );
+                        }))
+                .filter(Objects::nonNull)                                      // drop null entries
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (a, b) -> a,                                           // keep first on duplicate keys
+                        LinkedHashMap::new                                      // preserve encounter order
+                ));
 
         log.info("Converted cashout map size: {}", cashoutMap.size());
         return cashoutMap;
     }
+
 
     /** Build meta map keyed by providerKey (marketId + specifier + outcomeDesc). */
     public Map<String, MarketMeta> buildMetaMap(List<Market> markets) {

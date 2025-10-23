@@ -826,8 +826,8 @@ class ArbDetectorTest {
             arbs.add(createMockArb("arb-" + i));
         }
 
-        when(arbFactory.findOpportunities(anyList()))
-                .thenReturn(shouldDetect ? arbs : Collections.emptyList());
+//        when(arbFactory.findOpportunities(anyList()))
+//                .thenReturn(shouldDetect ? arbs : Collections.emptyList());
 
         arbDetector.init();
 
@@ -1000,7 +1000,7 @@ class ArbDetectorTest {
         NormalizedEvent event1 = createNormalizedEvent("event-null-test", BookMaker.BET9JA);
         NormalizedEvent event2 = createNormalizedEvent("event-null-test", BookMaker.SPORTY_BET);
 
-        when(arbFactory.findOpportunities(anyList())).thenReturn(Collections.emptyList());
+//        when(arbFactory.findOpportunities(anyList())).thenReturn(Collections.emptyList());
 
         arbDetector.init();
         arbDetector.addEventToPool(event1);

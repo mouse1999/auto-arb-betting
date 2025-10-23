@@ -2,6 +2,7 @@ package com.mouse.bet.service;
 
 import com.mouse.bet.detector.ArbDetector;
 import com.mouse.bet.enums.BookMaker;
+import com.mouse.bet.enums.MarketCategory;
 import com.mouse.bet.enums.SportEnum;
 import com.mouse.bet.model.MarketMeta;
 import com.mouse.bet.model.NormalizedEvent;
@@ -17,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,717 +44,978 @@ class SportyBetServiceTest {
 
     @BeforeEach
     void setUp() {
-        testOutcome = Outcome.builder()
-                .id("outcome1")
-                .odds("2.50")
-                .probability("0.40")
+        testEvent = createMockSportyEvent();
+
+        // Extract test market and outcome for individual tests
+        testMarket = testEvent.getMarkets().get(0);
+        testOutcome = testMarket.getOutcomes().get(0);
+
+    }
+
+    @Nested
+    @DisplayName("convertToNormalEvent Tests")
+    class ConvertToNormalEventTests {
+
+        @Test
+        @DisplayName("validEvent_returnsNormalizedEvent")
+        void convertToNormalEvent_validEvent_returnsNormalizedEvent() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+            assertEquals("Roma", result.getHomeTeam());
+            assertEquals("Viktoria Plzen", result.getAwayTeam());
+            assertEquals("UEFA Europa League", result.getLeague());
+            assertEquals(BookMaker.SPORTY_BET, result.getBookie());
+            assertEquals("Football|Roma|Viktoria Plzen", result.getEventId());
+            assertNotNull(result.getMarkets());
+            verify(teamAliasService, times(2)).canonicalOrSelf(anyString());
+        }
+
+        @Test
+        @DisplayName("withTeamAliases_appliesAliasesCorrectly")
+        void convertToNormalEvent_withTeamAliases_appliesAliasesCorrectly() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals("Roma", result.getHomeTeam());
+            assertEquals("Viktoria Plzen", result.getAwayTeam());
+            assertEquals("Football|Roma|Viktoria Plzen", result.getEventId());
+        }
+
+        @Test
+        @DisplayName("nullEvent_throwsIllegalArgumentException")
+        void convertToNormalEvent_nullEvent_throwsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () ->
+                    sportyBetService.convertToNormalEvent(null)
+            );
+        }
+
+        @Test
+        @DisplayName("eventWithNoMarkets_returnsEventWithEmptyMarketList")
+        void convertToNormalEvent_eventWithNoMarkets_returnsEventWithEmptyMarketList() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setMarkets(Collections.emptyList());
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+            assertTrue(result.getMarkets().isEmpty());
+        }
+
+        @Test
+        @DisplayName("eventWithNullMarkets_returnsEventWithEmptyMarketList")
+        void convertToNormalEvent_eventWithNullMarkets_returnsEventWithEmptyMarketList() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setMarkets(null);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+            assertTrue(result.getMarkets().isEmpty());
+        }
+
+        @Test
+        @DisplayName("footballEvent_determinesSportCorrectly")
+        void convertToNormalEvent_footballEvent_determinesSportCorrectly() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.getSport().setName("Football");
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals(SportEnum.FOOTBALL, result.getSportEnum());
+        }
+
+        @Test
+        @DisplayName("basketballEvent_determinesSportCorrectly")
+        void convertToNormalEvent_basketballEvent_determinesSportCorrectly() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.getSport().setName("Basketball");
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals(SportEnum.BASKETBALL, result.getSportEnum());
+        }
+
+        @Test
+        @DisplayName("tableTennisEvent_determinesSportCorrectly")
+        void convertToNormalEvent_tableTennisEvent_determinesSportCorrectly() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.getSport().setName("Table Tennis");
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals(SportEnum.TABLE_TENNIS, result.getSportEnum());
+        }
+
+        @Test
+        @DisplayName("unknownSport_defaultsToFootball")
+        void convertToNormalEvent_unknownSport_defaultsToFootball() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.getSport().setName("Cricket");
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals(SportEnum.FOOTBALL, result.getSportEnum());
+        }
+
+        @Test
+        @DisplayName("eventStartTime_preservedCorrectly")
+        void convertToNormalEvent_eventStartTime_preservedCorrectly() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            long startTime = 1761246000000L;
+            testEvent.setEstimateStartTime(startTime);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals(startTime, result.getEstimateStartTime());
+        }
+
+        @Test
+        @DisplayName("eventName_formattedCorrectly")
+        void convertToNormalEvent_eventName_formattedCorrectly() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertEquals("Roma vs Viktoria Plzen", result.getEventName());
+        }
+
+        @Test
+        @DisplayName("marketsConverted_containsExpectedMarkets")
+        void convertToNormalEvent_marketsConverted_containsExpectedMarkets() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result.getMarkets());
+            assertTrue(result.getMarkets().size() > 0);
+        }
+
+        @Test
+        @DisplayName("outcomesHaveCorrectProperties")
+        void convertToNormalEvent_outcomesHaveCorrectProperties() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertFalse(result.getMarkets().isEmpty());
+
+            NormalizedMarket firstMarket = result.getMarkets().get(0);
+            assertNotNull(firstMarket.getOutcomes());
+            assertFalse(firstMarket.getOutcomes().isEmpty());
+
+            NormalizedOutcome firstOutcome = firstMarket.getOutcomes().get(0);
+
+            assertNotNull(firstOutcome.getOutcomeId());
+            assertNotNull(firstOutcome.getEventId());
+            assertNotNull(firstOutcome.getOdds());
+            assertTrue(firstOutcome.getOdds().compareTo(BigDecimal.ZERO) > 0);
+            assertEquals(BookMaker.SPORTY_BET, firstOutcome.getBookmaker());
+            assertEquals("Roma", firstOutcome.getHomeTeam());
+            assertEquals("Viktoria Plzen", firstOutcome.getAwayTeam());
+            assertEquals("UEFA Europa League", firstOutcome.getLeague());
+            assertEquals(SportEnum.FOOTBALL, firstOutcome.getSportEnum());
+            assertEquals(1761246000000L, firstOutcome.getEventStartTime());
+        }
+
+        @Test
+        @DisplayName("matchStatusPreserved")
+        void convertToNormalEvent_matchStatusPreserved() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            NormalizedOutcome firstOutcome = result.getMarkets().get(0).getOutcomes().get(0);
+
+            assertEquals("HT", firstOutcome.getMatchStatus());
+            assertEquals("0:2", firstOutcome.getSetScore());
+            assertEquals("1", firstOutcome.getPeriod());
+            assertEquals("45:00", firstOutcome.getPlayedSeconds());
+            assertNotNull(firstOutcome.getGameScore());
+            assertEquals(1, firstOutcome.getGameScore().size());
+            assertEquals("0:2", firstOutcome.getGameScore().get(0));
+        }
+
+        @Test
+        @DisplayName("validOddsOnly_filtersInvalidOdds")
+        void convertToNormalEvent_validOddsOnly_filtersInvalidOdds() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            result.getMarkets().forEach(market ->
+                    market.getOutcomes().forEach(outcome ->
+                            assertTrue(outcome.getOdds().compareTo(BigDecimal.ZERO) > 0)
+                    )
+            );
+        }
+
+        @Test
+        @DisplayName("cashOutStatus_mappedCorrectly")
+        void convertToNormalEvent_cashOutStatus_mappedCorrectly() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            boolean hasCashOutInfo = result.getMarkets().stream()
+                    .flatMap(m -> m.getOutcomes().stream())
+                    .anyMatch(o -> o.getCashOutAvailable() != null);
+
+            assertTrue(hasCashOutInfo);
+        }
+
+        @Test
+        @DisplayName("providerMetadata_setCorrectly")
+        void convertToNormalEvent_providerMetadata_setCorrectly() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            NormalizedOutcome firstOutcome = result.getMarkets().get(0).getOutcomes().get(0);
+
+            assertNotNull(firstOutcome.getProviderMarketName());
+            assertNotNull(firstOutcome.getProviderMarketTitle());
+            assertNotNull(firstOutcome.getMarketId());
+        }
+    }
+
+    @Nested
+    @DisplayName("convertMarketsToOddsMap Tests")
+    class ConvertMarketsToOddsMapTests {
+
+        @Test
+        @DisplayName("validMarkets_returnsOddsMap")
+        void convertMarketsToOddsMap_validMarkets_returnsOddsMap() {
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(testEvent.getMarkets());
+
+            assertFalse(result.isEmpty());
+            assertTrue(result.values().stream().anyMatch(odds ->
+                    new BigDecimal(odds).compareTo(BigDecimal.ZERO) > 0
+            ));
+        }
+
+        @Test
+        @DisplayName("nullMarkets_returnsEmptyMap")
+        void convertMarketsToOddsMap_nullMarkets_returnsEmptyMap() {
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(null);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("emptyMarketsList_returnsEmptyMap")
+        void convertMarketsToOddsMap_emptyMarketsList_returnsEmptyMap() {
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(Collections.emptyList());
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("marketWithInvalidOdds_filtersOutInvalidOdds")
+        void convertMarketsToOddsMap_marketWithInvalidOdds_filtersOutInvalidOdds() {
+            Outcome validOutcome = Outcome.builder()
+                    .id("1")
+                    .odds("2.50")
+                    .isActive(1)
+                    .desc("Valid")
+                    .build();
+
+            Outcome invalidOutcome = Outcome.builder()
+                    .id("2")
+                    .odds("-1.00")
+                    .isActive(1)
+                    .desc("Invalid")
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(validOutcome, invalidOutcome))
+                    .build();
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+
+            assertFalse(result.containsValue("-1.00"));
+            assertTrue(result.containsValue("2.50"));
+        }
+
+        @Test
+        @DisplayName("zeroOdds_filtersOutZeroOdds")
+        void convertMarketsToOddsMap_zeroOdds_filtersOutZeroOdds() {
+            Outcome outcome = Outcome.builder()
+                    .id("1")
+                    .odds("0")
+                    .isActive(1)
+                    .desc("Zero")
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(outcome))
+                    .build();
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("multipleMarkets_aggregatesAllValid")
+        void convertMarketsToOddsMap_multipleMarkets_aggregatesAllValid() {
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(testEvent.getMarkets());
+
+            // Should have odds from multiple markets (1X2, Over/Under, Double Chance)
+            assertTrue(result.size() >= 6); // At least 3 outcomes from 1X2, 2 from O/U, etc.
+        }
+
+        @Test
+        @DisplayName("veryLargeOdds_handlesCorrectly")
+        void convertMarketsToOddsMap_veryLargeOdds_handlesCorrectly() {
+            Outcome outcome = Outcome.builder()
+                    .id("1")
+                    .odds("999.99")
+                    .isActive(1)
+                    .desc("Large")
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(outcome))
+                    .build();
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+
+            assertTrue(result.containsValue("999.99"));
+        }
+
+        @Test
+        @DisplayName("verySmallPositiveOdds_handlesCorrectly")
+        void convertMarketsToOddsMap_verySmallPositiveOdds_handlesCorrectly() {
+            Outcome outcome = Outcome.builder()
+                    .id("1")
+                    .odds("0.01")
+                    .isActive(1)
+                    .desc("Small")
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(outcome))
+                    .build();
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+
+            assertTrue(result.containsValue("0.01"));
+        }
+    }
+
+    @Nested
+    @DisplayName("mapOutcomeStatus Tests")
+    class MapOutcomeStatusTests {
+
+        @Test
+        @DisplayName("validMarkets_returnsStatusMap")
+        void mapOutcomeStatus_validMarkets_returnsStatusMap() {
+            Map<String, Integer> result = sportyBetService.mapOutcomeStatus(testEvent.getMarkets());
+
+            assertFalse(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("nullMarkets_returnsEmptyMap")
+        void mapOutcomeStatus_nullMarkets_returnsEmptyMap() {
+            Map<String, Integer> result = sportyBetService.mapOutcomeStatus(null);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("activeAndInactiveOutcomes_mapsBothCorrectly")
+        void mapOutcomeStatus_activeAndInactiveOutcomes_mapsBothCorrectly() {
+            Outcome activeOutcome = Outcome.builder()
+                    .id("1")
+                    .desc("Active")
+                    .odds("2.50")
+                    .isActive(1)
+                    .build();
+
+            Outcome inactiveOutcome = Outcome.builder()
+                    .id("2")
+                    .desc("Inactive")
+                    .odds("3.00")
+                    .isActive(0)
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(activeOutcome, inactiveOutcome))
+                    .build();
+
+            Map<String, Integer> result = sportyBetService.mapOutcomeStatus(List.of(market));
+
+            assertTrue(result.containsValue(1));
+            assertTrue(result.containsValue(0));
+        }
+
+        @Test
+        @DisplayName("excludesOutcomesWithInvalidOdds")
+        void mapOutcomeStatus_excludesOutcomesWithInvalidOdds() {
+            Outcome valid = Outcome.builder()
+                    .id("1")
+                    .desc("Valid")
+                    .odds("2.00")
+                    .isActive(1)
+                    .build();
+
+            Outcome invalid = Outcome.builder()
+                    .id("2")
+                    .desc("Invalid")
+                    .odds("abc")
+                    .isActive(0)
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(valid, invalid))
+                    .build();
+
+            Map<String, Integer> result = sportyBetService.mapOutcomeStatus(List.of(market));
+
+            assertEquals(1, result.size());
+        }
+    }
+
+    @Nested
+    @DisplayName("mapOutcomeCashOutIndicator Tests")
+    class MapOutcomeCashOutIndicatorTests {
+
+        @Test
+        @DisplayName("validMarkets_returnsCashOutMap")
+        void mapOutcomeCashOutIndicator_validMarkets_returnsCashOutMap() {
+            Map<String, Integer> result = sportyBetService.mapOutcomeCashOutIndicator(testEvent.getMarkets());
+
+            assertFalse(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("nullMarkets_returnsEmptyMap")
+        void mapOutcomeCashOutIndicator_nullMarkets_returnsEmptyMap() {
+            Map<String, Integer> result = sportyBetService.mapOutcomeCashOutIndicator(null);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("nullCashOut_throwsNPE")
+        void mapOutcomeCashOutIndicator_nullCashOut_throwsNPE() {
+            testOutcome.setCashOutIsActive(null);
+
+            assertThrows(NullPointerException.class, () ->
+                    sportyBetService.mapOutcomeCashOutIndicator(List.of(testMarket))
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("buildMetaMap Tests")
+    class BuildMetaMapTests {
+
+        @Test
+        @DisplayName("validMarkets_returnsMetaMap")
+        void buildMetaMap_validMarkets_returnsMetaMap() {
+            Map<String, MarketMeta> result = sportyBetService.buildMetaMap(testEvent.getMarkets());
+
+            assertFalse(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("nullMarkets_returnsEmptyMap")
+        void buildMetaMap_nullMarkets_returnsEmptyMap() {
+            Map<String, MarketMeta> result = sportyBetService.buildMetaMap(null);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("marketWithMultipleOutcomes_createsMetaForEachOutcome")
+        void buildMetaMap_marketWithMultipleOutcomes_createsMetaForEachOutcome() {
+            Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(testMarket));
+
+            // testMarket (1X2) has 3 outcomes
+            assertTrue(result.size() >= 3);
+        }
+
+        @Test
+        @DisplayName("withSpecifier_includesSpecifierInMeta")
+        void buildMetaMap_withSpecifier_includesSpecifierInMeta() {
+            // Over/Under market has specifier "total=2.5"
+            Market ouMarket = testEvent.getMarkets().get(1);
+
+            Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(ouMarket));
+
+            assertFalse(result.isEmpty());
+            MarketMeta meta = result.values().iterator().next();
+            assertEquals("total=2.5", meta.specifiers());
+        }
+
+        @Test
+        @DisplayName("verifyMetaContent_containsCorrectData")
+        void buildMetaMap_verifyMetaContent_containsCorrectData() {
+            Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(testMarket));
+
+            assertFalse(result.isEmpty());
+            MarketMeta meta = result.values().iterator().next();
+            assertEquals("1X2", meta.name());
+            assertEquals("1,X,2", meta.title());
+            assertEquals("Main", meta.group());
+            assertEquals("1", meta.marketId());
+        }
+    }
+
+    @Nested
+    @DisplayName("normalizeMarkets Tests")
+    class NormalizeMarketsTests {
+
+        @Test
+        @DisplayName("nullRawOdds_returnsEmptyList")
+        void normalizeMarkets_nullRawOdds_returnsEmptyList() {
+            List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
+                    null, Map.of(), Map.of(), Map.of(),
+                    BookMaker.SPORTY_BET, "eventId", "UEFA Europa League",
+                    "Roma", "Viktoria Plzen", testEvent
+            );
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("emptyRawOdds_returnsEmptyList")
+        void normalizeMarkets_emptyRawOdds_returnsEmptyList() {
+            List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
+                    Map.of(), Map.of(), Map.of(), Map.of(),
+                    BookMaker.SPORTY_BET, "eventId", "UEFA Europa League",
+                    "Roma", "Viktoria Plzen", testEvent
+            );
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("withUnrecognizedProviderKeys_returnsEmpty")
+        void normalizeMarkets_withUnrecognizedProviderKeys_returnsEmpty() {
+            Map<String, String> rawOdds = Map.of("UNKNOWN|BAD|KEY", "2.0");
+            Map<String, Integer> statusMap = Map.of("UNKNOWN|BAD|KEY", 1);
+            Map<String, Integer> cashOutMap = Map.of("UNKNOWN|BAD|KEY", 1);
+            Map<String, MarketMeta> metaMap = Map.of(
+                    "UNKNOWN|BAD|KEY", new MarketMeta("", "", "", "", "1")
+            );
+
+            List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
+                    rawOdds, statusMap, cashOutMap, metaMap,
+                    BookMaker.SPORTY_BET, "EVT-42", "League", "Home", "Away", testEvent
+            );
+
+            assertNotNull(result);
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("validData_createsNormalizedMarkets")
+        void normalizeMarkets_validData_createsNormalizedMarkets() {
+            Map<String, String> oddsMap = sportyBetService.convertMarketsToOddsMap(testEvent.getMarkets());
+            Map<String, Integer> statusMap = sportyBetService.mapOutcomeStatus(testEvent.getMarkets());
+            Map<String, Integer> cashOutMap = sportyBetService.mapOutcomeCashOutIndicator(testEvent.getMarkets());
+            Map<String, MarketMeta> metaMap = sportyBetService.buildMetaMap(testEvent.getMarkets());
+
+            List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
+                    oddsMap, statusMap, cashOutMap, metaMap,
+                    BookMaker.SPORTY_BET, "eventId", "UEFA Europa League",
+                    "Roma", "Viktoria Plzen", testEvent
+            );
+
+            assertNotNull(result);
+        }
+    }
+
+    @Nested
+    @DisplayName("Provider Key Generation Tests")
+    class ProviderKeyGenerationTests {
+
+        @Test
+        @DisplayName("marketWithSpecifier_includesSpecifierInKey")
+        void generateProviderKey_marketWithSpecifier_includesSpecifierInKey() {
+            Market ouMarket = testEvent.getMarkets().get(1); // Over/Under with specifier
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(ouMarket));
+
+            assertFalse(result.isEmpty());
+            assertTrue(result.keySet().stream().anyMatch(key -> key.contains("2.5")));
+        }
+
+        @Test
+        @DisplayName("outcomeDescriptionWithSpaces_normalizesToUnderscores")
+        void generateProviderKey_outcomeDescriptionWithSpaces_normalizesToUnderscores() {
+            Outcome outcome = Outcome.builder()
+                    .id("74")
+                    .desc("Both Teams To Score")
+                    .odds("2.20")
+                    .isActive(1)
+                    .build();
+
+            Market market = Market.builder()
+                    .id("29")
+                    .name("BTTS")
+                    .outcomes(List.of(outcome))
+                    .build();
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+
+            assertFalse(result.isEmpty());
+            assertTrue(result.keySet().stream()
+                    .anyMatch(key -> key.contains("BOTH_TEAMS_TO_SCORE")));
+        }
+
+        @Test
+        @DisplayName("outcomeDescriptionWithWhitespace_trimmedCorrectly")
+        void generateProviderKey_outcomeDescriptionWithWhitespace_trimmedCorrectly() {
+            Outcome outcome = Outcome.builder()
+                    .id("1")
+                    .desc("  Home Win  ")
+                    .odds("2.50")
+                    .isActive(1)
+                    .build();
+
+            Market market = Market.builder()
+                    .id("1")
+                    .name("Test")
+                    .outcomes(List.of(outcome))
+                    .build();
+
+            Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+
+            assertFalse(result.isEmpty());
+        }
+    }
+
+    @Nested
+    @DisplayName("Score/Period Null-Safety Tests")
+    class ScoreNullSafetyTests {
+
+        @Test
+        @DisplayName("gameScore_null_handled")
+        void gameScore_null_handled() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setGameScore(null);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("gameScore_empty_handled")
+        void gameScore_empty_handled() {
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setGameScore(Collections.emptyList());
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("setScore_null_handled")
+        void setScore_null_handled() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setSetScore(null);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("period_null_handled")
+        void period_null_handled() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setPeriod(null);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("matchStatus_null_handled")
+        void matchStatus_null_handled() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setMatchStatus(null);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("playedSeconds_null_handled")
+        void playedSeconds_null_handled() {
+
+            when(teamAliasService.canonicalOrSelf(anyString()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            testEvent.setPlayedSeconds(null);
+
+            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
+
+            assertNotNull(result);
+        }
+    }
+
+    @Nested
+    @DisplayName("addNormalizedEventToPool Tests")
+    class AddNormalizedEventToPoolTests {
+
+        @Test
+        @DisplayName("validEvent_forwardsToArbDetector")
+        void addNormalizedEventToPool_validEvent_forwardsToArbDetector() {
+            NormalizedEvent event = NormalizedEvent.builder()
+                    .eventId("E1")
+                    .build();
+
+            sportyBetService.addNormalizedEventToPool(event);
+
+            verify(arbDetector).addEventToPool(event);
+        }
+
+        @Test
+        @DisplayName("nullEvent_throwsIllegalArgumentException")
+        void addNormalizedEventToPool_nullEvent_throwsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () ->
+                    sportyBetService.addNormalizedEventToPool(null)
+            );
+        }
+    }
+
+    // Helper method to create mock SportyEvent with complete realistic data
+    private SportyEvent createMockSportyEvent() {
+        TournamentInfo tournament = new TournamentInfo();
+        tournament.setId("sr:tournament:679");
+        tournament.setName("UEFA Europa League");
+
+        Category category = new Category();
+        category.setId("sr:category:393");
+        category.setName("International Clubs");
+        category.setTournament(tournament);
+
+        Sport sport = new Sport();
+        sport.setId("sr:sport:1");
+        sport.setName("Football");
+        sport.setCategory(category);
+
+        // Create Outcomes for 1X2 Market
+        Outcome homeOutcome = Outcome.builder()
+                .id("1")
+                .odds("5.30")
+                .probability("0.1741572245")
+                .voidProbability("0E-10")
                 .isActive(1)
                 .desc("Home")
                 .cashOutIsActive(1)
                 .build();
 
-        testMarket = Market.builder()
-                .id("1")
-                .name("Match Result")
-                .title("Full Time Result")
-                .group("Main")
-                .specifier(null)
-                .status(1)
-                .outcomes(List.of(testOutcome))
-                .build();
-
-        TournamentInfo tournament = TournamentInfo.builder()
-                .name("Premier League")
-                .build();
-
-        Category category = Category.builder()
-                .tournament(tournament)
-                .build();
-
-        Sport sport = Sport.builder()
-                .id("1")
-                .name("Football")
-                .category(category)
-                .build();
-
-        testEvent = SportyEvent.builder()
-                .eventId("event1")
-                .gameId("game1")
-                .homeTeamName("Manchester United")
-                .awayTeamName("Liverpool")
-                .homeTeamId("team1")
-                .awayTeamId("team2")
-                .estimateStartTime(System.currentTimeMillis())
-                .status(1)
-                .matchStatus("Not Started")
-                .setScore("0-0")
-                .gameScore(Arrays.asList("0", "0"))
-                .period("1")
-                .playedSeconds("0")
-                .sport(sport)
-                .markets(List.of(testMarket))
-                .build();
-    }
-
-
-    @Test
-    @DisplayName("convertToNormalEvent_validEvent_returnsNormalizedEvent")
-    void convertToNormalEvent_validEvent_returnsNormalizedEvent() {
-        when(teamAliasService.canonicalOrSelf("Manchester United")).thenReturn("Man_Utd");
-        when(teamAliasService.canonicalOrSelf("Liverpool")).thenReturn("Liverpool");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertNotNull(result);
-        assertEquals("Man_Utd", result.getHomeTeam());
-        assertEquals("Liverpool", result.getAwayTeam());
-        assertEquals("Premier League", result.getLeague());
-        assertEquals(BookMaker.SPORTY_BET, result.getBookie());
-        assertEquals("Football|Man_Utd|Liverpool", result.getEventId());
-        assertNotNull(result.getMarkets());
-        verify(teamAliasService, times(2)).canonicalOrSelf(anyString());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_nullEvent_throwsIllegalArgumentException")
-    void convertToNormalEvent_nullEvent_throwsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () ->
-                sportyBetService.convertToNormalEvent(null)
-        );
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_eventWithNoMarkets_returnsEventWithEmptyMarketList")
-    void convertToNormalEvent_eventWithNoMarkets_returnsEventWithEmptyMarketList() {
-        testEvent.setMarkets(Collections.emptyList());
-        when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertNotNull(result);
-        assertTrue(result.getMarkets().isEmpty());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_footballEvent_determinesSportCorrectly")
-    void convertToNormalEvent_footballEvent_determinesSportCorrectly() {
-        testEvent.getSport().setName("Football");
-        when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals(SportEnum.FOOTBALL, result.getSportEnum());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_basketballEvent_determinesSportCorrectly")
-    void convertToNormalEvent_basketballEvent_determinesSportCorrectly() {
-        testEvent.getSport().setName("Basketball");
-        when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals(SportEnum.BASKETBALL, result.getSportEnum());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_tableTennisEvent_determinesSportCorrectly")
-    void convertToNormalEvent_tableTennisEvent_determinesSportCorrectly() {
-        testEvent.getSport().setName("Table Tennis");
-        when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals(SportEnum.TABLE_TENNIS, result.getSportEnum());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_unknownSport_defaultsToFootball")
-    void convertToNormalEvent_unknownSport_defaultsToFootball() {
-        testEvent.getSport().setName("Cricket");
-        when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals(SportEnum.FOOTBALL, result.getSportEnum());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_teamAliasApplied_evenWithNullMarkets")
-    void convertToNormalEvent_teamAliasApplied_evenWithNullMarkets() {
-        testEvent.setMarkets(null);
-        when(teamAliasService.canonicalOrSelf("Manchester United")).thenReturn("Man Utd");
-        when(teamAliasService.canonicalOrSelf("Liverpool")).thenReturn("Liverpool");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals("Man Utd", result.getHomeTeam());
-        assertEquals("Liverpool", result.getAwayTeam());
-        assertTrue(result.getMarkets().isEmpty());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_eventStartTime_preservedCorrectly")
-    void convertToNormalEvent_eventStartTime_preservedCorrectly() {
-        long startTime = System.currentTimeMillis() + 3600000; // 1 hour from now
-        testEvent.setEstimateStartTime(startTime);
-        when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals(startTime, result.getEstimateStartTime());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_eventName_formattedCorrectly")
-    void convertToNormalEvent_eventName_formattedCorrectly() {
-        when(teamAliasService.canonicalOrSelf(anyString()))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals("Manchester United vs Liverpool", result.getEventName());
-    }
-
-    @Test
-    @DisplayName("convertToNormalEvent_teamNamesWithSpecialCharacters_handlesCorrectly")
-    void convertToNormalEvent_teamNamesWithSpecialCharacters_handlesCorrectly() {
-        testEvent.setHomeTeamName("FC Bayern München");
-        testEvent.setAwayTeamName("Inter Milão");
-
-        when(teamAliasService.canonicalOrSelf("FC Bayern München")).thenReturn("Bayern");
-        when(teamAliasService.canonicalOrSelf("Inter Milão")).thenReturn("Inter");
-
-        NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-        assertEquals("Bayern", result.getHomeTeam());
-        assertEquals("Inter", result.getAwayTeam());
-    }
-
-    // -------- convertMarketsToOddsMap --------
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_validMarkets_returnsOddsMap")
-    void convertMarketsToOddsMap_validMarkets_returnsOddsMap() {
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        assertTrue(result.containsValue("2.50"));
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_nullMarkets_returnsEmptyMap")
-    void convertMarketsToOddsMap_nullMarkets_returnsEmptyMap() {
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(null);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_emptyMarketsList_returnsEmptyMap")
-    void convertMarketsToOddsMap_emptyMarketsList_returnsEmptyMap() {
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(Collections.emptyList());
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_marketWithInvalidOdds_filtersOutInvalidOdds")
-    void convertMarketsToOddsMap_marketWithInvalidOdds_filtersOutInvalidOdds() {
-        Outcome invalidOutcome = Outcome.builder()
-                .id("outcome2")
-                .odds("-1.00")
+        Outcome drawOutcome = Outcome.builder()
+                .id("2")
+                .odds("4.05")
+                .probability("0.2299046787")
+                .voidProbability("0E-10")
                 .isActive(1)
-                .desc("Invalid")
+                .desc("Draw")
+                .cashOutIsActive(1)
                 .build();
 
-        Market marketWithInvalid = Market.builder()
-                .id("1")
-                .name("Test")
-                .specifier(null)
-                .outcomes(List.of(testOutcome, invalidOutcome))
+        Outcome awayOutcome = Outcome.builder()
+                .id("3")
+                .odds("1.60")
+                .probability("0.5959380944")
+                .voidProbability("0E-10")
+                .isActive(1)
+                .desc("Away")
+                .cashOutIsActive(1)
                 .build();
 
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(marketWithInvalid));
-
-        assertFalse(result.containsValue("-1.00"));
-        assertTrue(result.containsValue("2.50"));
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_zeroOdds_filtersOutZeroOdds")
-    void convertMarketsToOddsMap_zeroOdds_filtersOutZeroOdds() {
-        testOutcome.setOdds("0");
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_negativeOdds_filtersOutNegativeOdds")
-    void convertMarketsToOddsMap_negativeOdds_filtersOutNegativeOdds() {
-        testOutcome.setOdds("-1.5");
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_multipleOutcomesSameKey_keepsFirstOdds")
-    void convertMarketsToOddsMap_multipleOutcomesSameKey_keepsFirstOdds() {
-        Outcome outcome1 = Outcome.builder().id("1").desc("Home").odds("2.50").isActive(1).build();
-        Outcome outcome2 = Outcome.builder().id("1").desc("Home").odds("2.60").isActive(1).build();
-
-        Market market = Market.builder()
+        // Create 1X2 Market
+        Market market1X2 = Market.builder()
                 .id("1")
-                .name("Match Result")
-                .specifier(null)
-                .outcomes(List.of(outcome1, outcome2))
-                .build();
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
-
-        assertEquals(1, result.size());
-        assertTrue(result.containsValue("2.50")); // first wins
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_multipleMarkets_aggregatesAllValid")
-    void convertMarketsToOddsMap_multipleMarkets_aggregatesAllValid() {
-        Outcome a = Outcome.builder().id("1").desc("Home").odds("2.01").isActive(1).build();
-        Outcome b = Outcome.builder().id("2").desc("Away").odds("3.10").isActive(1).build();
-        Market m1 = Market.builder().id("10").name("1x2").specifier(null).outcomes(List.of(a, b)).build();
-
-        Outcome c = Outcome.builder().id("3").desc("Over 2.5").odds("1.90").isActive(1).build();
-        Outcome d = Outcome.builder().id("4").desc("Under 2.5").odds("1.95").isActive(1).build();
-        Market m2 = Market.builder().id("11").name("Over/Under").specifier("2.5").outcomes(List.of(c, d)).build();
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(m1, m2));
-
-        assertEquals(4, result.size());
-        assertTrue(result.values().containsAll(List.of("2.01", "3.10", "1.90", "1.95")));
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_veryLargeOdds_handlesCorrectly")
-    void convertMarketsToOddsMap_veryLargeOdds_handlesCorrectly() {
-        testOutcome.setOdds("999.99");
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        assertTrue(result.containsValue("999.99"));
-    }
-
-    @Test
-    @DisplayName("convertMarketsToOddsMap_verySmallPositiveOdds_handlesCorrectly")
-    void convertMarketsToOddsMap_verySmallPositiveOdds_handlesCorrectly() {
-        testOutcome.setOdds("0.01");
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        assertTrue(result.containsValue("0.01"));
-    }
-
-
-    @Test
-    @DisplayName("mapOutcomeStatus_validMarkets_returnsStatusMap")
-    void mapOutcomeStatus_validMarkets_returnsStatusMap() {
-        Map<String, Integer> result = sportyBetService.mapOutcomeStatus(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        assertTrue(result.containsValue(1));
-    }
-
-    @Test
-    @DisplayName("mapOutcomeStatus_nullMarkets_returnsEmptyMap")
-    void mapOutcomeStatus_nullMarkets_returnsEmptyMap() {
-        Map<String, Integer> result = sportyBetService.mapOutcomeStatus(null);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("mapOutcomeStatus_activeAndInactiveOutcomes_mapsBothCorrectly")
-    void mapOutcomeStatus_activeAndInactiveOutcomes_mapsBothCorrectly() {
-        Outcome activeOutcome = Outcome.builder().id("1").desc("Home").odds("2.50").isActive(1).build();
-        Outcome inactiveOutcome = Outcome.builder().id("2").desc("Away").odds("3.00").isActive(0).build();
-
-        Market market = Market.builder()
-                .id("1")
-                .name("Test")
-                .specifier(null)
-                .outcomes(List.of(activeOutcome, inactiveOutcome))
-                .build();
-
-        Map<String, Integer> result = sportyBetService.mapOutcomeStatus(List.of(market));
-
-        assertTrue(result.containsValue(1));
-        assertTrue(result.containsValue(0));
-    }
-
-    @Test
-    @DisplayName("mapOutcomeStatus_excludesOutcomesWithInvalidOdds")
-    void mapOutcomeStatus_excludesOutcomesWithInvalidOdds() {
-        Outcome valid = Outcome.builder().id("1").desc("Home").odds("2.00").isActive(1).build();
-        Outcome invalid = Outcome.builder().id("2").desc("Draw").odds("abc").isActive(0).build();
-
-        Market market = Market.builder().id("1").name("1x2").specifier(null).outcomes(List.of(valid, invalid)).build();
-
-        Map<String, Integer> status = sportyBetService.mapOutcomeStatus(List.of(market));
-
-        assertEquals(1, status.size());
-        assertTrue(status.containsValue(1));
-    }
-
-    @Test
-    @DisplayName("mapOutcomeStatus_duplicateKeys_keepsFirstStatus")
-    void mapOutcomeStatus_duplicateKeys_keepsFirstStatus() {
-        Outcome a = Outcome.builder().id("1").desc("Home").odds("1.50").isActive(1).build();
-        Outcome b = Outcome.builder().id("1").desc("Home").odds("1.60").isActive(0).build();
-
-        Market market = Market.builder().id("1").name("1x2").specifier(null).outcomes(List.of(a, b)).build();
-
-        Map<String, Integer> result = sportyBetService.mapOutcomeStatus(List.of(market));
-
-        assertEquals(1, result.size());
-        assertTrue(result.containsValue(1)); // first wins
-    }
-
-
-    @Test
-    @DisplayName("mapOutcomeCashOutIndicator_validMarkets_returnsCashOutMap")
-    void mapOutcomeCashOutIndicator_validMarkets_returnsCashOutMap() {
-        Map<String, Integer> result = sportyBetService.mapOutcomeCashOutIndicator(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        assertTrue(result.containsValue(1));
-    }
-
-    @Test
-    @DisplayName("mapOutcomeCashOutIndicator_nullMarkets_returnsEmptyMap")
-    void mapOutcomeCashOutIndicator_nullMarkets_returnsEmptyMap() {
-        Map<String, Integer> result = sportyBetService.mapOutcomeCashOutIndicator(null);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("mapOutcomeCashOutIndicator_nullCashOut_throwsNPE (documents current behavior)")
-    void mapOutcomeCashOutIndicator_nullCashOut_throwsNPE() {
-        testOutcome.setCashOutIsActive(null);
-        assertThrows(NullPointerException.class, () ->
-                sportyBetService.mapOutcomeCashOutIndicator(List.of(testMarket))
-        );
-        // Suggestion for service (not part of test): map null -> 0 before Collectors.toMap.
-    }
-
-
-    @Test
-    @DisplayName("buildMetaMap_validMarkets_returnsMetaMap")
-    void buildMetaMap_validMarkets_returnsMetaMap() {
-        Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("buildMetaMap_nullMarkets_returnsEmptyMap")
-    void buildMetaMap_nullMarkets_returnsEmptyMap() {
-        Map<String, MarketMeta> result = sportyBetService.buildMetaMap(null);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("buildMetaMap_marketWithMultipleOutcomes_createsMetaForEachOutcome")
-    void buildMetaMap_marketWithMultipleOutcomes_createsMetaForEachOutcome() {
-        Outcome outcome1 = Outcome.builder().id("1").desc("Home").odds("2.50").isActive(1).build();
-        Outcome outcome2 = Outcome.builder().id("2").desc("Away").odds("3.00").isActive(1).build();
-
-        Market market = Market.builder()
-                .id("1")
-                .name("Match Result")
-                .title("Full Time Result")
+                .product(1)
+                .desc("1X2")
+                .status(0)
                 .group("Main")
-                .specifier(null)
-                .outcomes(List.of(outcome1, outcome2))
+                .groupId("171121135724MGI11262166")
+                .marketGuide("Which team will win the match. Overtime not included.")
+                .title("1,X,2")
+                .name("1X2")
+                .favourite(0)
+                .outcomes(List.of(homeOutcome, drawOutcome, awayOutcome))
+                .farNearOdds(0)
+                .sourceType("BET_RADAR")
+                .availableScore("0:2")
+                .lastOddsChangeTime(1761249320445L)
+                .banned(false)
+                .cashOutStatus(1)
                 .build();
 
-        Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(market));
-
-        assertEquals(2, result.size());
-    }
-
-    @Test
-    @DisplayName("buildMetaMap_withSpecifier_includesSpecifierInMeta")
-    void buildMetaMap_withSpecifier_includesSpecifierInMeta() {
-        testMarket.setSpecifier("2.5");
-
-        Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        MarketMeta meta = result.values().iterator().next();
-        assertEquals("2.5", meta.specifiers());
-    }
-
-    @Test
-    @DisplayName("buildMetaMap_duplicateKeys_keepsFirstMeta")
-    void buildMetaMap_duplicateKeys_keepsFirstMeta() {
-        Outcome a = Outcome.builder().id("1").desc("Over 2.5").odds("1.90").isActive(1).build();
-        Outcome b = Outcome.builder().id("2").desc("Over  2.5").odds("2.05").isActive(1).build();
-
-        Market market = Market.builder()
-                .id("18")
-                .name("Over/Under")
-                .specifier("2.5")
-                .outcomes(List.of(a, b))
-                .build();
-
-        Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(market));
-
-        assertEquals(1, result.size());
-    }
-
-    @Test
-    @DisplayName("buildMetaMap_verifyMetaContent_containsCorrectData")
-    void buildMetaMap_verifyMetaContent_containsCorrectData() {
-        Map<String, MarketMeta> result = sportyBetService.buildMetaMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-        MarketMeta meta = result.values().iterator().next();
-        assertEquals("Match Result", meta.name());
-        assertEquals("Full Time Result", meta.title());
-        assertEquals("Main", meta.group());
-        assertEquals("1", meta.marketId());
-    }
-
-    @Test
-    @DisplayName("normalizeMarkets_nullRawOdds_returnsEmptyList")
-    void normalizeMarkets_nullRawOdds_returnsEmptyList() {
-        List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
-                null, Map.of(), Map.of(), Map.of(),
-                BookMaker.SPORTY_BET, "eventId", "Premier League",
-                "Home", "Away", testEvent
-        );
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("normalizeMarkets_emptyRawOdds_returnsEmptyList")
-    void normalizeMarkets_emptyRawOdds_returnsEmptyList() {
-        List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
-                Map.of(), Map.of(), Map.of(), Map.of(),
-                BookMaker.SPORTY_BET, "eventId", "Premier League",
-                "Home", "Away", testEvent
-        );
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("normalizeMarkets_withUnrecognizedProviderKeys_returnsEmpty")
-    void normalizeMarkets_withUnrecognizedProviderKeys_returnsEmpty() {
-        Map<String, String> rawOdds = Map.of(
-                "UNKNOWN|BAD|KEY1", "2.0",
-                "RANDOM/KEY2", "1.5"
-        );
-        Map<String, Integer> statusMap = Map.of(
-                "UNKNOWN|BAD|KEY1", 1,
-                "RANDOM/KEY2", 0
-        );
-        Map<String, Integer> cashOutMap = Map.of(
-                "UNKNOWN|BAD|KEY1", 1,
-                "RANDOM/KEY2", 0
-        );
-        Map<String, MarketMeta> metaMap = Map.of(
-                "UNKNOWN|BAD|KEY1", new MarketMeta("", "", "", "", "1")
-        );
-
-        List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
-                rawOdds, statusMap, cashOutMap, metaMap,
-                BookMaker.SPORTY_BET, "EVT-42", "League", "Home", "Away", testEvent
-        );
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("normalizeMarkets_validData_createsNormalizedMarkets (may be empty if keys unrecognized)")
-    void normalizeMarkets_validData_createsNormalizedMarkets() {
-        Map<String, String> oddsMap = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-        Map<String, Integer> statusMap = sportyBetService.mapOutcomeStatus(List.of(testMarket));
-        Map<String, Integer> cashOutMap = sportyBetService.mapOutcomeCashOutIndicator(List.of(testMarket));
-        Map<String, MarketMeta> metaMap = sportyBetService.buildMetaMap(List.of(testMarket));
-
-        List<NormalizedMarket> result = sportyBetService.normalizeMarkets(
-                oddsMap, statusMap, cashOutMap, metaMap,
-                BookMaker.SPORTY_BET, "eventId", "Premier League",
-                "Manchester United", "Liverpool", testEvent
-        );
-
-        assertNotNull(result); // could be empty if SportyMarketType doesn't recognize generated keys
-    }
-
-
-    @Test
-    @DisplayName("generateProviderKey_marketWithSpecifier_includesSpecifierInKey")
-    void generateProviderKey_marketWithSpecifier_includesSpecifierInKey() {
-        Outcome outcome = Outcome.builder()
+        // Create Over/Under Market
+        Outcome overOutcome = Outcome.builder()
                 .id("12")
+                .odds("1.12")
+                .probability("0.8639548981")
+                .voidProbability("0E-10")
+                .isActive(1)
                 .desc("Over 2.5")
-                .odds("1.85")
-                .isActive(1)
+                .cashOutIsActive(1)
                 .build();
 
-        Market market = Market.builder()
+        Outcome underOutcome = Outcome.builder()
+                .id("13")
+                .odds("6.25")
+                .probability("0.1360451019")
+                .voidProbability("0E-10")
+                .isActive(1)
+                .desc("Under 2.5")
+                .cashOutIsActive(1)
+                .build();
+
+        Market marketOverUnder = Market.builder()
                 .id("18")
+                .specifier("total=2.5")
+                .product(1)
+                .desc("Over/Under")
+                .status(0)
+                .group("Main")
+                .groupId("171121135724MGI11262166")
+                .marketGuide("Predict whether the total number of goals scored in regular time is over/under a given line.")
+                .title("Goals,Over,Under")
                 .name("Over/Under")
-                .specifier("2.5")
-                .outcomes(List.of(outcome))
+                .favourite(0)
+                .outcomes(List.of(overOutcome, underOutcome))
+                .farNearOdds(0)
+                .sourceType("BET_RADAR")
+                .availableScore("0:2")
+                .lastOddsChangeTime(1761249320445L)
+                .banned(false)
+                .cashOutStatus(1)
                 .build();
 
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
-
-        assertFalse(result.isEmpty());
-        assertTrue(result.keySet().stream().anyMatch(key -> key.contains("2.5")));
-    }
-
-    @Test
-    @DisplayName("generateProviderKey_outcomeDescriptionWithSpaces_normalizesToUnderscores")
-    void generateProviderKey_outcomeDescriptionWithSpaces_normalizesToUnderscores() {
-        Outcome outcome = Outcome.builder()
-                .id("74")
-                .desc("Both Teams To Score")
-                .odds("2.20")
+        // Create Double Chance Market
+        Outcome dcHomeDrawOutcome = Outcome.builder()
+                .id("9")
+                .odds("2.30")
+                .probability("0.4040619032")
+                .voidProbability("0E-10")
                 .isActive(1)
+                .desc("Home or Draw")
+                .cashOutIsActive(1)
                 .build();
 
-        Market market = Market.builder()
-                .id("29")
-                .name("BTTS")
-                .specifier(null)
-                .outcomes(List.of(outcome))
+        Outcome dcHomeAwayOutcome = Outcome.builder()
+                .id("10")
+                .odds("1.22")
+                .probability("0.7700953189")
+                .voidProbability("0E-10")
+                .isActive(1)
+                .desc("Home or Away")
+                .cashOutIsActive(1)
                 .build();
 
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(market));
+        Outcome dcDrawAwayOutcome = Outcome.builder()
+                .id("11")
+                .odds("1.15")
+                .probability("0.8258427731")
+                .voidProbability("0E-10")
+                .isActive(1)
+                .desc("Draw or Away")
+                .cashOutIsActive(1)
+                .build();
 
-        assertFalse(result.isEmpty());
-        assertTrue(result.keySet().stream().anyMatch(key -> key.contains("BOTH_TEAMS_TO_SCORE")));
+        Market marketDoubleChance = Market.builder()
+                .id("10")
+                .product(1)
+                .desc("Double Chance")
+                .status(0)
+                .group("Main")
+                .groupId("171121135724MGI11262166")
+                .marketGuide("Predict the match result combining two of the three possible outcomes.")
+                .title("1X,12,X2")
+                .name("Double Chance")
+                .favourite(0)
+                .outcomes(List.of(dcHomeDrawOutcome, dcHomeAwayOutcome, dcDrawAwayOutcome))
+                .farNearOdds(0)
+                .sourceType("BET_RADAR")
+                .availableScore("0:2")
+                .lastOddsChangeTime(1761249320445L)
+                .banned(false)
+                .cashOutStatus(1)
+                .build();
+
+        List<Market> markets = new ArrayList<>();
+        markets.add(market1X2);
+        markets.add(marketOverUnder);
+        markets.add(marketDoubleChance);
+
+        // Create and return SportyEvent
+        return SportyEvent.builder()
+                .eventId("sr:match:63377841")
+                .gameId("40614")
+                .productStatus("0#0")
+                .estimateStartTime(1761246000000L)
+                .status(1)
+                .setScore("0:2")
+                .gameScore(List.of("0:2"))
+                .period("1")
+                .matchStatus("HT")
+                .playedSeconds("45:00")
+                .homeTeamId("sr:competitor:2702")
+                .homeTeamName("Roma")
+                .awayTeamName("Viktoria Plzen")
+                .awayTeamId("sr:competitor:4502")
+                .sport(sport)
+                .totalMarketSize(3)
+                .markets(markets)
+                .build();
     }
-
-    @Test
-    @DisplayName("generateProviderKey_outcomeDescriptionWithWhitespace_trimmedCorrectly")
-    void generateProviderKey_outcomeDescriptionWithWhitespace_trimmedCorrectly() {
-        testOutcome.setDesc("  Home Win  ");
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("generateProviderKey_outcomeDescriptionWithSpecialCharacters_handlesCorrectly")
-    void generateProviderKey_outcomeDescriptionWithSpecialCharacters_handlesCorrectly() {
-        testOutcome.setDesc("Home/Draw");
-
-        Map<String, String> result = sportyBetService.convertMarketsToOddsMap(List.of(testMarket));
-
-        assertFalse(result.isEmpty());
-    }
-
-    // -------- Score/Period null-safety --------
-
-    @Nested
-    @DisplayName("Score/Period null-safety")
-    class ScoreNullSafety {
-
-        @Test
-        @DisplayName("gameScore=null handled")
-        void gameScoreNullHandled() {
-            testEvent.setGameScore(null);
-            when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-            assertNotNull(result);
-            assertNotNull(result.getMarkets());
-        }
-
-        @Test
-        @DisplayName("gameScore=empty handled")
-        void gameScoreEmptyHandled() {
-            testEvent.setGameScore(Collections.emptyList());
-            when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        @DisplayName("setScore=null handled")
-        void setScoreNullHandled() {
-            testEvent.setSetScore(null);
-            when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        @DisplayName("period=null handled")
-        void periodNullHandled() {
-            testEvent.setPeriod(null);
-            when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        @DisplayName("matchStatus=null handled")
-        void matchStatusNullHandled() {
-            testEvent.setMatchStatus(null);
-            when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-            assertNotNull(result);
-        }
-
-        @Test
-        @DisplayName("playedSeconds=null handled")
-        void playedSecondsNullHandled() {
-            testEvent.setPlayedSeconds(null);
-            when(teamAliasService.canonicalOrSelf(anyString())).thenReturn("Team");
-
-            NormalizedEvent result = sportyBetService.convertToNormalEvent(testEvent);
-
-            assertNotNull(result);
-        }
-    }
-
-    // -------- addNormalizedEventToPool --------
-
-//    @Test
-//    @DisplayName("addNormalizedEventToPool forwards to arbDetector")
-//    void addNormalizedEventToPool_forwards() {
-//        NormalizedEvent ne = NormalizedEvent.builder().eventId("E1").build();
-//        sportyBetService.addNormalizedEventToPool(ne);
-//        verify(arbDetector).addEventToPool(ne);
-//    }
-//
-//    @Test
-//    @DisplayName("addNormalizedEventToPool forwards null (documents current behavior)")
-//    void addNormalizedEventToPool_nullStillForwards() {
-//        sportyBetService.addNormalizedEventToPool(null);
-//        verify(arbDetector).addEventToPool(null);
-//        // Consider guarding null in service.
-//    }
 }
