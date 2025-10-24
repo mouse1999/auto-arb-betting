@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -58,6 +59,7 @@ public class SportyBetOddsFetcher implements Runnable {
     private final AtomicReference<String> cookieHeaderRef = new AtomicReference<>("");
 
     private UserAgentProfile profile;
+    private final AtomicBoolean schedulesStarted = new AtomicBoolean();
 
 
     @Override
@@ -176,7 +178,7 @@ public class SportyBetOddsFetcher implements Runnable {
         log.debug("Creating new browser context with profile settings");
 
         ViewportSize viewportSize = new ViewportSize(profile.getViewport().getWidth(),
-                profile.getViewport().getWidth());
+                profile.getViewport().getHeight());
 
         Browser.NewContextOptions opts = new Browser.NewContextOptions()
                 .setUserAgent(profile.getUserAgent())
@@ -658,17 +660,14 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void startOrRefreshSchedules() {
-        log.info("Starting/refreshing scheduled tasks");
-        log.info("Schedule period: {}s, Tasks: Football, Basketball, TableTennis", SCHEDULER_PERIOD_SEC);
-
-        scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callFootball), 0, SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
-        log.info("Football scheduler started (initial delay: 0s, period: {}s)", SCHEDULER_PERIOD_SEC);
-
-        scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callBasketball), 5, SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
-        log.info("Basketball scheduler started (initial delay: 5s, period: {}s)", SCHEDULER_PERIOD_SEC);
-
+        if (!schedulesStarted.compareAndSet(false, true)) {
+            log.info("Schedulers already started; skipping.");
+            return;
+        }
+        log.info("Starting scheduled tasks (period: {}s)", SCHEDULER_PERIOD_SEC);
+        scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callFootball),     0,  SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callBasketball),   5,  SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callTableTennis), 10, SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
-        log.info("Table Tennis scheduler started (initial delay: 10s, period: {}s)", SCHEDULER_PERIOD_SEC);
     }
 
     private void safeApiWrapper(Runnable r) {
@@ -1103,11 +1102,11 @@ public class SportyBetOddsFetcher implements Runnable {
 
             // 3) Send to arb detector (sync)
             if (arbDetector != null) {
-                log.debug("Adding event to arb detector pool: eventId={}", normalizedEvent.getEventId());
+                log.info("Adding event to arb detector pool: eventId={}", normalizedEvent.getEventId());
                 arbDetector.addEventToPool(normalizedEvent);
-                log.debug("Event added to arb detector successfully");
+                log.info("Event added to arb detector successfully");
             } else {
-                log.warn("arbDetector is null; skipping addEventToPool for eventId={}", normalizedEvent.getEventId());
+                log.info("arbDetector is null; skipping addEventToPool for eventId={}", normalizedEvent.getEventId());
             }
 
             log.info("Successfully processed event: eventId={}", event.getEventId());

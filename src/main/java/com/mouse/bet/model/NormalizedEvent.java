@@ -16,17 +16,19 @@ import java.util.List;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 public class NormalizedEvent {
-    String eventId;
+    private String eventId;
     private String homeTeam;
-    String awayTeam;
-    String league;
+    private String awayTeam;
+    private String league;
     private Instant startTime;
     private String eventName;
     private Event event;
     private SportEnum sportEnum;
     private long estimateStartTime;
+
+    @Builder.Default
     private Instant lastUpdated = Instant.now();
+
     private BookMaker bookie;
     private List<NormalizedMarket> markets;
-
 }
