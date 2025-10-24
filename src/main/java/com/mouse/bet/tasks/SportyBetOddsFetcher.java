@@ -3,7 +3,8 @@ package com.mouse.bet.tasks;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.microsoft.playwright.*;
-import com.microsoft.playwright.options.*;
+import com.microsoft.playwright.options.Cookie;
+import com.microsoft.playwright.options.WaitUntilState;
 import com.mouse.bet.config.ScraperConfig;
 import com.mouse.bet.detector.ArbDetector;
 import com.mouse.bet.enums.BookMaker;
@@ -24,6 +25,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -37,40 +39,49 @@ public class SportyBetOddsFetcher implements Runnable {
     private final BetLegRetryService betLegRetryService;
     private final ArbDetector arbDetector;
     private final ObjectMapper objectMapper;
-    private final Map<String, APIRequestContext> apiClients = new ConcurrentHashMap<>();
-    private final AtomicReference<Map<String, APIRequestContext>> clientsRef = new AtomicReference<>(Map.of());
+
+    // Playwright
     private final AtomicReference<Playwright> playwrightRef = new AtomicReference<>();
 
+    // Schedulers / Executors
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
+    private final ExecutorService retryExecutor = Executors.newFixedThreadPool(2);
+
+    // Runtime state
+    private final AtomicReference<String> cookieHeaderRef = new AtomicReference<>("");
+    private final AtomicBoolean schedulesStarted = new AtomicBoolean(false);
+    private UserAgentProfile profile;
+
+    // --- API context pools ---
+    // Per-sport pool of contexts (immutable after swap)
+    private final AtomicReference<Map<String, List<APIRequestContext>>> ctxPoolsRef =
+            new AtomicReference<>(Map.of());
+
+    // Per-sport round-robin index
+    private final Map<String, AtomicInteger> rrCounters = new ConcurrentHashMap<>();
+
+    // Per-sport simple lock for pool maintenance
+    private final Map<String, Object> poolLocks = new ConcurrentHashMap<>();
+
+    // Constants
     private static final String BASE_URL   = "https://www.sportybet.com";
     private static final String SPORT_PAGE = BASE_URL + "/ng";
     private static final int CONTEXT_NAV_MAX_RETRIES = 3;
     private static final int API_MAX_RETRIES         = 3;
     private static final long SCHEDULER_PERIOD_SEC   = 45;
+    private static final BookMaker SCRAPER_BOOKMAKER = BookMaker.SPORTY_BET;
+    private static final int CTX_POOL_SIZE           = 6;  // pool size per sport
+    private static final long POOL_DISPOSE_GRACE_MS  = 15_000; // let in-flight calls finish
+
+    // Sport keys
     private static final String KEY_FB  = "sport:1";
     private static final String KEY_BB  = "sport:2";
     private static final String KEY_TT  = "sport:20";
-    private static final BookMaker SCRAPER_BOOKMAKER = BookMaker.SPORTY_BET;
-
-    // Schedulers
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
-    private final ExecutorService retryExecutor = Executors.newFixedThreadPool(2);
-
-    // Collected headers/tokens after a successful nav
-    private final Map<String, String> harvestedHeaders = new ConcurrentHashMap<>();
-    private final AtomicReference<String> cookieHeaderRef = new AtomicReference<>("");
-
-    private UserAgentProfile profile;
-    private final AtomicBoolean schedulesStarted = new AtomicBoolean();
-    private final ThreadLocal<Map<String, APIRequestContext>> threadLocalClients =
-            ThreadLocal.withInitial(HashMap::new);
-    private volatile boolean clientsNeedRefresh = false;
-
 
     @Override
     public void run() {
         log.info("=== Starting SportyBetOddsFetcher ===");
         log.info("Bookmaker: {}, Base URL: {}", SCRAPER_BOOKMAKER, BASE_URL);
-        log.info("Initializing playwright ...");
 
         playwrightRef.set(Playwright.create());
         log.info("Playwright instance created successfully");
@@ -91,51 +102,40 @@ public class SportyBetOddsFetcher implements Runnable {
                             profile.getViewport().getWidth(),
                             profile.getViewport().getHeight());
 
+                    Map<String, String> captured = new HashMap<>();
+
                     try (BrowserContext context = newContext(browser, profile)) {
-                        log.info("Browser context created with custom headers");
-
                         attachAntiDetection(context, profile);
-                        log.info("Anti-detection scripts injected into context");
-
                         Page page = context.newPage();
-                        log.info("New page created, attaching network listeners");
-
-                        Map<String, String> captured = new HashMap<>();
 
                         attachNetworkTaps(page, captured);
-                        log.info("Network response listeners attached");
 
                         performInitialNavigationWithRetry(page);
-                        log.info("Initial navigation completed successfully");
 
                         String cookieHeader = formatCookies(context.cookies());
                         cookieHeaderRef.set(cookieHeader);
-                        log.info("Cookies formatted and stored (length: {})", cookieHeader.length());
-
-                        log.info("Harvested headers count: {}", captured.size());
-                        captured.forEach((k, v) ->
-                                log.debug("Harvested header: {} = {}", k, v.substring(0, Math.min(50, v.length())))
-                        );
-
-                        page.close();
-                        log.debug("Page closed");
-                        context.close();
-                        log.debug("Browser context closed");
-
-                        rebuildClients(pw, cookieHeader, captured, profile);
-                        log.info("API clients rebuilt: {}", apiClients.keySet());
-
-                        startOrRefreshSchedules();
-                        log.info("Schedulers started/refreshed - Period: {}s", SCHEDULER_PERIOD_SEC);
-
-                        long sleepDuration = Duration.ofMinutes(10).toMillis();
-                        log.info("Sleeping for {} minutes before next cycle", sleepDuration / 60000);
-                        Thread.sleep(sleepDuration);
-
+                        log.info("Captured cookies (length={} chars)", cookieHeader.length());
                     } catch (PlaywrightException e) {
-                        log.warn("Context block failed in cycle #{}: {}", cycleCount, e.getMessage());
-                        log.debug("Context error details", e);
+                        log.warn("Context block failed in cycle #{}: {}", cycleCount, e.toString());
+                        continue; // try next cycle
                     }
+
+                    // Build fresh pools and atomically swap
+                    rebuildPoolsAtomically(pw, cookieHeaderRef.get(), captured, profile);
+
+                    // Start schedulers once
+                    if (schedulesStarted.compareAndSet(false, true)) {
+                        startSchedulersOnce();
+                    }
+
+                    // Sleep until next refresh cycle
+                    long sleepMs = Duration.ofMinutes(10).toMillis();
+                    log.info("Sleeping for {} minutes before next cycle", sleepMs / 60000);
+                    Thread.sleep(sleepMs);
+
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
                 } catch (Exception e) {
                     log.error("Browser-level error in cycle #{}: {}", cycleCount, e.getMessage(), e);
                     backoffWithJitter(1);
@@ -152,32 +152,9 @@ public class SportyBetOddsFetcher implements Runnable {
             log.info("Shutting down retry executor...");
             retryExecutor.shutdown();
 
-            // Clean up all thread-local clients
-            log.info("Cleaning up all thread-local clients...");
-            threadLocalClients.remove();
-
-            // Dispose old shared clients if any
-            log.info("Disposing {} shared API clients...", apiClients.size());
-            apiClients.values().forEach(c -> {
-                try {
-                    c.dispose();
-                } catch (Exception e) {
-                    log.debug("Error disposing shared client: {}", e.getMessage());
-                }
-            });
-            apiClients.clear();
-
-            // Also dispose clients from clientsRef
-            Map<String, APIRequestContext> oldClients = clientsRef.get();
-            if (oldClients != null) {
-                oldClients.values().forEach(c -> {
-                    try {
-                        c.dispose();
-                    } catch (Exception e) {
-                        log.debug("Error disposing client from ref: {}", e.getMessage());
-                    }
-                });
-            }
+            log.info("Disposing API client pools...");
+            Map<String, List<APIRequestContext>> pools = ctxPoolsRef.getAndSet(Map.of());
+            disposePools(pools);
 
             Playwright pw = playwrightRef.getAndSet(null);
             if (pw != null) {
@@ -189,59 +166,39 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-
     // -------------------- Browser/Context helpers --------------------
 
     private Browser launchBrowser(Playwright pw) {
         log.info("Launching new browser instance (headless=true, flags: {})",
                 scraperConfig.getBROWSER_FlAGS());
 
-        Browser browser = pw.chromium().launch(new BrowserType.LaunchOptions()
+        return pw.chromium().launch(new BrowserType.LaunchOptions()
                 .setHeadless(true)
                 .setArgs(scraperConfig.getBROWSER_FlAGS()));
-
-        log.info("Browser launched successfully");
-        return browser;
     }
 
     private BrowserContext newContext(Browser browser, UserAgentProfile profile) {
-        log.debug("Creating new browser context with profile settings");
-
-        ViewportSize viewportSize = new ViewportSize(profile.getViewport().getWidth(),
-                profile.getViewport().getHeight());
+        int w = profile.getViewport().getWidth();
+        int h = profile.getViewport().getHeight(); // ✅ correct height
 
         Browser.NewContextOptions opts = new Browser.NewContextOptions()
                 .setUserAgent(profile.getUserAgent())
-                .setViewportSize(viewportSize)
+                .setViewportSize(w, h)
                 .setExtraHTTPHeaders(getAllHeaders(profile));
 
-        BrowserContext context = browser.newContext(opts);
-        log.debug("Browser context created with viewport {}x{}",
-                viewportSize.width, viewportSize.height);
-
-        return context;
+        return browser.newContext(opts);
     }
 
-    public Map<String, String> getAllHeaders(UserAgentProfile profile) {
-        log.debug("Assembling headers from profile");
+    private Map<String, String> getAllHeaders(UserAgentProfile profile) {
+        Map<String, String> all = new HashMap<>();
+        Map<String, String> std = profile.getHeaders().getStandardHeaders();
+        Map<String, String> hints = profile.getHeaders().getClientHintsHeaders();
 
-        Map<String, String> allHeaders = new HashMap<>();
-        Map<String, String> standardHeaders = profile.getHeaders().getStandardHeaders();
-        Map<String, String> clientHintsHeaders = profile.getHeaders().getClientHintsHeaders();
+        if (std != null) all.putAll(std);
+        if (hints != null) all.putAll(hints);
 
-        if (standardHeaders != null) {
-            allHeaders.putAll(standardHeaders);
-            log.debug("Added {} standard headers", standardHeaders.size());
-        }
-        if (clientHintsHeaders != null) {
-            allHeaders.putAll(clientHintsHeaders);
-            log.debug("Added {} client hints headers", clientHintsHeaders.size());
-        }
-
-        log.debug("Total headers assembled: {}", allHeaders.size());
-        return allHeaders;
+        return all;
     }
-
 
     private void attachAntiDetection(BrowserContext context, UserAgentProfile profile) {
         log.info("Injecting anti-detection stealth script");
@@ -592,78 +549,101 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void attachNetworkTaps(Page page, Map<String,String> store) {
-        log.debug("Attaching network response listeners for header harvesting");
-
         page.onResponse(resp -> {
             String url = resp.url();
             int status = resp.status();
 
             if ((url.contains("prematch") || url.contains("odds")) && status >= 200 && status < 400) {
-                log.debug("Capturing headers from response: {} (status: {})", url, status);
-
                 Map<String, String> headers = resp.headers();
-                headers.forEach((k,v) -> {
+                headers.forEach((k, v) -> {
                     String key = k.toLowerCase(Locale.ROOT);
-                    if (key.equals("authorization") || key.equals("x-csrf-token") || key.equals("set-cookie")) {
+                    // Only carry forward request-useful headers
+                    if (key.equals("authorization") || key.equals("x-csrf-token")) {
                         store.put(key, v);
-                        log.debug("Harvested header: {}", key);
                     }
                 });
             }
         });
-
-        log.debug("Network listeners attached");
     }
 
     private void performInitialNavigationWithRetry(Page page) {
-        log.info("Starting initial navigation to {}", SPORT_PAGE);
-
         int attempt = 0;
         while (true) {
             try {
-                log.info("Navigate attempt {} to {}", attempt + 1, SPORT_PAGE);
-
                 page.navigate(SPORT_PAGE, new Page.NavigateOptions()
                         .setTimeout(45_000)
                         .setWaitUntil(WaitUntilState.NETWORKIDLE));
-
-                log.debug("Navigation completed, waiting for body selector");
                 page.waitForSelector("body", new Page.WaitForSelectorOptions().setTimeout(10_000));
-
-                log.info("Initial page load successful on attempt {}", attempt + 1);
                 return;
-
             } catch (PlaywrightException e) {
-                log.warn("Nav attempt {} failed: {}", attempt + 1, e.getMessage());
-
-                if (attempt++ >= SportyBetOddsFetcher.CONTEXT_NAV_MAX_RETRIES - 1) {
-                    log.error("Navigation failed after {} attempts", CONTEXT_NAV_MAX_RETRIES);
-                    throw e;
-                }
-
-                log.info("Retrying navigation after backoff...");
+                if (attempt++ >= CONTEXT_NAV_MAX_RETRIES - 1) throw e;
                 backoffWithJitter(attempt);
             }
         }
     }
 
     private String formatCookies(List<Cookie> cookies) {
-        log.debug("Formatting {} cookies", cookies.size());
-
-        String joined = cookies.stream()
+        return cookies.stream()
                 .map(c -> c.name + "=" + c.value)
-                .reduce((a,b) -> a + "; " + b)
-                .orElse("");
-
-        log.debug("Cookie header formatted: length={}, cookies={}", joined.length(), cookies.size());
-        return joined;
+                .collect(Collectors.joining("; "));
     }
 
-    // -------------------- API client & schedulers --------------------
+    // -------------------- API client pools --------------------
+
+    private void rebuildPoolsAtomically(Playwright pw, String cookie, Map<String,String> harvested, UserAgentProfile profile) {
+        log.info("Rebuilding API client pools (atomic swap)");
+
+        Map<String, List<APIRequestContext>> fresh = new HashMap<>();
+        fresh.put(KEY_FB, buildPoolForKey(pw, cookie, harvested, profile));
+        fresh.put(KEY_BB, buildPoolForKey(pw, cookie, harvested, profile));
+        fresh.put(KEY_TT, buildPoolForKey(pw, cookie, harvested, profile));
+
+        // Init counters/locks if missing
+        for (String key : fresh.keySet()) {
+            rrCounters.computeIfAbsent(key, k -> new AtomicInteger());
+            poolLocks.computeIfAbsent(key, k -> new Object());
+        }
+
+        Map<String, List<APIRequestContext>> old = ctxPoolsRef.getAndSet(
+                Map.copyOf(fresh) // make it immutable snapshot
+        );
+
+        // Dispose old pools *after* short grace period to let in-flight calls finish
+        disposePoolsAsync(old);
+        log.info("API client pools swapped successfully");
+    }
+
+    private List<APIRequestContext> buildPoolForKey(Playwright pw, String cookie, Map<String,String> harvested, UserAgentProfile profile) {
+        List<APIRequestContext> pool = new ArrayList<>(CTX_POOL_SIZE);
+        for (int i = 0; i < CTX_POOL_SIZE; i++) {
+            pool.add(
+                    pw.request().newContext(
+                            new APIRequest.NewContextOptions()
+                                    .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))
+                    )
+            );
+        }
+        return Collections.unmodifiableList(pool);
+    }
+
+    private void disposePools(Map<String, List<APIRequestContext>> pools) {
+        if (pools == null || pools.isEmpty()) return;
+        pools.values().forEach(list -> list.forEach(APIRequestContext::dispose));
+    }
+
+    private void disposePoolsAsync(Map<String, List<APIRequestContext>> old) {
+        if (old == null || old.isEmpty()) return;
+        scheduler.schedule(() -> {
+            try {
+                disposePools(old);
+                log.info("Disposed old API client pools");
+            } catch (Exception e) {
+                log.warn("Failed to dispose old pools: {}", e.toString());
+            }
+        }, POOL_DISPOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+    }
 
     private Map<String,String> buildHeaders(String cookieHeader, Map<String,String> harvested, UserAgentProfile profile) {
-        log.debug("Building API request headers");
-
         Map<String,String> h = new HashMap<>();
         h.put("User-Agent", profile.getUserAgent());
         h.put("Referer", SPORT_PAGE);
@@ -671,29 +651,56 @@ public class SportyBetOddsFetcher implements Runnable {
         h.put("Accept", "application/json");
         h.put("Content-Type", "application/json");
         h.put("X-Requested-With", "XMLHttpRequest");
-        if (harvested != null) h.putAll(harvested);
 
-        log.debug("Built headers: {} total (including {} harvested)", h.size(), harvested.size());
+        if (harvested != null) {
+            harvested.forEach((k,v) -> {
+                String key = k.toLowerCase(Locale.ROOT);
+                if (key.equals("authorization") || key.equals("x-csrf-token")) {
+                    h.put(key, v);
+                }
+            });
+        }
         return h;
     }
 
-//    private APIRequestContext getOrCreateClient(String key, Playwright pw, String cookieHeader,
-//                                                Map<String,String> harvested, UserAgentProfile profile) {
-//        log.debug("Getting or creating API client for key: {}", key);
-//
-//        return apiClients.computeIfAbsent(key, k -> {
-//            log.info("Creating new API client for key: {}", k);
-//            return pw.request().newContext(
-//                    new APIRequest.NewContextOptions().setExtraHTTPHeaders(buildHeaders(cookieHeader, harvested, profile))
-//            );
-//        });
-//    }
+    private APIRequestContext pickCtx(String key) {
+        List<APIRequestContext> pool = ctxPoolsRef.get().get(key);
+        if (pool == null || pool.isEmpty()) throw new IllegalStateException("No API context pool for key " + key);
+        AtomicInteger ctr = rrCounters.get(key);
+        int idx = Math.abs(ctr.getAndIncrement() % pool.size());
+        return pool.get(idx);
+    }
 
-    private void startOrRefreshSchedules() {
-        if (!schedulesStarted.compareAndSet(false, true)) {
-            log.info("Schedulers already started; skipping.");
-            return;
+    private void refreshOneCtxInPool(String key, APIRequestContext toReplace) {
+        synchronized (poolLocks.get(key)) {
+            Map<String, List<APIRequestContext>> snapshot = ctxPoolsRef.get();
+            List<APIRequestContext> pool = snapshot.get(key);
+            if (pool == null || pool.isEmpty()) return;
+
+            // Create a mutable copy, replace the specific instance, then swap
+            List<APIRequestContext> newPool = new ArrayList<>(pool);
+            int idx = newPool.indexOf(toReplace);
+            if (idx < 0) return; // not found (already rotated)
+            try {
+                toReplace.dispose();
+            } catch (Exception ignored) {}
+
+            APIRequestContext fresh = playwrightRef.get().request().newContext(
+                    new APIRequest.NewContextOptions().setExtraHTTPHeaders(
+                            buildHeaders(cookieHeaderRef.get(), Map.of(), profile)
+                    )
+            );
+            newPool.set(idx, fresh);
+
+            Map<String, List<APIRequestContext>> newSnapshot = new HashMap<>(snapshot);
+            newSnapshot.put(key, Collections.unmodifiableList(newPool));
+            ctxPoolsRef.set(Collections.unmodifiableMap(newSnapshot));
         }
+    }
+
+    // -------------------- Schedulers --------------------
+
+    private void startSchedulersOnce() {
         log.info("Starting scheduled tasks (period: {}s)", SCHEDULER_PERIOD_SEC);
         scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callFootball),     0,  SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(() -> safeApiWrapper(this::callBasketball),   5,  SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS);
@@ -708,6 +715,8 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
+    // -------------------- Callers --------------------
+
     private void callFootball() {
         log.info("=== Starting Football fetch ===");
         long startTime = System.currentTimeMillis();
@@ -716,67 +725,39 @@ public class SportyBetOddsFetcher implements Runnable {
             String url = buildUrl(BASE_URL + "/api/ng/factsCenter/liveOrPrematchEvents",
                     Map.of("sportId","sr:sport:1","_t",String.valueOf(System.currentTimeMillis())));
 
-            log.debug("Football API URL: {}", url);
-
             String body = safeApiGet(url, KEY_FB);
-            log.debug("Football response received: {} chars", body != null ? body.length() : 0);
-
             List<String> eventIds = extractEventIds(body);
-
             if (eventIds == null || eventIds.isEmpty()) {
                 log.info("No football events found");
                 return;
             }
 
-            log.info("Found {} football events", eventIds.size());
-
             int parallelism = Math.min(12, Math.max(4, eventIds.size() / 2));
-            log.info("Processing football events with parallelism: {}", parallelism);
-
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
+
             try {
                 List<Callable<Void>> tasks = eventIds.stream().map(eventId -> (Callable<Void>) () -> {
-                    try {
-                        fetchAndProcessEventDetail(eventId, KEY_FB);
-                        return null;
-                    } finally {
-                        // Clean up thread-local clients after processing
-                        cleanupThreadLocalClients();
-                    }
+                    fetchAndProcessEventDetail(eventId, KEY_FB);
+                    return null;
                 }).toList();
 
                 List<Future<Void>> futures = pool.invokeAll(tasks);
-
-                int successCount = 0;
-                int failureCount = 0;
-
+                int success = 0, fail = 0;
                 for (Future<Void> f : futures) {
-                    try {
-                        f.get();
-                        successCount++;
-                    } catch (ExecutionException | InterruptedException ee) {
-                        failureCount++;
-                        Throwable cause = ee.getCause();
-                        if (cause instanceof PlaywrightException pe) {
-                            log.warn("Football detail call PlaywrightException: {}", pe.getMessage());
-                        } else {
-                            log.warn("Football detail call error: {}", cause == null ? "unknown" : cause.getMessage());
-                        }
-                    }
+                    try { f.get(); success++; }
+                    catch (Exception ex) { fail++; log.warn("Football detail call error: {}", ex.getMessage()); }
                 }
-
-                log.info("Football batch complete: {} successful, {} failed", successCount, failureCount);
+                log.info("Football batch complete: {} successful, {} failed", success, fail);
 
             } catch (InterruptedException e) {
-                log.error("Football task execution interrupted", e);
+                Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             } finally {
                 pool.shutdownNow();
             }
         });
 
-        long duration = System.currentTimeMillis() - startTime;
-        log.info("=== Football fetch complete (duration: {}ms) ===", duration);
+        log.info("=== Football fetch complete ({}ms) ===", (System.currentTimeMillis() - startTime));
     }
 
     private void callBasketball() {
@@ -787,66 +768,39 @@ public class SportyBetOddsFetcher implements Runnable {
             String url = buildUrl(BASE_URL + "/api/ng/factsCenter/liveOrPrematchEvents",
                     Map.of("sportId","sr:sport:2","_t",String.valueOf(System.currentTimeMillis())));
 
-            log.debug("Basketball API URL: {}", url);
-
             String body = safeApiGet(url, KEY_BB);
-            log.debug("Basketball response received: {} chars", body != null ? body.length() : 0);
-
             List<String> eventIds = extractEventIds(body);
-
             if (eventIds == null || eventIds.isEmpty()) {
                 log.info("No basketball events found");
                 return;
             }
 
-            log.info("Found {} basketball events", eventIds.size());
-
             int parallelism = Math.min(12, Math.max(4, eventIds.size() / 2));
-            log.info("Processing basketball events with parallelism: {}", parallelism);
-
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
+
             try {
                 List<Callable<Void>> tasks = eventIds.stream().map(eventId -> (Callable<Void>) () -> {
-                    try {
-                        fetchAndProcessEventDetail(eventId, KEY_BB);
-                        return null;
-                    } finally {
-                        cleanupThreadLocalClients();
-                    }
+                    fetchAndProcessEventDetail(eventId, KEY_BB);
+                    return null;
                 }).toList();
 
                 List<Future<Void>> futures = pool.invokeAll(tasks);
-
-                int successCount = 0;
-                int failureCount = 0;
-
+                int success = 0, fail = 0;
                 for (Future<Void> f : futures) {
-                    try {
-                        f.get();
-                        successCount++;
-                    } catch (ExecutionException | InterruptedException ee) {
-                        failureCount++;
-                        Throwable cause = ee.getCause();
-                        if (cause instanceof PlaywrightException pe) {
-                            log.warn("Basketball detail call PlaywrightException: {}", pe.getMessage());
-                        } else {
-                            log.warn("Basketball detail call error: {}", cause == null ? "unknown" : cause.getMessage());
-                        }
-                    }
+                    try { f.get(); success++; }
+                    catch (Exception ex) { fail++; log.warn("Basketball detail call error: {}", ex.getMessage()); }
                 }
-
-                log.info("Basketball batch complete: {} successful, {} failed", successCount, failureCount);
+                log.info("Basketball batch complete: {} successful, {} failed", success, fail);
 
             } catch (InterruptedException e) {
-                log.error("Basketball task execution interrupted", e);
+                Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             } finally {
                 pool.shutdownNow();
             }
         });
 
-        long duration = System.currentTimeMillis() - startTime;
-        log.info("=== Basketball fetch complete (duration: {}ms) ===", duration);
+        log.info("=== Basketball fetch complete ({}ms) ===", (System.currentTimeMillis() - startTime));
     }
 
     private void callTableTennis() {
@@ -857,89 +811,50 @@ public class SportyBetOddsFetcher implements Runnable {
             String url = buildUrl(BASE_URL + "/api/ng/factsCenter/liveOrPrematchEvents",
                     Map.of("sportId","sr:sport:20","_t",String.valueOf(System.currentTimeMillis())));
 
-            log.debug("Table Tennis API URL: {}", url);
-
             String body = safeApiGet(url, KEY_TT);
-            log.debug("Table Tennis response received: {} chars", body != null ? body.length() : 0);
-
             List<String> eventIds = extractEventIds(body);
-
             if (eventIds == null || eventIds.isEmpty()) {
                 log.info("No table tennis events found");
                 return;
             }
 
-            log.info("Found {} table tennis events", eventIds.size());
-
             int parallelism = Math.min(12, Math.max(4, eventIds.size() / 2));
-            log.info("Processing table tennis events with parallelism: {}", parallelism);
-
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
+
             try {
                 List<Callable<Void>> tasks = eventIds.stream().map(eventId -> (Callable<Void>) () -> {
-                    try {
-                        fetchAndProcessEventDetail(eventId, KEY_TT);
-                        return null;
-                    } finally {
-                        cleanupThreadLocalClients();
-                    }
+                    fetchAndProcessEventDetail(eventId, KEY_TT);
+                    return null;
                 }).toList();
 
                 List<Future<Void>> futures = pool.invokeAll(tasks);
-
-                int successCount = 0;
-                int failureCount = 0;
-
+                int success = 0, fail = 0;
                 for (Future<Void> f : futures) {
-                    try {
-                        f.get();
-                        successCount++;
-                    } catch (ExecutionException | InterruptedException ee) {
-                        failureCount++;
-                        Throwable cause = ee.getCause();
-                        if (cause instanceof PlaywrightException pe) {
-                            log.warn("Table Tennis detail call PlaywrightException: {}", pe.getMessage());
-                        } else {
-                            log.warn("Table Tennis detail call error: {}", cause == null ? "unknown" : cause.getMessage());
-                        }
-                    }
+                    try { f.get(); success++; }
+                    catch (Exception ex) { fail++; log.warn("Table Tennis detail call error: {}", ex.getMessage()); }
                 }
-
-                log.info("Table Tennis batch complete: {} successful, {} failed", successCount, failureCount);
+                log.info("Table Tennis batch complete: {} successful, {} failed", success, fail);
 
             } catch (InterruptedException e) {
-                log.error("Table Tennis task execution interrupted", e);
+                Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             } finally {
                 pool.shutdownNow();
             }
         });
 
-        long duration = System.currentTimeMillis() - startTime;
-        log.info("=== Table Tennis fetch complete (duration: {}ms) ===", duration);
+        log.info("=== Table Tennis fetch complete ({}ms) ===", (System.currentTimeMillis() - startTime));
     }
+
+    // -------------------- Details --------------------
+
     private List<String> extractEventIds(String body) {
-        log.debug("Extracting event IDs from response body");
-
-        List<String> eventIds = JsonParser.extractEventIds(body);
-
-        if (eventIds != null) {
-            log.debug("Extracted {} event IDs", eventIds.size());
-        } else {
-            log.debug("No event IDs extracted (null result)");
-        }
-
-        return eventIds;
+        return JsonParser.extractEventIds(body);
     }
 
-    /** Second API call: per-event detail JSON -> parse -> normalize -> dispatch */
     private void fetchAndProcessEventDetail(String eventId, String clientKey) {
-        log.debug("Fetching detail for eventId: {} using client: {}", eventId, clientKey);
-
         apiCallWithRetry(() -> {
             String url = buildEventDetailUrl(eventId);
-            log.debug("Detail URL for {}: {}", eventId, url);
-
             String body = safeApiGet(url, clientKey);
 
             if (body == null || body.isBlank()) {
@@ -947,15 +862,9 @@ public class SportyBetOddsFetcher implements Runnable {
                 return;
             }
 
-            log.debug("Received detail body for eventId={}: {} chars", eventId, body.length());
-
             try {
                 SportyEvent domainEvent = parseEventDetail(body);
-                log.debug("Successfully parsed SportyEvent for eventId={}", eventId);
-
                 processParsedEvent(domainEvent);
-                log.debug("Successfully processed event: {}", domainEvent.getEventId());
-
             } catch (Exception ex) {
                 log.error("Failed to parse/process eventId={} detail: {}", eventId, ex.getMessage(), ex);
             }
@@ -963,70 +872,19 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private SportyEvent parseEventDetail(String detailJson) {
-        log.debug("Parsing event detail JSON (length: {})", detailJson.length());
-
-        SportyEvent event = JsonParser.deserializeSportyEvent(detailJson, objectMapper);
-
-        if (event != null) {
-            log.debug("Parsed SportyEvent: eventId={}", event.getEventId());
-        } else {
-            log.warn("Failed to parse SportyEvent - result is null");
-        }
-
-        return event;
+        return JsonParser.deserializeSportyEvent(detailJson, objectMapper);
     }
 
-    /** If Sporty has a different detail endpoint, change here (kept centralized). */
     private String buildEventDetailUrl(String eventId) {
-        log.trace("Building detail URL for eventId: {}", eventId);
-
         String base = BASE_URL + "/api/ng/factsCenter/event";
-        String url = buildUrl(base, Map.of(
+        return buildUrl(base, Map.of(
                 "eventId", eventId,
                 "productId", "1",
                 "_t", String.valueOf(System.currentTimeMillis())
         ));
-
-        log.trace("Built detail URL: {}", url);
-        return url;
     }
 
-    private synchronized void refreshSingleClient(String key) {
-        log.info("Refreshing API client for key: {}", key);
-
-        Map<String, APIRequestContext> current = new HashMap<>(clientsRef.get());
-        APIRequestContext old = current.get(key);
-
-        // Create new client BEFORE disposing old one
-        APIRequestContext fresh = playwrightRef.get().request().newContext(
-                new APIRequest.NewContextOptions()
-                        .setExtraHTTPHeaders(buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile))
-        );
-
-        // Atomic swap
-        current.put(key, fresh);
-        clientsRef.set(Collections.unmodifiableMap(current));
-
-        // Now dispose old client with a small delay to allow in-flight requests to complete
-        if (old != null) {
-            CompletableFuture.runAsync(() -> {
-                try {
-                    Thread.sleep(1000); // Give in-flight requests time to complete
-                    old.dispose();
-                    log.info("Disposed old API client for key: {}", key);
-                } catch (Exception e) {
-                    log.warn("Error disposing old client for key {}: {}", key, e.getMessage());
-                }
-            });
-        }
-    }
-
-
-
-    /** URL builder with simple encoding for query params. */
     private String buildUrl(String base, Map<String, String> params) {
-        log.trace("Building URL - base: {}, params: {}", base, params != null ? params.size() : 0);
-
         StringBuilder sb = new StringBuilder(base);
         if (params != null && !params.isEmpty()) {
             sb.append("?");
@@ -1034,108 +892,28 @@ public class SportyBetOddsFetcher implements Runnable {
                     .map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
                     .collect(Collectors.joining("&")));
         }
-
-        String url = sb.toString();
-        log.trace("Built URL: {}", url);
-        return url;
+        return sb.toString();
     }
 
     private String encode(String s) {
-        try {
-            return URLEncoder.encode(s, StandardCharsets.UTF_8);
-        }
-        catch (Exception e) {
-            log.error("URL encoding failed for string: {}", s, e);
-            throw new RuntimeException("Encoding failed", e);
-        }
+        try { return URLEncoder.encode(s, StandardCharsets.UTF_8); }
+        catch (Exception e) { throw new RuntimeException("Encoding failed", e); }
     }
 
-    private APIRequestContext getThreadLocalClient(String clientKey) {
-        Map<String, APIRequestContext> localClients = threadLocalClients.get();
-
-        // Check if we need to refresh due to auth issues
-        if (clientsNeedRefresh) {
-            // Dispose old clients for this thread
-            localClients.values().forEach(c -> {
-                try {
-                    c.dispose();
-                } catch (Exception e) {
-                    log.debug("Error disposing thread-local client: {}", e.getMessage());
-                }
-            });
-            localClients.clear();
-            clientsNeedRefresh = false;
-        }
-
-        // Create new client if needed
-        if (!localClients.containsKey(clientKey)) {
-            log.debug("Creating new thread-local API client for key: {} on thread: {}",
-                    clientKey, Thread.currentThread().getName());
-
-            Playwright pw = playwrightRef.get();
-            if (pw == null) {
-                throw new IllegalStateException("Playwright instance not available");
-            }
-
-            APIRequestContext newClient = pw.request().newContext(
-                    new APIRequest.NewContextOptions()
-                            .setExtraHTTPHeaders(buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile))
-                            .setTimeout(30_000) // 30 second timeout
-            );
-
-            localClients.put(clientKey, newClient);
-        }
-
-        return localClients.get(clientKey);
-    }
-
-
-    private void cleanupThreadLocalClients() {
-        Map<String, APIRequestContext> localClients = threadLocalClients.get();
-        if (localClients != null && !localClients.isEmpty()) {
-            log.debug("Cleaning up {} thread-local clients", localClients.size());
-            localClients.values().forEach(c -> {
-                try {
-                    c.dispose();
-                } catch (Exception e) {
-                    log.debug("Error disposing thread-local client: {}", e.getMessage());
-                }
-            });
-            localClients.clear();
-        }
-        threadLocalClients.remove();
-    }
-
-
+    // -------------------- HTTP with Pool + Recovery --------------------
 
     private String safeApiGet(String url, String clientKey) {
-        return safeApiGet(url, clientKey, 0);
-    }
-
-    private String safeApiGet(String url, String clientKey, int authRetryCount) {
-        if (authRetryCount > 2) {
-            log.error("Max auth retries exceeded for URL: {}", url);
-            throw new PlaywrightException("Max auth retries exceeded");
-        }
-
-        APIRequestContext client = null;
+        APIRequestContext ctx = pickCtx(clientKey);
         try {
-            client = getThreadLocalClient(clientKey);
-
-            APIResponse res = client.get(url);
+            APIResponse res = ctx.get(url);
             int status = res.status();
 
             if (status == 401 || status == 403) {
-                log.warn("Auth {} for {}, marking clients for refresh and retrying", status, url);
-
-                // Mark for refresh globally
-                clientsNeedRefresh = true;
-
-                // Small delay before retry
-                Thread.sleep(500);
-
-                // Recursive retry with incremented counter
-                return safeApiGet(url, clientKey, authRetryCount + 1);
+                log.warn("Auth {} for {}, refreshing one ctx in {} and retrying once", status, url, clientKey);
+                refreshOneCtxInPool(clientKey, ctx);
+                APIRequestContext ctx2 = pickCtx(clientKey);
+                res = ctx2.get(url);
+                status = res.status();
             }
 
             String body = safeBody(res);
@@ -1143,167 +921,90 @@ public class SportyBetOddsFetcher implements Runnable {
                 log.warn("GET {} -> {} {} body: {}", url, status, res.statusText(), snippet(body));
                 throw new PlaywrightException("HTTP " + status + " on " + url);
             }
-
             return body;
 
         } catch (PlaywrightException e) {
+            String msg = String.valueOf(e.getMessage());
+            // Transport recovery: "Cannot find command to respond"
+            if (msg.contains("Cannot find command to respond")) {
+                log.warn("Transport error on {}, rotating one ctx for {} and retrying once", url, clientKey);
+                refreshOneCtxInPool(clientKey, ctx);
+                APIRequestContext ctx2 = pickCtx(clientKey);
+                APIResponse res2 = ctx2.get(url);
+                int status2 = res2.status();
+                String body2 = safeBody(res2);
+                if (status2 >= 200 && status2 < 300) return body2;
+                throw new PlaywrightException("HTTP " + status2 + " on retry for " + url);
+            }
             log.error("Playwright error during API call to {}: {}", url, e.getMessage());
-
-            // If it's a "Cannot find command" error, dispose this thread's clients and retry once
-            if (e.getMessage().contains("Cannot find command") && authRetryCount == 0) {
-                log.warn("Detected 'Cannot find command' error, disposing thread-local clients and retrying");
-                cleanupThreadLocalClients();
-                return safeApiGet(url, clientKey, authRetryCount + 1);
-            }
-
             throw e;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted during API call", e);
         }
     }
 
-
-
-
-    private void rebuildClients(Playwright pw, String cookie, Map<String,String> harvested, UserAgentProfile profile) {
-        log.info("Rebuilding API clients (atomic swap)");
-        Map<String, APIRequestContext> newMap = new HashMap<>();
-        newMap.put(KEY_FB, pw.request().newContext(new APIRequest.NewContextOptions()
-                .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))));
-        newMap.put(KEY_BB, pw.request().newContext(new APIRequest.NewContextOptions()
-                .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))));
-        newMap.put(KEY_TT, pw.request().newContext(new APIRequest.NewContextOptions()
-                .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))));
-
-        Map<String, APIRequestContext> old = clientsRef.getAndSet(Collections.unmodifiableMap(newMap));
-        log.info("API clients swapped. Disposing {} old clients...", old.size());
-        old.values().forEach(APIRequestContext::dispose);
+    private String safeBody(APIResponse res) {
+        try { return res.text(); }
+        catch (Exception e) { log.warn("Failed to extract response body: {}", e.getMessage()); return null; }
     }
 
+    // -------------------- Normalize/Dispatch --------------------
 
-
-    private void apiCallWithRetry(Runnable call) {
-        log.debug("Starting API call with retry logic (max retries: {})", API_MAX_RETRIES);
-
-        int attempt = 0;
-        while (true) {
-            try {
-                call.run();
-                log.debug("API call succeeded on attempt {}", attempt + 1);
-                return;
-            } catch (PlaywrightException e) {
-                attempt++;
-                log.warn("API call failed (attempt {}): {}", attempt, e.getMessage());
-
-                if (attempt >= API_MAX_RETRIES) {
-                    log.error("API call failed after {} attempts", API_MAX_RETRIES);
-                    throw e;
-                }
-
-                log.info("Retrying API call after backoff (attempt {} of {})", attempt, API_MAX_RETRIES);
-                backoffWithJitter(attempt);
-            } catch (RuntimeException e) {
-                log.error("Non-retryable RuntimeException in API call: {}", e.getMessage(), e);
-                throw e;
-            }
-        }
-    }
-
-    /** Normalize + route to downstream systems (ArbDetector, caches, retries, etc.). */
     private void processParsedEvent(SportyEvent event) {
-        if (event == null) {
-            log.debug("processParsedEvent: event is null, skipping.");
-            return;
-        }
-
-        log.info("Processing parsed event: eventId={}", event.getEventId());
+        if (event == null) return;
 
         try {
-            // 1) Normalize (sync)
-            log.info("Converting SportyEvent to NormalizedEvent for eventId={}", event.getEventId());
             NormalizedEvent normalizedEvent = sportyBetService.convertToNormalEvent(event);
+            if (normalizedEvent == null) return;
 
-            if (normalizedEvent == null) {
-                log.info("convertToNormalEvent returned null for eventId={}", event.getEventId());
-                return;
-            }
-
-            log.info("Normalized event created successfully for eventId={}", normalizedEvent.getEventId());
-
-            // 2) Process bet-retry info (async, separate thread)
-            log.info("Submitting bet retry processing to executor for eventId={}", normalizedEvent.getEventId());
             CompletableFuture
                     .runAsync(() -> processBetRetryInfo(normalizedEvent), retryExecutor)
-                    .exceptionally(ex -> {
-                        log.error("processBetRetryInfo failed for eventId={}, err={}",
-                                normalizedEvent.getEventId(), ex.getMessage(), ex);
-                        return null;
-                    });
+                    .exceptionally(ex -> { log.error("processBetRetryInfo failed: {}", ex.getMessage(), ex); return null; });
 
-            // 3) Send to arb detector (sync)
             if (arbDetector != null) {
-                log.info("Adding event to arb detector pool: eventId={}", normalizedEvent.getEventId());
                 arbDetector.addEventToPool(normalizedEvent);
-                log.info("Event added to arb detector successfully");
-            } else {
-                log.info("arbDetector is null; skipping addEventToPool for eventId={}", normalizedEvent.getEventId());
             }
-
-            log.info("Successfully processed event: eventId={}", event.getEventId());
-
         } catch (Exception e) {
-            log.error("processParsedEvent failed for eventId={}: {}",
-                    event.getEventId(), e.getMessage(), e);
+            log.error("processParsedEvent failed for eventId={}: {}", event.getEventId(), e.getMessage(), e);
         }
     }
 
     private void processBetRetryInfo(NormalizedEvent normalizedEvent) {
-        log.debug("Processing bet retry info for eventId={}, bookmaker={}",
-                normalizedEvent.getEventId(), SCRAPER_BOOKMAKER);
-
         try {
             betLegRetryService.updateFailedBetLeg(normalizedEvent, SCRAPER_BOOKMAKER);
-            log.debug("Bet retry info updated successfully for eventId={}", normalizedEvent.getEventId());
         } catch (Exception e) {
             log.error("BetLegRetry processing failed for eventId={}, err={}",
                     normalizedEvent.getEventId(), e.getMessage(), e);
         }
     }
 
+    // -------------------- Retry / Backoff --------------------
 
-
-    private String safeBody(APIResponse res) {
-        try {
-            return res.text();
-        } catch (Exception e) {
-            log.warn("Failed to extract response body: {}", e.getMessage());
-            return null;
+    private void apiCallWithRetry(Runnable call) {
+        int attempt = 0;
+        while (true) {
+            try {
+                call.run();
+                return;
+            } catch (PlaywrightException e) {
+                attempt++;
+                log.warn("API call failed (attempt {}): {}", attempt, e.getMessage());
+                if (attempt >= API_MAX_RETRIES) throw e;
+                backoffWithJitter(attempt);
+            } catch (RuntimeException e) {
+                throw e;
+            }
         }
     }
-
-    private String snippet(String s) {
-        if (s == null) return "null";
-        return s.length() > 500 ? s.substring(0, 500) + "..." : s;
-    }
-
-    // -------------------- Backoff --------------------
 
     private void backoffWithJitter(int attempt) {
         long base = 2_000L; // 2s
         long delay = (long) (base * Math.pow(2, Math.max(1, attempt)));
         long jitter = ThreadLocalRandom.current().nextLong(500, 1500);
-        long totalDelay = Math.min(delay + jitter, 20_000L);
+        long total = Math.min(delay + jitter, 20_000L);
+        try { Thread.sleep(total); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+    }
 
-        log.info("Backing off for {}ms (attempt: {}, base delay: {}ms, jitter: {}ms)",
-                totalDelay, attempt, delay, jitter);
-
-        try {
-            Thread.sleep(totalDelay);
-            log.debug("Backoff complete");
-        } catch (InterruptedException ie) {
-            log.warn("Backoff interrupted");
-            Thread.currentThread().interrupt();
-        }
+    private String snippet(String s) {
+        if (s == null) return "null";
+        return s.length() > 500 ? s.substring(0, 500) + "..." : s;
     }
 }
