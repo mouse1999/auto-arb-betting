@@ -38,6 +38,7 @@ public class SportyBetOddsFetcher implements Runnable {
     private final ArbDetector arbDetector;
     private final ObjectMapper objectMapper;
     private final Map<String, APIRequestContext> apiClients = new ConcurrentHashMap<>();
+    private final AtomicReference<Map<String, APIRequestContext>> clientsRef = new AtomicReference<>(Map.of());
     private final AtomicReference<Playwright> playwrightRef = new AtomicReference<>();
 
     private static final String BASE_URL   = "https://www.sportybet.com";
@@ -96,7 +97,9 @@ public class SportyBetOddsFetcher implements Runnable {
                         Page page = context.newPage();
                         log.info("New page created, attaching network listeners");
 
-                        attachNetworkTaps(page, harvestedHeaders);
+                        Map<String, String> captured = new HashMap<>();
+
+                        attachNetworkTaps(page, captured);
                         log.info("Network response listeners attached");
 
                         performInitialNavigationWithRetry(page);
@@ -106,8 +109,8 @@ public class SportyBetOddsFetcher implements Runnable {
                         cookieHeaderRef.set(cookieHeader);
                         log.info("Cookies formatted and stored (length: {})", cookieHeader.length());
 
-                        log.info("Harvested headers count: {}", harvestedHeaders.size());
-                        harvestedHeaders.forEach((k, v) ->
+                        log.info("Harvested headers count: {}", captured.size());
+                        captured.forEach((k, v) ->
                                 log.debug("Harvested header: {} = {}", k, v.substring(0, Math.min(50, v.length())))
                         );
 
@@ -116,7 +119,7 @@ public class SportyBetOddsFetcher implements Runnable {
                         context.close();
                         log.debug("Browser context closed");
 
-                        rebuildClients(pw, cookieHeader, harvestedHeaders, profile);
+                        rebuildClients(pw, cookieHeader, captured, profile);
                         log.info("API clients rebuilt: {}", apiClients.keySet());
 
                         startOrRefreshSchedules();
@@ -641,23 +644,23 @@ public class SportyBetOddsFetcher implements Runnable {
         h.put("Accept", "application/json");
         h.put("Content-Type", "application/json");
         h.put("X-Requested-With", "XMLHttpRequest");
-        harvested.forEach(h::putIfAbsent);
+        if (harvested != null) h.putAll(harvested);
 
         log.debug("Built headers: {} total (including {} harvested)", h.size(), harvested.size());
         return h;
     }
 
-    private APIRequestContext getOrCreateClient(String key, Playwright pw, String cookieHeader,
-                                                Map<String,String> harvested, UserAgentProfile profile) {
-        log.debug("Getting or creating API client for key: {}", key);
-
-        return apiClients.computeIfAbsent(key, k -> {
-            log.info("Creating new API client for key: {}", k);
-            return pw.request().newContext(
-                    new APIRequest.NewContextOptions().setExtraHTTPHeaders(buildHeaders(cookieHeader, harvested, profile))
-            );
-        });
-    }
+//    private APIRequestContext getOrCreateClient(String key, Playwright pw, String cookieHeader,
+//                                                Map<String,String> harvested, UserAgentProfile profile) {
+//        log.debug("Getting or creating API client for key: {}", key);
+//
+//        return apiClients.computeIfAbsent(key, k -> {
+//            log.info("Creating new API client for key: {}", k);
+//            return pw.request().newContext(
+//                    new APIRequest.NewContextOptions().setExtraHTTPHeaders(buildHeaders(cookieHeader, harvested, profile))
+//            );
+//        });
+//    }
 
     private void startOrRefreshSchedules() {
         if (!schedulesStarted.compareAndSet(false, true)) {
@@ -688,10 +691,9 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.debug("Football API URL: {}", url);
 
-            APIRequestContext client = getOrCreateClient(KEY_FB, playwrightRef.get(), cookieHeaderRef.get(), harvestedHeaders,
-                    profile);
+            APIRequestContext client = getClient(KEY_FB);
 
-            String body = doGetString(url, client);
+            String body = doGetStringWithAutoRefresh(url, KEY_FB);
             log.debug("Football response received: {} chars", body != null ? body.length() : 0);
 
             List<String> eventIds = extractEventIds(body);
@@ -762,10 +764,9 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.debug("Basketball API URL: {}", url);
 
-            APIRequestContext client = getOrCreateClient(KEY_BB,  playwrightRef.get(), cookieHeaderRef.get(), harvestedHeaders,
-                    profile);
+            APIRequestContext client = getClient(KEY_FB);
 
-            String body = doGetString(url, client);
+            String body = doGetStringWithAutoRefresh(url, KEY_FB);
             log.debug("Basketball response received: {} chars", body != null ? body.length() : 0);
 
             List<String> eventIds = extractEventIds(body);
@@ -834,10 +835,9 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.debug("Table Tennis API URL: {}", url);
 
-            APIRequestContext client = getOrCreateClient(KEY_TT, playwrightRef.get(), cookieHeaderRef.get(), harvestedHeaders,
-                    profile);
+            APIRequestContext client = getClient(KEY_FB);
 
-            String body = doGetString(url, client);
+            String body = doGetStringWithAutoRefresh(url, KEY_FB);
             log.debug("Table Tennis response received: {} chars", body != null ? body.length() : 0);
 
             List<String> eventIds = extractEventIds(body);
@@ -918,7 +918,7 @@ public class SportyBetOddsFetcher implements Runnable {
             String url = buildEventDetailUrl(eventId);
             log.debug("Detail URL for {}: {}", eventId, url);
 
-            String body = doGetString(url, apiClient);
+            String body = doGetStringWithAutoRefresh(url, KEY_FB);
 
             if (body == null || body.isBlank()) {
                 log.warn("Empty detail response for eventId={}", eventId);
@@ -971,27 +971,36 @@ public class SportyBetOddsFetcher implements Runnable {
 
 
 
-    private String doGetString(String url, APIRequestContext client) {
-        log.debug("Executing GET request: {}", url);
-
+    private String doGetStringWithAutoRefresh(String url, String key) {
+        APIRequestContext client = getClient(key);
         APIResponse res = client.get(url);
         int status = res.status();
-        String body = safeBody(res);
-
-        log.debug("Response status: {} for URL: {}", status, url);
-
         if (status == 401 || status == 403) {
-            log.warn("Authorization error {} for {}", status, url);
-            throw new PlaywrightException("Auth/rate error " + status);
+            log.warn("Auth {} for {}, refreshing {} client and retrying once", status, url, key);
+            refreshSingleClient(key);
+            client = getClient(key);
+            res = client.get(url);
+            status = res.status();
         }
-
+        String body = safeBody(res);
         if (status < 200 || status >= 300) {
             log.warn("GET {} -> {} {} body: {}", url, status, res.statusText(), snippet(body));
             throw new PlaywrightException("HTTP " + status + " on " + url);
         }
-
-        log.debug("GET successful: {} chars returned", body != null ? body.length() : 0);
         return body;
+    }
+
+    private synchronized void refreshSingleClient(String key) {
+        Map<String, APIRequestContext> current = new HashMap<>(clientsRef.get());
+        APIRequestContext old = current.remove(key);
+        if (old != null) old.dispose();
+
+        // Rebuild headers from the latest cookie/headers/profile snapshot you stored on last nav
+        APIRequestContext fresh = playwrightRef.get().request().newContext(
+                new APIRequest.NewContextOptions().setExtraHTTPHeaders(buildHeaders(cookieHeaderRef.get(), /* latest captured map */ Map.of(), profile))
+        );
+        current.put(key, fresh);
+        clientsRef.set(Collections.unmodifiableMap(current));
     }
 
 
@@ -1023,21 +1032,27 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
+    private APIRequestContext getClient(String key) {
+        APIRequestContext c = clientsRef.get().get(key);
+        if (c == null) throw new IllegalStateException("Missing API client for key " + key);
+        return c;
+    }
+
 
 
     private void rebuildClients(Playwright pw, String cookie, Map<String,String> harvested, UserAgentProfile profile) {
-        log.info("Rebuilding API clients");
-        log.debug("Disposing {} existing clients", apiClients.size());
+        log.info("Rebuilding API clients (atomic swap)");
+        Map<String, APIRequestContext> newMap = new HashMap<>();
+        newMap.put(KEY_FB, pw.request().newContext(new APIRequest.NewContextOptions()
+                .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))));
+        newMap.put(KEY_BB, pw.request().newContext(new APIRequest.NewContextOptions()
+                .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))));
+        newMap.put(KEY_TT, pw.request().newContext(new APIRequest.NewContextOptions()
+                .setExtraHTTPHeaders(buildHeaders(cookie, harvested, profile))));
 
-        apiClients.values().forEach(APIRequestContext::dispose);
-        apiClients.clear();
-
-        log.debug("Creating fresh API clients for all sports");
-        apiClients.put(KEY_FB, getOrCreateClient(KEY_FB, pw, cookie, harvested, profile));
-        apiClients.put(KEY_BB, getOrCreateClient(KEY_BB, pw, cookie, harvested, profile));
-        apiClients.put(KEY_TT, getOrCreateClient(KEY_TT, pw, cookie, harvested, profile));
-
-        log.info("API clients rebuilt successfully: {}", apiClients.keySet());
+        Map<String, APIRequestContext> old = clientsRef.getAndSet(Collections.unmodifiableMap(newMap));
+        log.info("API clients swapped. Disposing {} old clients...", old.size());
+        old.values().forEach(APIRequestContext::dispose);
     }
 
 
