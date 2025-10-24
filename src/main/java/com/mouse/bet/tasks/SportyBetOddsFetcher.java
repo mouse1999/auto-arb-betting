@@ -61,6 +61,9 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private UserAgentProfile profile;
     private final AtomicBoolean schedulesStarted = new AtomicBoolean();
+    private final ThreadLocal<Map<String, APIRequestContext>> threadLocalClients =
+            ThreadLocal.withInitial(HashMap::new);
+    private volatile boolean clientsNeedRefresh = false;
 
 
     @Override
@@ -149,8 +152,32 @@ public class SportyBetOddsFetcher implements Runnable {
             log.info("Shutting down retry executor...");
             retryExecutor.shutdown();
 
-            log.info("Disposing {} API clients...", apiClients.size());
-            apiClients.values().forEach(APIRequestContext::dispose);
+            // Clean up all thread-local clients
+            log.info("Cleaning up all thread-local clients...");
+            threadLocalClients.remove();
+
+            // Dispose old shared clients if any
+            log.info("Disposing {} shared API clients...", apiClients.size());
+            apiClients.values().forEach(c -> {
+                try {
+                    c.dispose();
+                } catch (Exception e) {
+                    log.debug("Error disposing shared client: {}", e.getMessage());
+                }
+            });
+            apiClients.clear();
+
+            // Also dispose clients from clientsRef
+            Map<String, APIRequestContext> oldClients = clientsRef.get();
+            if (oldClients != null) {
+                oldClients.values().forEach(c -> {
+                    try {
+                        c.dispose();
+                    } catch (Exception e) {
+                        log.debug("Error disposing client from ref: {}", e.getMessage());
+                    }
+                });
+            }
 
             Playwright pw = playwrightRef.getAndSet(null);
             if (pw != null) {
@@ -709,8 +736,13 @@ public class SportyBetOddsFetcher implements Runnable {
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
             try {
                 List<Callable<Void>> tasks = eventIds.stream().map(eventId -> (Callable<Void>) () -> {
-                    fetchAndProcessEventDetail(eventId, KEY_FB);
-                    return null;
+                    try {
+                        fetchAndProcessEventDetail(eventId, KEY_FB);
+                        return null;
+                    } finally {
+                        // Clean up thread-local clients after processing
+                        cleanupThreadLocalClients();
+                    }
                 }).toList();
 
                 List<Future<Void>> futures = pool.invokeAll(tasks);
@@ -747,8 +779,6 @@ public class SportyBetOddsFetcher implements Runnable {
         log.info("=== Football fetch complete (duration: {}ms) ===", duration);
     }
 
-
-
     private void callBasketball() {
         log.info("=== Starting Basketball fetch ===");
         long startTime = System.currentTimeMillis();
@@ -759,7 +789,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.debug("Basketball API URL: {}", url);
 
-            // FIX: Use KEY_BB instead of KEY_FB
             String body = safeApiGet(url, KEY_BB);
             log.debug("Basketball response received: {} chars", body != null ? body.length() : 0);
 
@@ -778,9 +807,12 @@ public class SportyBetOddsFetcher implements Runnable {
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
             try {
                 List<Callable<Void>> tasks = eventIds.stream().map(eventId -> (Callable<Void>) () -> {
-                    // Pass the correct client key
-                    fetchAndProcessEventDetail(eventId, KEY_BB);
-                    return null;
+                    try {
+                        fetchAndProcessEventDetail(eventId, KEY_BB);
+                        return null;
+                    } finally {
+                        cleanupThreadLocalClients();
+                    }
                 }).toList();
 
                 List<Future<Void>> futures = pool.invokeAll(tasks);
@@ -827,7 +859,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.debug("Table Tennis API URL: {}", url);
 
-            // FIX: Use KEY_TT instead of KEY_FB
             String body = safeApiGet(url, KEY_TT);
             log.debug("Table Tennis response received: {} chars", body != null ? body.length() : 0);
 
@@ -846,9 +877,12 @@ public class SportyBetOddsFetcher implements Runnable {
             ExecutorService pool = Executors.newFixedThreadPool(parallelism);
             try {
                 List<Callable<Void>> tasks = eventIds.stream().map(eventId -> (Callable<Void>) () -> {
-                    // Pass the correct client key
-                    fetchAndProcessEventDetail(eventId, KEY_TT);
-                    return null;
+                    try {
+                        fetchAndProcessEventDetail(eventId, KEY_TT);
+                        return null;
+                    } finally {
+                        cleanupThreadLocalClients();
+                    }
                 }).toList();
 
                 List<Future<Void>> futures = pool.invokeAll(tasks);
@@ -884,7 +918,6 @@ public class SportyBetOddsFetcher implements Runnable {
         long duration = System.currentTimeMillis() - startTime;
         log.info("=== Table Tennis fetch complete (duration: {}ms) ===", duration);
     }
-
     private List<String> extractEventIds(String body) {
         log.debug("Extracting event IDs from response body");
 
@@ -958,27 +991,6 @@ public class SportyBetOddsFetcher implements Runnable {
         return url;
     }
 
-
-
-    private String doGetStringWithAutoRefresh(String url, String key) {
-        APIRequestContext client = getClient(key);
-        APIResponse res = client.get(url);
-        int status = res.status();
-        if (status == 401 || status == 403) {
-            log.warn("Auth {} for {}, refreshing {} client and retrying once", status, url, key);
-            refreshSingleClient(key);
-            client = getClient(key);
-            res = client.get(url);
-            status = res.status();
-        }
-        String body = safeBody(res);
-        if (status < 200 || status >= 300) {
-            log.warn("GET {} -> {} {} body: {}", url, status, res.statusText(), snippet(body));
-            throw new PlaywrightException("HTTP " + status + " on " + url);
-        }
-        return body;
-    }
-
     private synchronized void refreshSingleClient(String key) {
         log.info("Refreshing API client for key: {}", key);
 
@@ -1038,43 +1050,92 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    private APIRequestContext getClient(String key) {
-        Map<String, APIRequestContext> clients = clientsRef.get();
-        APIRequestContext c = clients.get(key);
-        if (c == null) {
-            log.error("Missing API client for key: {}", key);
-            throw new IllegalStateException("Missing API client for key " + key);
+    private APIRequestContext getThreadLocalClient(String clientKey) {
+        Map<String, APIRequestContext> localClients = threadLocalClients.get();
+
+        // Check if we need to refresh due to auth issues
+        if (clientsNeedRefresh) {
+            // Dispose old clients for this thread
+            localClients.values().forEach(c -> {
+                try {
+                    c.dispose();
+                } catch (Exception e) {
+                    log.debug("Error disposing thread-local client: {}", e.getMessage());
+                }
+            });
+            localClients.clear();
+            clientsNeedRefresh = false;
         }
-        return c;
+
+        // Create new client if needed
+        if (!localClients.containsKey(clientKey)) {
+            log.debug("Creating new thread-local API client for key: {} on thread: {}",
+                    clientKey, Thread.currentThread().getName());
+
+            Playwright pw = playwrightRef.get();
+            if (pw == null) {
+                throw new IllegalStateException("Playwright instance not available");
+            }
+
+            APIRequestContext newClient = pw.request().newContext(
+                    new APIRequest.NewContextOptions()
+                            .setExtraHTTPHeaders(buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile))
+                            .setTimeout(30_000) // 30 second timeout
+            );
+
+            localClients.put(clientKey, newClient);
+        }
+
+        return localClients.get(clientKey);
     }
 
-    private String safeApiGet(String url, String clientKey) {
-        Map<String, APIRequestContext> clients = clientsRef.get();
-        APIRequestContext client = clients.get(clientKey);
 
-        if (client == null) {
-            log.error("No client available for key: {}", clientKey);
-            throw new IllegalStateException("No client available for key: " + clientKey);
+    private void cleanupThreadLocalClients() {
+        Map<String, APIRequestContext> localClients = threadLocalClients.get();
+        if (localClients != null && !localClients.isEmpty()) {
+            log.debug("Cleaning up {} thread-local clients", localClients.size());
+            localClients.values().forEach(c -> {
+                try {
+                    c.dispose();
+                } catch (Exception e) {
+                    log.debug("Error disposing thread-local client: {}", e.getMessage());
+                }
+            });
+            localClients.clear();
+        }
+        threadLocalClients.remove();
+    }
+
+
+
+    private String safeApiGet(String url, String clientKey) {
+        return safeApiGet(url, clientKey, 0);
+    }
+
+    private String safeApiGet(String url, String clientKey, int authRetryCount) {
+        if (authRetryCount > 2) {
+            log.error("Max auth retries exceeded for URL: {}", url);
+            throw new PlaywrightException("Max auth retries exceeded");
         }
 
+        APIRequestContext client = null;
         try {
+            client = getThreadLocalClient(clientKey);
+
             APIResponse res = client.get(url);
             int status = res.status();
 
             if (status == 401 || status == 403) {
-                log.warn("Auth {} for {}, refreshing {} client and retrying once", status, url, clientKey);
-                refreshSingleClient(clientKey);
+                log.warn("Auth {} for {}, marking clients for refresh and retrying", status, url);
 
-                // Get the refreshed client
-                clients = clientsRef.get();
-                client = clients.get(clientKey);
+                // Mark for refresh globally
+                clientsNeedRefresh = true;
 
-                if (client == null) {
-                    throw new IllegalStateException("Client refresh failed for key: " + clientKey);
-                }
+                // Small delay before retry
+                Thread.sleep(500);
 
-                res = client.get(url);
-                status = res.status();
+                // Recursive retry with incremented counter
+                return safeApiGet(url, clientKey, authRetryCount + 1);
             }
 
             String body = safeBody(res);
@@ -1082,11 +1143,23 @@ public class SportyBetOddsFetcher implements Runnable {
                 log.warn("GET {} -> {} {} body: {}", url, status, res.statusText(), snippet(body));
                 throw new PlaywrightException("HTTP " + status + " on " + url);
             }
+
             return body;
 
         } catch (PlaywrightException e) {
             log.error("Playwright error during API call to {}: {}", url, e.getMessage());
+
+            // If it's a "Cannot find command" error, dispose this thread's clients and retry once
+            if (e.getMessage().contains("Cannot find command") && authRetryCount == 0) {
+                log.warn("Detected 'Cannot find command' error, disposing thread-local clients and retrying");
+                cleanupThreadLocalClients();
+                return safeApiGet(url, clientKey, authRetryCount + 1);
+            }
+
             throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during API call", e);
         }
     }
 
