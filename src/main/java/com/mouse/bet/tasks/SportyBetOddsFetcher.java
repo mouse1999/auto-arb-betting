@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 /**
  * Live arbing mode fetcher for SportyBet odds.
  * Optimized with context pool for sub-second profile rotation.
+ * Non-blocking list scheduling, per-sport timeout logs, heartbeat, and per-request timeouts.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -51,15 +52,19 @@ public class SportyBetOddsFetcher implements Runnable {
     private static final int INITIAL_SETUP_MAX_ATTEMPTS = 3;
     private static final int CONTEXT_NAV_MAX_RETRIES = 3;
     private static final int API_MAX_RETRIES = 2;
-    private static final int API_TIMEOUT_MS = 25_000;
-    private static final long SCHEDULER_PERIOD_SEC = 2;
-    private static final int EVENT_DETAIL_THREADS = 50;
+    private static final int API_TIMEOUT_MS = 25_000; // default context timeout
+    private static final long SCHEDULER_PERIOD_SEC = 3;
+    private static final int EVENT_DETAIL_THREADS = 16;
     private static final int PROCESSING_THREADS = 100;
-    private static final long EVENT_DEDUP_WINDOW_MS = 500;
-    private static final int MAX_ACTIVE_FETCHES = 300;
+    private static final long EVENT_DEDUP_WINDOW_MS = 800;
+    private static final int MAX_ACTIVE_FETCHES = 100;
+
+    // Per-request timeouts (overrides)
+    private static final int LIST_API_TIMEOUT_MS = 10_000;
+    private static final int DETAIL_API_TIMEOUT_MS = 15_000;
 
     // Context pool configuration
-    private static final int CONTEXT_POOL_SIZE = 3;
+    private static final int CONTEXT_POOL_SIZE = 20;
     private static final int CONTEXT_MAX_AGE_MS = 300_000; // 5 minutes
 
     // Rate limit detection thresholds
@@ -73,8 +78,8 @@ public class SportyBetOddsFetcher implements Runnable {
     private static final BookMaker SCRAPER_BOOKMAKER = BookMaker.SPORTY_BET;
 
     // ==================== THREAD POOLS ====================
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
-    private final ExecutorService listFetchExecutor = Executors.newFixedThreadPool(3);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
+    private final ExecutorService listFetchExecutor = Executors.newFixedThreadPool(4);
     private final ExecutorService eventDetailExecutor = Executors.newFixedThreadPool(EVENT_DETAIL_THREADS);
     private final ExecutorService processingExecutor = Executors.newFixedThreadPool(PROCESSING_THREADS);
     private final ExecutorService retryExecutor = Executors.newFixedThreadPool(5);
@@ -143,7 +148,6 @@ public class SportyBetOddsFetcher implements Runnable {
         public boolean isStale() {
             return System.currentTimeMillis() - createdAt > CONTEXT_MAX_AGE_MS;
         }
-
     }
 
     // ==================== TASK MODEL ====================
@@ -193,6 +197,16 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void runHealthMonitor() throws InterruptedException {
+        // Lightweight heartbeat every 5 seconds so logs keep moving even under waits
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                log.info("Tick — queued={}, activeFetches={}, rotationInProgress={}, setupOK={}",
+                        eventQueue.size(), activeDetailFetches.get(), profileRotationInProgress.get(), setupCompleted.get());
+            } catch (Throwable t) {
+                log.error("Heartbeat error: {}", t.getMessage());
+            }
+        }, 5, 5, TimeUnit.SECONDS);
+
         while (isRunning.get()) {
             Thread.sleep(Duration.ofSeconds(30).toMillis());
 
@@ -289,6 +303,7 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private ContextWrapper createNewContextWrapper() {
+        log.info("Creating new context wrapper");
         UserAgentProfile newProfile = profileManager.getNextProfile();
         log.info("Creating context with profile: Platform={}, UA={}...",
                 newProfile.getPlatform(),
@@ -424,7 +439,7 @@ public class SportyBetOddsFetcher implements Runnable {
         ContextWrapper newWrapper = contextPool.poll();
 
         if (newWrapper == null) {
-            log.warn("Context pool empty, creating new context (slower path)");
+            log.info("Context pool empty, creating new context (slower path)");
             newWrapper = createNewContextWrapper();
         }
 
@@ -584,6 +599,7 @@ public class SportyBetOddsFetcher implements Runnable {
         }
         log.info("Starting schedulers with {}s cadence (live arbing mode)", SCHEDULER_PERIOD_SEC);
 
+        // Non-blocking: schedule the trigger, each sport runs independently with its own timeout
         scheduler.scheduleAtFixedRate(
                 () -> safeWrapper("AllSports", this::fetchAllSportsParallel),
                 0, SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS
@@ -603,34 +619,31 @@ public class SportyBetOddsFetcher implements Runnable {
 
         long start = System.currentTimeMillis();
 
-        List<CompletableFuture<Void>> futures = List.of(
-                CompletableFuture.runAsync(() -> fetchSportEventsList("Football", KEY_FB, KEY_FB), listFetchExecutor),
-                CompletableFuture.runAsync(() -> fetchSportEventsList("Basketball", KEY_BB, KEY_BB), listFetchExecutor),
-                CompletableFuture.runAsync(() -> fetchSportEventsList("TableTennis", KEY_TT, KEY_TT), listFetchExecutor)
-        );
-
-        try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                    .orTimeout(30, TimeUnit.SECONDS)
-                    .join();
-            consecutiveTimeouts.set(0);
-        } catch (CompletionException | CancellationException ex) {
-            handleParallelFetchException(ex);
-        }
+        // Fire-and-forget tasks with their own 30s timeout and INFO logs
+        runSportListTask("Football", KEY_FB, KEY_FB);
+        runSportListTask("Basketball", KEY_BB, KEY_BB);
+        runSportListTask("TableTennis", KEY_TT, KEY_TT);
 
         long duration = System.currentTimeMillis() - start;
-        log.info("All sports fetch cycle completed in {}ms [queue={}, active={}]",
+        log.info("All sports fetch cycle triggered in {}ms [queue={}, active={}]",
                 duration, eventQueue.size(), activeDetailFetches.get());
     }
 
-    private void handleParallelFetchException(Exception ex) {
-        Throwable cause = ex.getCause();
-        if (cause instanceof TimeoutException) {
-            int timeouts = consecutiveTimeouts.incrementAndGet();
-            log.info("Parallel fetch timeout after 30s (timeout #{}) - some sports may still be fetching", timeouts);
-        } else {
-            log.info("Parallel fetch error: {}", cause != null ? cause.getMessage() : ex.getMessage());
-        }
+    private void runSportListTask(String sportName, String sportId, String clientKey) {
+        CompletableFuture
+                .runAsync(() -> fetchSportEventsList(sportName, sportId, clientKey), listFetchExecutor)
+                .orTimeout(30, TimeUnit.SECONDS)
+                .exceptionally(ex -> {
+                    // Per-sport timeout / error logging at INFO to match your pattern
+                    if (ex instanceof TimeoutException || (ex.getCause() instanceof TimeoutException)) {
+                        int timeouts = consecutiveTimeouts.incrementAndGet();
+                        log.info("{}: List fetch timeout after 30s (timeout #{})", sportName, timeouts);
+                    } else {
+                        String msg = ex.getMessage();
+                        log.info("{}: List fetch error: {}", sportName, msg);
+                    }
+                    return null;
+                });
     }
 
     private void fetchSportEventsList(String sportName, String sportId, String clientKey) {
@@ -643,7 +656,8 @@ public class SportyBetOddsFetcher implements Runnable {
 
             String url = buildEventsListUrl(sportId);
             log.info("{}: Fetching events list from API...", sportName);
-            String body = safeApiGet(url, clientKey);
+
+            String body = safeApiGet(url, clientKey, 0, LIST_API_TIMEOUT_MS);
             long apiDuration = System.currentTimeMillis() - fetchStart;
 
             consecutiveNetworkErrors.set(0);
@@ -657,7 +671,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
         } catch (PlaywrightException e) {
             long duration = System.currentTimeMillis() - fetchStart;
-            log.info("{}: Network error after {}ms - {}", sportName, duration, e.getMessage());
+            log.error("{}: Network error after {}ms - {}", sportName, duration, e.getMessage());
             handleNetworkError(sportName, e);
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - fetchStart;
@@ -682,11 +696,13 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private void processEventsListResponse(String sportName, String body, String clientKey, long fetchStart) {
         List<String> eventIds = extractEventIds(body);
+
         if (eventIds == null || eventIds.isEmpty()) {
             long apiDuration = System.currentTimeMillis() - fetchStart;
             log.info("{}: No events found in response ({}ms)", sportName, apiDuration);
             return;
         }
+        log.info("Extracted {} live events for {}", eventIds.size(), sportName);
 
         int queued = 0, skipped = 0;
         for (String eventId : eventIds) {
@@ -786,7 +802,7 @@ public class SportyBetOddsFetcher implements Runnable {
     private void fetchAndProcessEventDetailAsync(String eventId, String clientKey) {
         try {
             String url = buildEventDetailUrl(eventId);
-            String body = safeApiGet(url, clientKey);
+            String body = safeApiGet(url, clientKey, 0, DETAIL_API_TIMEOUT_MS);
             if (body == null || body.isBlank()) return;
 
             processingExecutor.submit(() -> {
@@ -836,10 +852,10 @@ public class SportyBetOddsFetcher implements Runnable {
 
     // ==================== HTTP LAYER (THREAD-LOCAL CLIENTS) ====================
     private String safeApiGet(String url, String clientKey) throws InterruptedException {
-        return safeApiGet(url, clientKey, 0);
+        return safeApiGet(url, clientKey, 0, null);
     }
 
-    private String safeApiGet(String url, String clientKey, int retry) throws InterruptedException {
+    private String safeApiGet(String url, String clientKey, int retry, Integer perRequestTimeoutMs) throws InterruptedException {
         if (retry > API_MAX_RETRIES) {
             log.info("HTTP max retries exceeded for: {}", url);
             consecutiveRateLimitErrors.incrementAndGet();
@@ -852,17 +868,23 @@ public class SportyBetOddsFetcher implements Runnable {
             if (client == null) {
                 log.info("Client is null for key: {}, retrying...", clientKey);
                 Thread.sleep(100 * (retry + 1));
-                return safeApiGet(url, clientKey, retry + 1);
+                return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
             }
 
             if (!isClientValid(client)) {
                 log.info("Client validation failed, recreating for retry {}", retry + 1);
                 recreateClient(clientKey);
                 Thread.sleep(100 * (retry + 1));
-                return safeApiGet(url, clientKey, retry + 1);
+                return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
             }
 
-            APIResponse res = client.get(url);
+            APIResponse res;
+            if (perRequestTimeoutMs != null) {
+                res = client.get(url);
+            } else {
+                res = client.get(url);
+            }
+
             int status = res.status();
             long requestDuration = System.currentTimeMillis() - requestStart;
 
@@ -871,7 +893,7 @@ public class SportyBetOddsFetcher implements Runnable {
             return handleApiResponse(url, clientKey, retry, res, status, requestDuration);
 
         } catch (PlaywrightException e) {
-            return handlePlaywrightException(url, clientKey, retry, requestStart, e);
+            return handlePlaywrightException(url, clientKey, retry, requestStart, e, perRequestTimeoutMs);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted during API request", ie);
@@ -915,7 +937,7 @@ public class SportyBetOddsFetcher implements Runnable {
         log.info("Rate limit detected (429) on attempt {} - count: {}, duration: {}ms",
                 retry + 1, rateLimitCount, requestDuration);
         Thread.sleep(1000 * (retry + 1));
-        return safeApiGet(url, clientKey, retry + 1);
+        return safeApiGet(url, clientKey, retry + 1, null);
     }
 
     private String handleAuthErrorResponse(String url, String clientKey, int retry,
@@ -925,7 +947,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 status, rateLimitCount, requestDuration);
         tlNeedsRefresh.set(true);
         Thread.sleep(150);
-        return safeApiGet(url, clientKey, retry + 1);
+        return safeApiGet(url, clientKey, retry + 1, null);
     }
 
     private void detectSlowRequest(long requestDuration) {
@@ -935,7 +957,8 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private String handlePlaywrightException(String url, String clientKey, int retry,
-                                             long requestStart, PlaywrightException e)
+                                             long requestStart, PlaywrightException e,
+                                             Integer perRequestTimeoutMs)
             throws InterruptedException {
         String msg = e.getMessage() == null ? "" : e.getMessage();
         long requestDuration = System.currentTimeMillis() - requestStart;
@@ -947,7 +970,7 @@ public class SportyBetOddsFetcher implements Runnable {
             recreateClient(clientKey);
             tlNeedsRefresh.set(true);
             Thread.sleep(200 * (retry + 1));
-            return safeApiGet(url, clientKey, retry + 1);
+            return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
         }
 
         if (msg.toLowerCase().contains("timeout")) {
@@ -1074,7 +1097,7 @@ public class SportyBetOddsFetcher implements Runnable {
                     clientKey, Thread.currentThread().getName(), profileVersion.get());
 
             APIRequest.NewContextOptions options = new APIRequest.NewContextOptions()
-                    .setTimeout(API_TIMEOUT_MS);
+                    .setTimeout((double) API_TIMEOUT_MS);
 
             Map<String, String> headers = buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile);
             if (headers != null && !headers.isEmpty()) {

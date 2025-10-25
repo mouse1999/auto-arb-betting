@@ -1,32 +1,27 @@
 [
   {
-    "id": "win-chrome-1",
+    "id": "win-edge-1",
     "type": "desktop",
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
     "viewport": { "width": 1920, "height": 1080 },
     "platform": "Win32",
     "hardwareConcurrency": 8,
     "deviceMemory": 8,
     "webglVendor": "Google Inc.",
-    "webglRenderer": "ANGLE (NVIDIA GeForce RTX 3080 Direct3D11 vs_5_0 ps_5_0)",
+    "webglRenderer": "ANGLE (NVIDIA GeForce GTX 1650 Direct3D11 vs_5_0 ps_5_0)",
     "audioFrequency": 440,
     "canvasFillStyle": "#ffffff",
     "timeZone": "Africa/Lagos",
-    "geolocation": {
-      "latitude": 6.5244,
-      "longitude": 3.3792,
-      "accuracy": 50
-    },
-    "fonts": ["Arial", "Times New Roman", "Courier New", "Verdana", "Georgia"],
-    "languages": ["en-NG", "en"],
+    "geolocation": { "latitude": 6.465422, "longitude": 3.406448, "accuracy": 50 },
+    "fonts": ["Arial","Times New Roman","Courier New","Verdana","Segoe UI"],
+    "languages": ["en-NG","en"],
     "colorEnum": "LIGHT",
     "cityCode": "LAG",
-
     "clientHints": {
       "brands": [
-        {"brand": "Chromium", "version": "120"},
-        {"brand": "Google Chrome", "version": "120"},
-        {"brand": "Not?A_Brand", "version": "24"}
+        {"brand":"Chromium","version":"141"},
+        {"brand":"Microsoft Edge","version":"141"},
+        {"brand":"Not_A Brand","version":"99"}
       ],
       "mobile": "?0",
       "platform": "Windows",
@@ -34,106 +29,659 @@
       "architecture": "x86",
       "bitness": "64",
       "model": "",
-      "uaFullVersion": "120.0.0.0"
+      "uaFullVersion": "141.0.0.0"
     },
-
     "webgl": {
       "vendor": "WebKit",
       "renderer": "WebKit WebGL",
       "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
     },
-
     "plugins": [
-      {
-        "name": "Chrome PDF Plugin",
-        "filename": "internal-pdf-viewer",
-        "description": "Portable Document Format"
-      },
-      {
-        "name": "Chrome PDF Viewer",
-        "filename": "mhjfbmdgcfjbbpaeojofohoefgiehjai",
-        "description": "Portable Document Format"
-      },
-      {
-        "name": "Native Client",
-        "filename": "internal-nacl-plugin",
-        "description": "Native Client Executable"
-      }
+      {"name":"Chrome PDF Plugin","filename":"internal-pdf-viewer","description":"Portable Document Format"},
+      {"name":"Chrome PDF Viewer","filename":"mhjfbmdgcfjbbpaeojofohoefgiehjai","description":"Portable Document Format"},
+      {"name":"Native Client","filename":"internal-nacl-plugin","description":"Native Client Executable"}
     ],
-
-    "screen": {
-      "availWidth": 1920,
-      "availHeight": 1040,
-      "colorDepth": 24,
-      "pixelDepth": 24
-    },
-
-    "connection": {
-      "downlink": 5.0,
-      "effectiveType": "4g",
-      "rtt": 100
-    },
-
-    "battery": {
-      "level": 0.85,
-      "charging": true,
-      "chargingTime": 0,
-      "dischargingTime": 1800
-    },
-
+    "screen": { "availWidth":1920, "availHeight":1040, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 8.5, "effectiveType": "4g", "rtt": 60 },
+    "battery": { "level": 0.92, "charging": true, "chargingTime": 0, "dischargingTime": 0 },
     "mediaDevices": [
-      {
-        "deviceId": "default",
-        "kind": "audioinput",
-        "label": "Default Microphone",
-        "groupId": "default"
-      },
-      {
-        "deviceId": "default",
-        "kind": "audiooutput",
-        "label": "Default Speakers",
-        "groupId": "default"
-      },
-      {
-        "deviceId": "default",
-        "kind": "videoinput",
-        "label": "Default Camera",
-        "groupId": "default"
-      }
+      {"deviceId":"default","kind":"audioinput","label":"Realtek(R) Audio","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Speakers (Realtek(R) Audio)","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"Integrated Camera","groupId":"default"}
     ],
-
-    "permissions": {
-      "notifications": "default",
-      "geolocation": "prompt"
-    },
-
-    "storage": {
-      "quota": 1000000000000,
-      "usage": 50000000000
-    },
-
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 500000000000, "usage": 35000000000 },
     "headers": {
       "standardHeaders": {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0"
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Accept-Encoding":"gzip, deflate, br",
+        "Connection":"keep-alive",
+        "Upgrade-Insecure-Requests":"1",
+        "Sec-Fetch-Dest":"document",
+        "Sec-Fetch-Mode":"navigate",
+        "Sec-Fetch-Site":"none",
+        "Sec-Fetch-User":"?1",
+        "Cache-Control":"max-age=0"
       },
       "clientHintsHeaders": {
-        "Sec-CH-UA": "\"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\", \"Not?A_Brand\";v=\"24\"",
-        "Sec-CH-UA-Mobile": "?0",
-        "Sec-CH-UA-Platform": "\"Windows\"",
-        "Sec-CH-UA-Arch": "\"x86\"",
-        "Sec-CH-UA-Bitness": "\"64\"",
-        "Sec-CH-UA-Model": "\"\"",
-        "Sec-CH-UA-Full-Version": "\"120.0.0.0\"",
-        "Sec-CH-UA-Platform-Version": "\"15.0.0\""
+        "Sec-CH-UA":"\"Chromium\";v=\"141\", \"Microsoft Edge\";v=\"141\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?0",
+        "Sec-CH-UA-Platform":"\"Windows\"",
+        "Sec-CH-UA-Arch":"\"x86\"",
+        "Sec-CH-UA-Bitness":"\"64\"",
+        "Sec-CH-UA-Model":"\"\"",
+        "Sec-CH-UA-Full-Version":"\"141.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"15.0.0\""
+      }
+    }
+  },
+  {
+    "id": "mac-chrome-m1pro",
+    "type": "laptop",
+    "userAgent": "Mozilla/5.0 (Macintosh; ARM Mac OS X 15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "viewport": { "width": 1728, "height": 1117 },
+    "platform": "MacIntel",
+    "hardwareConcurrency": 10,
+    "deviceMemory": 8,
+    "webglVendor": "Google Inc.",
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.5244, "longitude": 3.3792, "accuracy": 50 },
+    "fonts": ["Helvetica","Arial","Times","Courier","Geneva","Menlo"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [
+        {"brand":"Chromium","version":"141"},
+        {"brand":"Google Chrome","version":"141"},
+        {"brand":"Not_A Brand","version":"99"}
+      ],
+      "mobile": "?0",
+      "platform": "macOS",
+      "platformVersion": "15.0.0",
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "",
+      "uaFullVersion": "141.0.0.0"
+    },
+    "webgl": {
+      "vendor": "WebKit",
+      "renderer": "WebKit WebGL",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "plugins": [],
+    "screen": { "availWidth":1728, "availHeight":1097, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 9.8, "effectiveType": "4g", "rtt": 40 },
+    "battery": { "level": 0.77, "charging": false, "chargingTime": 0, "dischargingTime": 7200 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"MacBook Pro Microphone","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"MacBook Pro Speakers","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"FaceTime HD Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 1000000000000, "usage": 42000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Accept-Encoding":"gzip, deflate, br",
+        "Connection":"keep-alive",
+        "Upgrade-Insecure-Requests":"1",
+        "Sec-Fetch-Dest":"document",
+        "Sec-Fetch-Mode":"navigate",
+        "Sec-Fetch-Site":"none",
+        "Sec-Fetch-User":"?1",
+        "Cache-Control":"max-age=0"
+      },
+      "clientHintsHeaders": {
+        "Sec-CH-UA":"\"Chromium\";v=\"141\", \"Google Chrome\";v=\"141\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?0",
+        "Sec-CH-UA-Platform":"\"macOS\"",
+        "Sec-CH-UA-Arch":"\"arm\"",
+        "Sec-CH-UA-Bitness":"\"64\"",
+        "Sec-CH-UA-Model":"\"\"",
+        "Sec-CH-UA-Full-Version":"\"141.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"15.0.0\""
+      }
+    }
+  },
+  {
+    "id": "mac-safari-17",
+    "type": "laptop",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "viewport": { "width": 1440, "height": 900 },
+    "platform": "MacIntel",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "webglVendor": "Apple Inc.",
+    "webglRenderer": "Apple GPU",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.465422, "longitude": 3.406448, "accuracy": 50 },
+    "fonts": ["Helvetica","Arial","Times","Courier","Geneva","Menlo"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [],
+      "mobile": "?0",
+      "platform": "macOS",
+      "platformVersion": "15.0.0",
+      "architecture": "x86",
+      "bitness": "64",
+      "model": "",
+      "uaFullVersion": ""
+    },
+    "webgl": {
+      "vendor": "Apple Inc.",
+      "renderer": "Apple GPU",
+      "version": "WebGL 2.0"
+    },
+    "plugins": [],
+    "screen": { "availWidth":1440, "availHeight":860, "colorDepth":30, "pixelDepth":30 },
+    "connection": { "downlink": 7.2, "effectiveType": "4g", "rtt": 55 },
+    "battery": { "level": 0.61, "charging": false, "chargingTime": 0, "dischargingTime": 5400 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"Mac Microphone","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Mac Speakers","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"FaceTime HD Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 1000000000000, "usage": 60000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive",
+        "Upgrade-Insecure-Requests":"1"
+      },
+      "clientHintsHeaders": {}
+    }
+  },
+  {
+    "id": "linux-chrome-ubuntu",
+    "type": "desktop",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "viewport": { "width": 1920, "height": 1080 },
+    "platform": "Linux x86_64",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "webglVendor": "Google Inc. (Intel Open Source Technology Center)",
+    "webglRenderer": "ANGLE (Intel(R) UHD Graphics 620 (KBL GT2), Vulkan 1.3)",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.5244, "longitude": 3.3792, "accuracy": 60 },
+    "fonts": ["DejaVu Sans","Ubuntu","Liberation Sans","Arial","Times New Roman"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [
+        {"brand":"Chromium","version":"141"},
+        {"brand":"Google Chrome","version":"141"},
+        {"brand":"Not_A Brand","version":"99"}
+      ],
+      "mobile": "?0",
+      "platform": "Linux",
+      "platformVersion": "6.8",
+      "architecture": "x86",
+      "bitness": "64",
+      "model": "",
+      "uaFullVersion": "141.0.0.0"
+    },
+    "webgl": {
+      "vendor": "Intel Open Source Technology Center",
+      "renderer": "Mesa Intel(R) UHD Graphics 620 (KBL GT2)",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "plugins": [],
+    "screen": { "availWidth":1920, "availHeight":1040, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 6.5, "effectiveType": "4g", "rtt": 80 },
+    "battery": { "level": 0.55, "charging": false, "chargingTime": 0, "dischargingTime": 8400 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"USB Microphone","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"HDMI Output","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"USB Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 250000000000, "usage": 30000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Accept-Encoding":"gzip, deflate, br",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {
+        "Sec-CH-UA":"\"Chromium\";v=\"141\", \"Google Chrome\";v=\"141\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?0",
+        "Sec-CH-UA-Platform":"\"Linux\"",
+        "Sec-CH-UA-Arch":"\"x86\"",
+        "Sec-CH-UA-Bitness":"\"64\"",
+        "Sec-CH-UA-Model":"\"\"",
+        "Sec-CH-UA-Full-Version":"\"141.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"6.8\""
+      }
+    }
+  },
+  {
+    "id": "pixel8-chrome",
+    "type": "phone",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; Pixel 8 Build/BP1A.250305.019) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+    "viewport": { "width": 393, "height": 851 },
+    "platform": "Linux armv8l",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "webglVendor": "Qualcomm",
+    "webglRenderer": "Adreno (TM) 740",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.465422, "longitude": 3.406448, "accuracy": 65 },
+    "fonts": ["Roboto","Noto Sans","Droid Sans","Arial"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [
+        {"brand":"Chromium","version":"140"},
+        {"brand":"Google Chrome","version":"140"},
+        {"brand":"Not_A Brand","version":"99"}
+      ],
+      "mobile": "?1",
+      "platform": "Android",
+      "platformVersion": "15",
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "Pixel 8",
+      "uaFullVersion": "140.0.0.0"
+    },
+    "webgl": {
+      "vendor": "Qualcomm",
+      "renderer": "Adreno (TM) 740",
+      "version": "WebGL 2.0 (OpenGL ES 3.2 V@0502)"
+    },
+    "plugins": [],
+    "screen": { "availWidth":393, "availHeight":851, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 25.0, "effectiveType": "4g", "rtt": 40 },
+    "battery": { "level": 0.68, "charging": true, "chargingTime": 1200, "dischargingTime": 0 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"Built-in Mic","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Built-in Speaker","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"Front Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"granted" },
+    "storage": { "quota": 128000000000, "usage": 22000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {
+        "Sec-CH-UA":"\"Chromium\";v=\"140\", \"Google Chrome\";v=\"140\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?1",
+        "Sec-CH-UA-Platform":"\"Android\"",
+        "Sec-CH-UA-Model":"\"Pixel 8\"",
+        "Sec-CH-UA-Full-Version":"\"140.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"15\""
+      }
+    }
+  },
+  {
+    "id": "galaxy-s23-chrome",
+    "type": "phone",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
+    "viewport": { "width": 360, "height": 780 },
+    "platform": "Linux armv8l",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "webglVendor": "ARM",
+    "webglRenderer": "Mali-G715",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.5244, "longitude": 3.3792, "accuracy": 65 },
+    "fonts": ["SamsungOne","Roboto","Arial"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [
+        {"brand":"Chromium","version":"138"},
+        {"brand":"Google Chrome","version":"138"},
+        {"brand":"Not_A Brand","version":"99"}
+      ],
+      "mobile": "?1",
+      "platform": "Android",
+      "platformVersion": "15",
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "SM-S911B",
+      "uaFullVersion": "138.0.0.0"
+    },
+    "webgl": {
+      "vendor": "ARM",
+      "renderer": "Mali-G715",
+      "version": "WebGL 2.0 (OpenGL ES 3.2)"
+    },
+    "plugins": [],
+    "screen": { "availWidth":360, "availHeight":760, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 20.0, "effectiveType": "4g", "rtt": 45 },
+    "battery": { "level": 0.53, "charging": false, "chargingTime": 0, "dischargingTime": 10800 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"Built-in Mic","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Built-in Speaker","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"Front Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 256000000000, "usage": 40000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {
+        "Sec-CH-UA":"\"Chromium\";v=\"138\", \"Google Chrome\";v=\"138\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?1",
+        "Sec-CH-UA-Platform":"\"Android\"",
+        "Sec-CH-UA-Model":"\"SM-S911B\"",
+        "Sec-CH-UA-Full-Version":"\"138.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"15\""
+      }
+    }
+  },
+  {
+    "id": "iphone15pro-safari",
+    "type": "phone",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+    "viewport": { "width": 393, "height": 852 },
+    "platform": "iPhone",
+    "hardwareConcurrency": 6,
+    "deviceMemory": 4,
+    "webglVendor": "Apple Inc.",
+    "webglRenderer": "Apple GPU",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.465422, "longitude": 3.406448, "accuracy": 75 },
+    "fonts": ["Helvetica","Arial","San Francisco"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [],
+      "mobile": "?1",
+      "platform": "iOS",
+      "platformVersion": "17.2.1",
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "iPhone16,2",
+      "uaFullVersion": ""
+    },
+    "webgl": {
+      "vendor": "Apple Inc.",
+      "renderer": "Apple GPU",
+      "version": "WebGL 2.0"
+    },
+    "plugins": [],
+    "screen": { "availWidth":393, "availHeight":852, "colorDepth":32, "pixelDepth":32 },
+    "connection": { "downlink": 18.0, "effectiveType": "4g", "rtt": 50 },
+    "battery": { "level": 0.74, "charging": true, "chargingTime": 1800, "dischargingTime": 0 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"Built-in Microphone","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Built-in Speaker","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"Front Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 128000000000, "usage": 30000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {}
+    }
+  },
+  {
+    "id": "ipadpro-safari",
+    "type": "tablet",
+    "userAgent": "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "viewport": { "width": 1024, "height": 1366 },
+    "platform": "iPad",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "webglVendor": "Apple Inc.",
+    "webglRenderer": "Apple GPU",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.5244, "longitude": 3.3792, "accuracy": 70 },
+    "fonts": ["Helvetica","Arial","San Francisco"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [],
+      "mobile": "?0",
+      "platform": "iOS",
+      "platformVersion": "17.5",
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "iPad15,5",
+      "uaFullVersion": ""
+    },
+    "webgl": {
+      "vendor": "Apple Inc.",
+      "renderer": "Apple GPU",
+      "version": "WebGL 2.0"
+    },
+    "plugins": [],
+    "screen": { "availWidth":1024, "availHeight":1346, "colorDepth":32, "pixelDepth":32 },
+    "connection": { "downlink": 12.0, "effectiveType": "4g", "rtt": 55 },
+    "battery": { "level": 0.81, "charging": false, "chargingTime": 0, "dischargingTime": 14400 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"Built-in Microphone","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Built-in Speakers","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"Front Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 512000000000, "usage": 80000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {}
+    }
+  },
+  {
+    "id": "win-chrome-amd",
+    "type": "desktop",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "viewport": { "width": 2560, "height": 1440 },
+    "platform": "Win32",
+    "hardwareConcurrency": 16,
+    "deviceMemory": 16,
+    "webglVendor": "Google Inc.",
+    "webglRenderer": "ANGLE (AMD Radeon RX 6600 Direct3D11 vs_5_0 ps_5_0)",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.465422, "longitude": 3.406448, "accuracy": 50 },
+    "fonts": ["Arial","Verdana","Segoe UI","Consolas","Georgia"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [
+        {"brand":"Chromium","version":"141"},
+        {"brand":"Google Chrome","version":"141"},
+        {"brand":"Not_A Brand","version":"99"}
+      ],
+      "mobile": "?0",
+      "platform": "Windows",
+      "platformVersion": "15.0.0",
+      "architecture": "x86",
+      "bitness": "64",
+      "model": "",
+      "uaFullVersion": "141.0.0.0"
+    },
+    "webgl": {
+      "vendor": "Google Inc.",
+      "renderer": "ANGLE (AMD Radeon RX 6600 Direct3D11 vs_5_0 ps_5_0)",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "plugins": [
+      {"name":"Chrome PDF Plugin","filename":"internal-pdf-viewer","description":"Portable Document Format"},
+      {"name":"Chrome PDF Viewer","filename":"mhjfbmdgcfjbbpaeojofohoefgiehjai","description":"Portable Document Format"}
+    ],
+    "screen": { "availWidth":2560, "availHeight":1400, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 15.0, "effectiveType": "4g", "rtt": 35 },
+    "battery": { "level": 1.0, "charging": true, "chargingTime": 0, "dischargingTime": 0 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"USB Mic","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Speakers","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 1000000000000, "usage": 120000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {
+        "Sec-CH-UA":"\"Chromium\";v=\"141\", \"Google Chrome\";v=\"141\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?0",
+        "Sec-CH-UA-Platform":"\"Windows\"",
+        "Sec-CH-UA-Arch":"\"x86\"",
+        "Sec-CH-UA-Bitness":"\"64\"",
+        "Sec-CH-UA-Model":"\"\"",
+        "Sec-CH-UA-Full-Version":"\"141.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"15.0.0\""
+      }
+    }
+  },
+  {
+    "id": "mac-firefox-131",
+    "type": "laptop",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15.0; rv:131.0) Gecko/20100101 Firefox/131.0",
+    "viewport": { "width": 1680, "height": 1050 },
+    "platform": "MacIntel",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8,
+    "webglVendor": "Apple Inc.",
+    "webglRenderer": "Apple GPU",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.5244, "longitude": 3.3792, "accuracy": 50 },
+    "fonts": ["Helvetica","Arial","Times","Courier","Geneva","Menlo"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [],
+      "mobile": "?0",
+      "platform": "macOS",
+      "platformVersion": "15.0.0",
+      "architecture": "x86",
+      "bitness": "64",
+      "model": "",
+      "uaFullVersion": ""
+    },
+    "webgl": {
+      "vendor": "Apple Inc.",
+      "renderer": "Apple GPU",
+      "version": "WebGL 2.0"
+    },
+    "plugins": [],
+    "screen": { "availWidth":1680, "availHeight":1010, "colorDepth":30, "pixelDepth":30 },
+    "connection": { "downlink": 8.0, "effectiveType": "4g", "rtt": 45 },
+    "battery": { "level": 0.66, "charging": false, "chargingTime": 0, "dischargingTime": 7200 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"Mac Microphone","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Mac Speakers","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 512000000000, "usage": 30000000000 },
+    "headers": { "standardHeaders": { "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }, "clientHintsHeaders": {} }
+  },
+  {
+    "id": "win-chrome-rtx2060",
+    "type": "desktop",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "viewport": { "width": 1920, "height": 1200 },
+    "platform": "Win32",
+    "hardwareConcurrency": 12,
+    "deviceMemory": 16,
+    "webglVendor": "Google Inc.",
+    "webglRenderer": "ANGLE (NVIDIA GeForce RTX 2060 Direct3D11 vs_5_0 ps_5_0)",
+    "audioFrequency": 440,
+    "canvasFillStyle": "#ffffff",
+    "timeZone": "Africa/Lagos",
+    "geolocation": { "latitude": 6.465422, "longitude": 3.406448, "accuracy": 55 },
+    "fonts": ["Arial","Verdana","Segoe UI","Consolas","Calibri"],
+    "languages": ["en-NG","en"],
+    "colorEnum": "LIGHT",
+    "cityCode": "LAG",
+    "clientHints": {
+      "brands": [
+        {"brand":"Chromium","version":"141"},
+        {"brand":"Google Chrome","version":"141"},
+        {"brand":"Not_A Brand","version":"99"}
+      ],
+      "mobile": "?0",
+      "platform": "Windows",
+      "platformVersion": "15.0.0",
+      "architecture": "x86",
+      "bitness": "64",
+      "model": "",
+      "uaFullVersion": "141.0.0.0"
+    },
+    "webgl": {
+      "vendor": "Google Inc.",
+      "renderer": "ANGLE (NVIDIA GeForce RTX 2060 Direct3D11 vs_5_0 ps_5_0)",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "plugins": [
+      {"name":"Chrome PDF Plugin","filename":"internal-pdf-viewer","description":"Portable Document Format"}
+    ],
+    "screen": { "availWidth":1920, "availHeight":1160, "colorDepth":24, "pixelDepth":24 },
+    "connection": { "downlink": 10.0, "effectiveType": "4g", "rtt": 40 },
+    "battery": { "level": 1.0, "charging": true, "chargingTime": 0, "dischargingTime": 0 },
+    "mediaDevices": [
+      {"deviceId":"default","kind":"audioinput","label":"USB Mic","groupId":"default"},
+      {"deviceId":"default","kind":"audiooutput","label":"Speakers","groupId":"default"},
+      {"deviceId":"default","kind":"videoinput","label":"USB Camera","groupId":"default"}
+    ],
+    "permissions": { "notifications":"default", "geolocation":"prompt" },
+    "storage": { "quota": 2000000000000, "usage": 220000000000 },
+    "headers": {
+      "standardHeaders": {
+        "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/avif,*/*;q=0.8",
+        "Accept-Language":"en-US,en;q=0.9",
+        "Connection":"keep-alive"
+      },
+      "clientHintsHeaders": {
+        "Sec-CH-UA":"\"Chromium\";v=\"141\", \"Google Chrome\";v=\"141\", \"Not_A Brand\";v=\"99\"",
+        "Sec-CH-UA-Mobile":"?0",
+        "Sec-CH-UA-Platform":"\"Windows\"",
+        "Sec-CH-UA-Arch":"\"x86\"",
+        "Sec-CH-UA-Bitness":"\"64\"",
+        "Sec-CH-UA-Model":"\"\"",
+        "Sec-CH-UA-Full-Version":"\"141.0.0.0\"",
+        "Sec-CH-UA-Platform-Version":"\"15.0.0\""
       }
     }
   }
