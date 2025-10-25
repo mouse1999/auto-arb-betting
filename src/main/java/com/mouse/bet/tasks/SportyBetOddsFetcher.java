@@ -27,10 +27,16 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.stream.Collectors;
 
+/**
+ * Live arbing mode fetcher for SportyBet odds.
+ * Optimized with context pool for sub-second profile rotation.
+ */
 @Slf4j
 @RequiredArgsConstructor
 @Component
 public class SportyBetOddsFetcher implements Runnable {
+
+    // ==================== DEPENDENCIES ====================
     private final ScraperConfig scraperConfig;
     private final ProfileManager profileManager;
     private final SportyBetService sportyBetService;
@@ -38,85 +44,114 @@ public class SportyBetOddsFetcher implements Runnable {
     private final ArbDetector arbDetector;
     private final ObjectMapper objectMapper;
 
-    // ==================== CONSTANTS (LIVE ARBING MODE) ====================
-    private static final String BASE_URL   = "https://www.sportybet.com";
+    // ==================== CONFIGURATION CONSTANTS ====================
+    private static final String BASE_URL = "https://www.sportybet.com";
     private static final String SPORT_PAGE = BASE_URL + "/ng";
 
-    private static final int  INITIAL_SETUP_MAX_ATTEMPTS = 3;
-    private static final int  CONTEXT_NAV_MAX_RETRIES = 3;
-    private static final int  API_MAX_RETRIES         = 2;
-    private static final int  API_TIMEOUT_MS          = 25_000;
-    private static final long SCHEDULER_PERIOD_SEC    = 2;
-    private static final int  EVENT_DETAIL_THREADS    = 50;
-    private static final int  PROCESSING_THREADS      = 100;
-    private static final long EVENT_DEDUP_WINDOW_MS   = 500;
-    private static final int  MAX_ACTIVE_FETCHES      = 300;
+    private static final int INITIAL_SETUP_MAX_ATTEMPTS = 3;
+    private static final int CONTEXT_NAV_MAX_RETRIES = 3;
+    private static final int API_MAX_RETRIES = 2;
+    private static final int API_TIMEOUT_MS = 25_000;
+    private static final long SCHEDULER_PERIOD_SEC = 2;
+    private static final int EVENT_DETAIL_THREADS = 50;
+    private static final int PROCESSING_THREADS = 100;
+    private static final long EVENT_DEDUP_WINDOW_MS = 500;
+    private static final int MAX_ACTIVE_FETCHES = 300;
 
-    // Rate limit detection
-    private static final int  RATE_LIMIT_THRESHOLD    = 5;  // consecutive failures
-    private static final int  SLOW_REQUEST_THRESHOLD_MS = 20_000; // 20s is suspicious
+    // Context pool configuration
+    private static final int CONTEXT_POOL_SIZE = 3;
+    private static final int CONTEXT_MAX_AGE_MS = 300_000; // 5 minutes
 
+    // Rate limit detection thresholds
+    private static final int RATE_LIMIT_THRESHOLD = 5;
+    private static final int SLOW_REQUEST_THRESHOLD_MS = 20_000;
+
+    // Sport keys
     private static final String KEY_FB = "sr:sport:1";
     private static final String KEY_BB = "sr:sport:2";
     private static final String KEY_TT = "sr:sport:20";
     private static final BookMaker SCRAPER_BOOKMAKER = BookMaker.SPORTY_BET;
 
-    // ==================== THREADING ====================
+    // ==================== THREAD POOLS ====================
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
     private final ExecutorService listFetchExecutor = Executors.newFixedThreadPool(3);
     private final ExecutorService eventDetailExecutor = Executors.newFixedThreadPool(EVENT_DETAIL_THREADS);
-    private final ExecutorService processingExecutor  = Executors.newFixedThreadPool(PROCESSING_THREADS);
+    private final ExecutorService processingExecutor = Executors.newFixedThreadPool(PROCESSING_THREADS);
     private final ExecutorService retryExecutor = Executors.newFixedThreadPool(5);
     private final ExecutorService profileRotationExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService poolWarmerExecutor = Executors.newSingleThreadExecutor();
 
-    // ==================== SESSION / HTTP ====================
+    // ==================== SESSION MANAGEMENT ====================
     private final AtomicReference<Playwright> playwrightRef = new AtomicReference<>();
+    private volatile Browser sharedBrowser;
     private volatile UserAgentProfile profile;
-    private final AtomicLong profileVersion = new AtomicLong(0); // Track profile changes
+    private final AtomicLong profileVersion = new AtomicLong(0);
+
+    // Context pool for fast rotation
+    private final BlockingQueue<ContextWrapper> contextPool = new LinkedBlockingQueue<>(CONTEXT_POOL_SIZE);
+    private volatile ContextWrapper activeContext;
 
     private final ThreadLocal<Map<String, APIRequestContext>> threadLocalClients =
             ThreadLocal.withInitial(HashMap::new);
-    private final ThreadLocal<Long> threadLocalProfileVersion = ThreadLocal.withInitial(() -> -1L);
+    private final ThreadLocal<Long> threadLocalProfileVersion =
+            ThreadLocal.withInitial(() -> -1L);
 
     private final AtomicBoolean globalNeedsRefresh = new AtomicBoolean(false);
-    private final ThreadLocal<Boolean> tlNeedsRefresh = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private final ThreadLocal<Boolean> tlNeedsRefresh =
+            ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     private final Map<String, String> harvestedHeaders = new ConcurrentHashMap<>();
     private final AtomicReference<String> cookieHeaderRef = new AtomicReference<>("");
 
-    // ==================== STATE / METRICS ====================
+    // ==================== STATE TRACKING ====================
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private final AtomicBoolean schedulesStarted = new AtomicBoolean(false);
     private final AtomicBoolean setupCompleted = new AtomicBoolean(false);
     private final AtomicBoolean profileRotationInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean needsSessionRefresh = new AtomicBoolean(false);
 
     private final AtomicInteger activeDetailFetches = new AtomicInteger(0);
-    private final Map<String, Long> lastFetchTime   = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastFetchTime = new ConcurrentHashMap<>();
     private final Map<String, Long> lastRequestTime = new ConcurrentHashMap<>();
 
-    // Rate limit detection
+    // Rate limit metrics
     private final AtomicInteger consecutiveRateLimitErrors = new AtomicInteger(0);
     private final AtomicInteger consecutiveTimeouts = new AtomicInteger(0);
     private final AtomicInteger consecutiveNetworkErrors = new AtomicInteger(0);
     private final AtomicLong lastProfileRotation = new AtomicLong(System.currentTimeMillis());
     private final AtomicInteger requestsSinceLastRotation = new AtomicInteger(0);
 
-    private final AtomicBoolean needsSessionRefresh      = new AtomicBoolean(false);
-
     private final PriorityBlockingQueue<EventFetchTask> eventQueue = new PriorityBlockingQueue<>(
             1000,
             Comparator.comparingInt(EventFetchTask::getPriority).reversed()
     );
 
+    // ==================== CONTEXT WRAPPER ====================
+    private static class ContextWrapper {
+        @Getter
+        private final BrowserContext context;
+        @Getter
+        private final UserAgentProfile profile;
+        private final long createdAt;
+
+        public ContextWrapper(BrowserContext context, UserAgentProfile profile) {
+            this.context = context;
+            this.profile = profile;
+            this.createdAt = System.currentTimeMillis();
+        }
+
+        public boolean isStale() {
+            return System.currentTimeMillis() - createdAt > CONTEXT_MAX_AGE_MS;
+        }
+
+    }
+
     // ==================== TASK MODEL ====================
     private static class EventFetchTask {
-        @Getter
-        private final String eventId;
-        @Getter
-        private final String clientKey;
+        @Getter private final String eventId;
+        @Getter private final String clientKey;
         private final boolean isLive;
-        @Getter
-        private final long timestamp;
+        @Getter private final long timestamp;
 
         public EventFetchTask(String eventId, String clientKey, boolean isLive) {
             this.eventId = eventId;
@@ -124,93 +159,32 @@ public class SportyBetOddsFetcher implements Runnable {
             this.isLive = isLive;
             this.timestamp = System.currentTimeMillis();
         }
-        public int getPriority() { return isLive ? 100 : 50; }
+
+        public int getPriority() {
+            return isLive ? 100 : 50;
+        }
     }
 
     // ==================== MAIN RUN ====================
     @Override
     public void run() {
-        log.info("=== Starting SportyBetOddsFetcher (LIVE ARBING MODE with Profile Rotation) ===");
-        log.info("Cadence={}s, Dedup={}ms, DetailThreads={}, ProcessingThreads={}",
-                SCHEDULER_PERIOD_SEC, EVENT_DEDUP_WINDOW_MS, EVENT_DETAIL_THREADS, PROCESSING_THREADS);
+        log.info("=== Starting SportyBetOddsFetcher (OPTIMIZED with Context Pool) ===");
+        log.info("Cadence={}s, Dedup={}ms, DetailThreads={}, ProcessingThreads={}, PoolSize={}",
+                SCHEDULER_PERIOD_SEC, EVENT_DEDUP_WINDOW_MS, EVENT_DETAIL_THREADS,
+                PROCESSING_THREADS, CONTEXT_POOL_SIZE);
 
         playwrightRef.set(Playwright.create());
 
         try {
             performInitialSetupWithRetry();
-
+            initializeContextPool();
+            startPoolWarmer();
             startSchedulers();
             startQueueProcessor();
-
-            // Health monitor
-            while (isRunning.get()) {
-                Thread.sleep(Duration.ofSeconds(30).toMillis());
-                int active = activeDetailFetches.get();
-                int queued = eventQueue.size();
-                int netErrors = consecutiveNetworkErrors.get();
-                int rateLimitErrors = consecutiveRateLimitErrors.get();
-                int timeouts = consecutiveTimeouts.get();
-                int requests = requestsSinceLastRotation.get();
-                long timeSinceRotation = System.currentTimeMillis() - lastProfileRotation.get();
-
-                log.info("Health — Active: {}, Queued: {}, NetErrors: {}, RateLimit: {}, Timeouts: {}, Requests: {}, TimeSinceRotation: {}s, SetupOK: {}",
-                        active, queued, netErrors, rateLimitErrors, timeouts, requests,
-                        timeSinceRotation / 1000, setupCompleted.get());
-
-                // Trigger profile rotation if needed
-                if (shouldRotateProfile()) {
-                    log.info("Rate limit detected! Triggering profile rotation...");
-                    triggerProfileRotation();
-                }
-
-                if (needsSessionRefresh.get()) {
-                    log.info("Triggering streaming session refresh...");
-                    performStreamingSessionRefresh();
-                }
-
-                if (lastFetchTime.size() > 10_000) {
-                    long cutoff = System.currentTimeMillis() - 60_000;
-                    lastFetchTime.entrySet().removeIf(e -> e.getValue() < cutoff);
-                }
-            }
+            runHealthMonitor();
         } catch (RuntimeException setupEx) {
             log.error("Could not complete initial setup, entering recovery mode", setupEx);
-
-            while (isRunning.get()) {
-                try {
-                    Thread.sleep(30_000);
-                    log.info("Attempting setup recovery...");
-                    performInitialSetupWithRetry();
-
-                    if (setupCompleted.get()) {
-                        log.info("Setup recovery successful, starting schedulers...");
-                        startSchedulers();
-                        startQueueProcessor();
-
-                        while (isRunning.get()) {
-                            Thread.sleep(Duration.ofSeconds(30).toMillis());
-                            int active = activeDetailFetches.get();
-                            int queued = eventQueue.size();
-                            int errors = consecutiveNetworkErrors.get();
-                            log.info("Health — Active: {}, Queued: {}, NetErrors: {}", active, queued, errors);
-
-                            if (shouldRotateProfile()) {
-                                triggerProfileRotation();
-                            }
-
-                            if (needsSessionRefresh.get()) {
-                                performStreamingSessionRefresh();
-                            }
-                        }
-                        break;
-                    }
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception retryEx) {
-                    log.error("Setup recovery failed: {}", retryEx.getMessage());
-                }
-            }
+            runRecoveryMode();
         } catch (Exception fatal) {
             log.error("Fatal error in main loop", fatal);
         } finally {
@@ -218,27 +192,188 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    // ==================== RATE LIMIT DETECTION & PROFILE ROTATION ====================
+    private void runHealthMonitor() throws InterruptedException {
+        while (isRunning.get()) {
+            Thread.sleep(Duration.ofSeconds(30).toMillis());
+
+            logHealthMetrics();
+            checkThreadLocalClientsHealth();
+
+            if (shouldRotateProfile()) {
+                log.info("Rate limit detected! Triggering fast profile rotation...");
+                triggerProfileRotation();
+            }
+
+            if (needsSessionRefresh.get()) {
+                log.info("Triggering streaming session refresh...");
+                performStreamingSessionRefresh();
+            }
+
+            cleanupStaleFetchTimes();
+        }
+    }
+
+    private void logHealthMetrics() {
+        int active = activeDetailFetches.get();
+        int queued = eventQueue.size();
+        int netErrors = consecutiveNetworkErrors.get();
+        int rateLimitErrors = consecutiveRateLimitErrors.get();
+        int timeouts = consecutiveTimeouts.get();
+        int requests = requestsSinceLastRotation.get();
+        long timeSinceRotation = System.currentTimeMillis() - lastProfileRotation.get();
+        int poolSize = contextPool.size();
+
+        log.info("Health — Active: {}, Queued: {}, NetErrors: {}, RateLimit: {}, Timeouts: {}, " +
+                        "Requests: {}, TimeSinceRotation: {}s, PoolSize: {}, SetupOK: {}",
+                active, queued, netErrors, rateLimitErrors, timeouts, requests,
+                timeSinceRotation / 1000, poolSize, setupCompleted.get());
+    }
+
+    private void cleanupStaleFetchTimes() {
+        if (lastFetchTime.size() > 10_000) {
+            long cutoff = System.currentTimeMillis() - 60_000;
+            lastFetchTime.entrySet().removeIf(e -> e.getValue() < cutoff);
+        }
+    }
+
+    private void runRecoveryMode() {
+        while (isRunning.get()) {
+            try {
+                Thread.sleep(30_000);
+                log.info("Attempting setup recovery...");
+                performInitialSetupWithRetry();
+
+                if (setupCompleted.get()) {
+                    log.info("Setup recovery successful, starting schedulers...");
+                    initializeContextPool();
+                    startPoolWarmer();
+                    startSchedulers();
+                    startQueueProcessor();
+                    runHealthMonitor();
+                    break;
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception retryEx) {
+                log.error("Setup recovery failed: {}", retryEx.getMessage());
+            }
+        }
+    }
+
+    // ==================== CONTEXT POOL MANAGEMENT ====================
+    private void initializeContextPool() {
+        log.info("=== Initializing context pool (size: {}) ===", CONTEXT_POOL_SIZE);
+
+        Playwright pw = playwrightRef.get();
+        if (pw == null) {
+            throw new IllegalStateException("Playwright not initialized");
+        }
+
+        // Create single shared browser (reused for all contexts)
+        sharedBrowser = launchBrowser(pw);
+        log.info("Shared browser created");
+
+        // Pre-warm the pool
+        for (int i = 0; i < CONTEXT_POOL_SIZE; i++) {
+            try {
+                ContextWrapper wrapper = createNewContextWrapper();
+                contextPool.offer(wrapper);
+                log.info("Pre-warmed context {}/{}", i + 1, CONTEXT_POOL_SIZE);
+            } catch (Exception e) {
+                log.error("Failed to pre-warm context: {}", e.getMessage());
+            }
+        }
+
+        log.info("Context pool initialized with {} contexts", contextPool.size());
+    }
+
+    private ContextWrapper createNewContextWrapper() {
+        UserAgentProfile newProfile = profileManager.getNextProfile();
+        log.info("Creating context with profile: Platform={}, UA={}...",
+                newProfile.getPlatform(),
+                newProfile.getUserAgent().substring(0, Math.min(50, newProfile.getUserAgent().length())));
+
+        BrowserContext context = newContext(sharedBrowser, newProfile);
+        attachAntiDetection(context, newProfile);
+
+        return new ContextWrapper(context, newProfile);
+    }
+
+    private void startPoolWarmer() {
+        log.info("Starting context pool warmer");
+        poolWarmerExecutor.submit(() -> {
+            while (isRunning.get()) {
+                try {
+                    // Keep pool topped up and fresh
+                    maintainContextPool();
+                    Thread.sleep(10_000); // Check every 10 seconds
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    log.error("Pool warmer error: {}", e.getMessage());
+                }
+            }
+        });
+    }
+
+    private void maintainContextPool() {
+        // Remove stale contexts
+        contextPool.removeIf(wrapper -> {
+            if (wrapper.isStale()) {
+                log.info("Removing stale context from pool (age: {}ms)",
+                        System.currentTimeMillis() - wrapper.createdAt);
+                safeClose(wrapper.getContext());
+                return true;
+            }
+            return false;
+        });
+
+        // Refill pool to capacity
+        while (contextPool.size() < CONTEXT_POOL_SIZE) {
+            try {
+                ContextWrapper wrapper = createNewContextWrapper();
+                contextPool.offer(wrapper);
+                log.info("Pool refilled: {}/{}", contextPool.size(), CONTEXT_POOL_SIZE);
+            } catch (Exception e) {
+                log.error("Failed to refill pool: {}", e.getMessage());
+                break;
+            }
+        }
+    }
+
+    private void refillContextPoolAsync() {
+        poolWarmerExecutor.submit(() -> {
+            try {
+                if (contextPool.size() < CONTEXT_POOL_SIZE) {
+                    ContextWrapper wrapper = createNewContextWrapper();
+                    contextPool.offer(wrapper);
+                    log.info("Pool async refill: {}/{}", contextPool.size(), CONTEXT_POOL_SIZE);
+                }
+            } catch (Exception e) {
+                log.error("Pool async refill failed: {}", e.getMessage());
+            }
+        });
+    }
+
+    // ==================== OPTIMIZED PROFILE ROTATION ====================
     private boolean shouldRotateProfile() {
         int rateLimitErrors = consecutiveRateLimitErrors.get();
         int timeouts = consecutiveTimeouts.get();
         long timeSinceLastRotation = System.currentTimeMillis() - lastProfileRotation.get();
         int requests = requestsSinceLastRotation.get();
 
-        // Rotate if:
-        // 1. Too many rate limit errors (429, 403, slow requests)
         if (rateLimitErrors >= RATE_LIMIT_THRESHOLD) {
             log.info("Rate limit threshold reached: {} consecutive errors", rateLimitErrors);
             return true;
         }
 
-        // 2. Too many consecutive timeouts
         if (timeouts >= 3) {
             log.info("Timeout threshold reached: {} consecutive timeouts", timeouts);
             return true;
         }
 
-        // 3. Proactive rotation: every 5 minutes or 500 requests (whichever comes first)
         if (timeSinceLastRotation > 300_000 && requests > 100) {
             log.info("Proactive profile rotation: {}s elapsed, {} requests made",
                     timeSinceLastRotation / 1000, requests);
@@ -255,10 +390,10 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private void triggerProfileRotation() {
         if (profileRotationInProgress.compareAndSet(false, true)) {
-            log.info("=== Starting Profile Rotation ===");
+            log.info("=== Triggering Fast Profile Rotation ===");
             profileRotationExecutor.submit(() -> {
                 try {
-                    performProfileRotation();
+                    performFastProfileRotation();
                 } catch (Exception e) {
                     log.error("Profile rotation failed: {}", e.getMessage(), e);
                 } finally {
@@ -270,66 +405,88 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    private void performProfileRotation() {
-        log.info("Executing profile rotation...");
-        Playwright pw = playwrightRef.get();
-        if (pw == null) {
-            log.error("Playwright not available for profile rotation");
+    private void performFastProfileRotation() {
+        log.info("=== Fast Profile Rotation (Context Pool) ===");
+        long startTime = System.currentTimeMillis();
+
+        // Signal threads to pause briefly
+        globalNeedsRefresh.set(true);
+
+        // Small delay to allow in-flight requests to complete
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             return;
         }
 
-        Browser browser = null;
-        BrowserContext context = null;
+        // Get pre-warmed context from pool (instant!)
+        ContextWrapper newWrapper = contextPool.poll();
+
+        if (newWrapper == null) {
+            log.warn("Context pool empty, creating new context (slower path)");
+            newWrapper = createNewContextWrapper();
+        }
+
         Page page = null;
-
         try {
-            // Get new profile
-            UserAgentProfile newProfile = profileManager.getNextProfile();
-            log.info("Rotating to new profile: Platform={}, UA={}...",
-                    newProfile.getPlatform(),
-                    newProfile.getUserAgent().substring(0, Math.min(50, newProfile.getUserAgent().length())));
-
-            // Create new browser session with new profile
-            browser = launchBrowser(pw);
-            context = newContext(browser, newProfile);
-            attachAntiDetection(context, newProfile);
-            page = context.newPage();
-
-            // Harvest new headers/cookies
+            // Quick cookie harvest
+            page = newWrapper.getContext().newPage();
             Map<String, String> captured = new HashMap<>();
             attachNetworkTaps(page, captured);
-            performInitialNavigationWithRetry(page);
 
-            String cookieHeader = formatCookies(context.cookies());
+            // Fast navigation - just harvest cookies
+            page.navigate(SPORT_PAGE, new Page.NavigateOptions()
+                    .setTimeout(15_000)
+                    .setWaitUntil(WaitUntilState.DOMCONTENTLOADED)); // Faster than NETWORKIDLE
 
-            // Atomic swap of profile and headers
-            profile = newProfile;
+            String cookieHeader = formatCookies(newWrapper.getContext().cookies());
+
+            // Store old context for cleanup
+            ContextWrapper oldContext = activeContext;
+
+            // Atomic swap
+            profile = newWrapper.getProfile();
             cookieHeaderRef.set(cookieHeader);
             harvestedHeaders.clear();
             harvestedHeaders.putAll(captured);
+            activeContext = newWrapper;
 
-            // Increment profile version to invalidate all thread-local clients
             long newVersion = profileVersion.incrementAndGet();
-            globalNeedsRefresh.set(true);
+            resetRateLimitMetrics();
 
-            // Reset counters
-            consecutiveRateLimitErrors.set(0);
-            consecutiveTimeouts.set(0);
-            consecutiveNetworkErrors.set(0);
-            requestsSinceLastRotation.set(0);
-            lastProfileRotation.set(System.currentTimeMillis());
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("Fast rotation complete in {}ms! Version: {}, cookies: {} bytes, headers: {}",
+                    duration, newVersion, cookieHeader.length(), captured.size());
 
-            log.info("Profile rotation complete! New version: {}, cookies: {} bytes, headers: {}",
-                    newVersion, cookieHeader.length(), captured.size());
+            // Clean up old context
+            if (oldContext != null) {
+                safeClose(oldContext.getContext());
+            }
+
+            // Trigger background refill
+            refillContextPoolAsync();
 
         } catch (Exception e) {
-            log.error("Profile rotation failed: {}", e.getMessage(), e);
-            // Don't throw - let the system continue with old profile
+            log.error("Fast rotation failed: {}", e.getMessage(), e);
+            // Return context to pool if we didn't use it
+            if (page == null && newWrapper != null) {
+                contextPool.offer(newWrapper);
+            }
         } finally {
-            safeClose(page);
-            safeClose(context);
-            safeClose(browser);
+            if (page != null) {
+                safeClose(page);
+            }
+            globalNeedsRefresh.set(false);
         }
+    }
+
+    private void resetRateLimitMetrics() {
+        consecutiveRateLimitErrors.set(0);
+        consecutiveTimeouts.set(0);
+        consecutiveNetworkErrors.set(0);
+        requestsSinceLastRotation.set(0);
+        lastProfileRotation.set(System.currentTimeMillis());
     }
 
     // ==================== INITIAL SETUP WITH RETRY ====================
@@ -345,21 +502,13 @@ public class SportyBetOddsFetcher implements Runnable {
                 setupCompleted.set(true);
                 log.info("=== Initial setup completed successfully on attempt {} ===", attempt);
                 return;
-
             } catch (Exception e) {
                 lastException = e;
                 log.error("Initial setup attempt {}/{} failed: {}",
                         attempt, INITIAL_SETUP_MAX_ATTEMPTS, e.getMessage());
 
                 if (attempt < INITIAL_SETUP_MAX_ATTEMPTS) {
-                    try {
-                        long backoffMs = 2000L * attempt;
-                        log.info("Waiting {}ms before retry...", backoffMs);
-                        Thread.sleep(backoffMs);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Setup interrupted during backoff", ie);
-                    }
+                    backoffBeforeRetry(attempt);
                 }
             }
         }
@@ -369,6 +518,17 @@ public class SportyBetOddsFetcher implements Runnable {
                 "Initial setup failed after " + INITIAL_SETUP_MAX_ATTEMPTS + " attempts",
                 lastException
         );
+    }
+
+    private void backoffBeforeRetry(int attempt) {
+        try {
+            long backoffMs = 2000L * attempt;
+            log.info("Waiting {}ms before retry...", backoffMs);
+            Thread.sleep(backoffMs);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Setup interrupted during backoff", ie);
+        }
     }
 
     private void performInitialSetup() {
@@ -392,7 +552,6 @@ public class SportyBetOddsFetcher implements Runnable {
             browser = launchBrowser(pw);
             context = newContext(browser, profile);
             attachAntiDetection(context, profile);
-
             page = context.newPage();
 
             Map<String, String> captured = new HashMap<>();
@@ -406,7 +565,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.info("Setup OK — cookies={} bytes, harvestedHeaders={}",
                     cookieHeader.length(), captured.size());
-
         } finally {
             safeClose(page);
             safeClose(context);
@@ -455,15 +613,9 @@ public class SportyBetOddsFetcher implements Runnable {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                     .orTimeout(30, TimeUnit.SECONDS)
                     .join();
-            consecutiveTimeouts.set(0); // Reset on success
+            consecutiveTimeouts.set(0);
         } catch (CompletionException | CancellationException ex) {
-            Throwable cause = ex.getCause();
-            if (cause instanceof TimeoutException) {
-                int timeouts = consecutiveTimeouts.incrementAndGet();
-                log.info("Parallel fetch timeout after 30s (timeout #{}) - some sports may still be fetching", timeouts);
-            } else {
-                log.info("Parallel fetch error: {}", cause != null ? cause.getMessage() : ex.getMessage());
-            }
+            handleParallelFetchException(ex);
         }
 
         long duration = System.currentTimeMillis() - start;
@@ -471,55 +623,37 @@ public class SportyBetOddsFetcher implements Runnable {
                 duration, eventQueue.size(), activeDetailFetches.get());
     }
 
+    private void handleParallelFetchException(Exception ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof TimeoutException) {
+            int timeouts = consecutiveTimeouts.incrementAndGet();
+            log.info("Parallel fetch timeout after 30s (timeout #{}) - some sports may still be fetching", timeouts);
+        } else {
+            log.info("Parallel fetch error: {}", cause != null ? cause.getMessage() : ex.getMessage());
+        }
+    }
+
     private void fetchSportEventsList(String sportName, String sportId, String clientKey) {
         long fetchStart = System.currentTimeMillis();
         try {
-            Long lastReq = lastRequestTime.get(clientKey);
-            long now = System.currentTimeMillis();
-            if (lastReq != null && (now - lastReq) < 100) {
+            if (shouldSkipRequest(clientKey)) {
                 log.info("{}: Skipping - too soon after last request", sportName);
                 return;
             }
-            lastRequestTime.put(clientKey, now);
 
-            String url = buildUrl(BASE_URL + "/api/ng/factsCenter/liveOrPrematchEvents",
-                    Map.of("sportId", sportId, "_t", String.valueOf(System.currentTimeMillis())));
-
+            String url = buildEventsListUrl(sportId);
             log.info("{}: Fetching events list from API...", sportName);
             String body = safeApiGet(url, clientKey);
             long apiDuration = System.currentTimeMillis() - fetchStart;
 
             consecutiveNetworkErrors.set(0);
+
             if (body == null || body.isEmpty()) {
                 log.info("{}: Empty response from API ({}ms)", sportName, apiDuration);
                 return;
             }
 
-            List<String> eventIds = extractEventIds(body);
-            if (eventIds == null || eventIds.isEmpty()) {
-                log.info("{}: No events found in response ({}ms)", sportName, apiDuration);
-                return;
-            }
-
-            int queued = 0, skipped = 0;
-            for (String eventId : eventIds) {
-                Long last = lastFetchTime.get(eventId);
-                if (last != null && (System.currentTimeMillis() - last) < EVENT_DEDUP_WINDOW_MS) {
-                    skipped++;
-                    continue;
-                }
-                lastFetchTime.put(eventId, System.currentTimeMillis());
-
-                boolean isLive = isLiveEvent(body, eventId);
-                eventQueue.offer(new EventFetchTask(eventId, clientKey, isLive));
-                queued++;
-            }
-
-            long totalDuration = System.currentTimeMillis() - fetchStart;
-            if (queued > 0 || log.isDebugEnabled()) {
-                log.info("{}: Completed in {}ms - queued {}/{} events (skipped: {})",
-                        sportName, totalDuration, queued, eventIds.size(), skipped);
-            }
+            processEventsListResponse(sportName, body, clientKey, fetchStart);
 
         } catch (PlaywrightException e) {
             long duration = System.currentTimeMillis() - fetchStart;
@@ -531,60 +665,115 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    // ==================== QUEUE PROCESSOR ====================
-    private void startQueueProcessor() {
-        for (int i = 0; i < EVENT_DETAIL_THREADS; i++) {
-            eventDetailExecutor.submit(() -> {
-                while (isRunning.get()) {
-                    try {
-                        if (!setupCompleted.get()) {
-                            Thread.sleep(1000);
-                            continue;
-                        }
+    private boolean shouldSkipRequest(String clientKey) {
+        Long lastReq = lastRequestTime.get(clientKey);
+        long now = System.currentTimeMillis();
+        if (lastReq != null && (now - lastReq) < 100) {
+            return true;
+        }
+        lastRequestTime.put(clientKey, now);
+        return false;
+    }
 
-                        if (profileRotationInProgress.get()) {
-                            Thread.sleep(500);
-                            continue;
-                        }
+    private String buildEventsListUrl(String sportId) {
+        return buildUrl(BASE_URL + "/api/ng/factsCenter/liveOrPrematchEvents",
+                Map.of("sportId", sportId, "_t", String.valueOf(System.currentTimeMillis())));
+    }
 
-                        if (activeDetailFetches.get() > MAX_ACTIVE_FETCHES) {
-                            Thread.sleep(100);
-                            continue;
-                        }
+    private void processEventsListResponse(String sportName, String body, String clientKey, long fetchStart) {
+        List<String> eventIds = extractEventIds(body);
+        if (eventIds == null || eventIds.isEmpty()) {
+            long apiDuration = System.currentTimeMillis() - fetchStart;
+            log.info("{}: No events found in response ({}ms)", sportName, apiDuration);
+            return;
+        }
 
-                        EventFetchTask task = eventQueue.poll(1, TimeUnit.SECONDS);
-                        if (task == null) continue;
+        int queued = 0, skipped = 0;
+        for (String eventId : eventIds) {
+            if (isEventRecentlyFetched(eventId)) {
+                skipped++;
+                continue;
+            }
 
-                        long age = System.currentTimeMillis() - task.getTimestamp();
-                        long maxAge = (task.getPriority() > 50) ? 5_000 : 30_000;
-                        if (age > maxAge) {
-                            log.info("Dropping stale task: eventId={}, age={}ms", task.getEventId(), age);
-                            continue;
-                        }
+            lastFetchTime.put(eventId, System.currentTimeMillis());
+            boolean isLive = isLiveEvent(body, eventId);
+            eventQueue.offer(new EventFetchTask(eventId, clientKey, isLive));
+            queued++;
+        }
 
-                        activeDetailFetches.incrementAndGet();
-                        try {
-                            fetchAndProcessEventDetailAsync(task.getEventId(), task.getClientKey());
-                        } finally {
-                            activeDetailFetches.decrementAndGet();
-                        }
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    } catch (Exception ex) {
-                        log.error("Queue processor error: {}", ex.getMessage());
-                    }
-                }
-            });
+        if (queued > 0) {
+            long totalDuration = System.currentTimeMillis() - fetchStart;
+            log.info("{}: Completed in {}ms - queued {}/{} events (skipped: {})",
+                    sportName, totalDuration, queued, eventIds.size(), skipped);
         }
     }
 
-    // ==================== STREAMING SESSION REFRESH (ZERO DOWNTIME) ====================
+    private boolean isEventRecentlyFetched(String eventId) {
+        Long last = lastFetchTime.get(eventId);
+        return last != null && (System.currentTimeMillis() - last) < EVENT_DEDUP_WINDOW_MS;
+    }
+
+    // ==================== QUEUE PROCESSOR ====================
+    private void startQueueProcessor() {
+        for (int i = 0; i < EVENT_DETAIL_THREADS; i++) {
+            eventDetailExecutor.submit(this::processEventQueue);
+        }
+    }
+
+    private void processEventQueue() {
+        while (isRunning.get()) {
+            try {
+                if (!setupCompleted.get()) {
+                    Thread.sleep(1000);
+                    continue;
+                }
+
+                if (profileRotationInProgress.get()) {
+                    Thread.sleep(500);
+                    continue;
+                }
+
+                if (activeDetailFetches.get() > MAX_ACTIVE_FETCHES) {
+                    Thread.sleep(100);
+                    continue;
+                }
+
+                EventFetchTask task = eventQueue.poll(1, TimeUnit.SECONDS);
+                if (task == null) continue;
+
+                if (isTaskStale(task)) {
+                    long age = System.currentTimeMillis() - task.getTimestamp();
+                    log.info("Dropping stale task: eventId={}, age={}ms", task.getEventId(), age);
+                    continue;
+                }
+
+                activeDetailFetches.incrementAndGet();
+                try {
+                    fetchAndProcessEventDetailAsync(task.getEventId(), task.getClientKey());
+                } finally {
+                    activeDetailFetches.decrementAndGet();
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception ex) {
+                log.error("Queue processor error: {}", ex.getMessage());
+            }
+        }
+    }
+
+    private boolean isTaskStale(EventFetchTask task) {
+        long age = System.currentTimeMillis() - task.getTimestamp();
+        long maxAge = (task.getPriority() > 50) ? 5_000 : 30_000;
+        return age > maxAge;
+    }
+
+    // ==================== STREAMING SESSION REFRESH ====================
     private void performStreamingSessionRefresh() {
         log.info("=== Streaming session refresh started ===");
         Executors.newSingleThreadExecutor().submit(() -> {
             try {
-                performProfileRotation();
+                performFastProfileRotation();
                 needsSessionRefresh.set(false);
             } catch (Exception e) {
                 log.error("Streaming refresh failed: {}", e.getMessage());
@@ -603,7 +792,9 @@ public class SportyBetOddsFetcher implements Runnable {
             processingExecutor.submit(() -> {
                 try {
                     SportyEvent domainEvent = parseEventDetail(body);
-                    if (domainEvent != null) processParsedEvent(domainEvent);
+                    if (domainEvent != null) {
+                        processParsedEvent(domainEvent);
+                    }
                 } catch (Exception ex) {
                     log.info("Process failed for {}: {}", eventId, ex.getMessage());
                 }
@@ -619,6 +810,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private void processParsedEvent(SportyEvent event) {
         if (event == null) return;
+
         try {
             NormalizedEvent normalized = sportyBetService.convertToNormalEvent(event);
             if (normalized == null) return;
@@ -642,13 +834,13 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    // ==================== HTTP LAYER (THREAD-LOCAL CLIENTS, SAFE REFRESH) ====================
-    private String safeApiGet(String url, String clientKey) {
+    // ==================== HTTP LAYER (THREAD-LOCAL CLIENTS) ====================
+    private String safeApiGet(String url, String clientKey) throws InterruptedException {
         return safeApiGet(url, clientKey, 0);
     }
 
-    private String safeApiGet(String url, String clientKey, int retry) {
-        if (retry > 2) {
+    private String safeApiGet(String url, String clientKey, int retry) throws InterruptedException {
+        if (retry > API_MAX_RETRIES) {
             log.info("HTTP max retries exceeded for: {}", url);
             consecutiveRateLimitErrors.incrementAndGet();
             throw new PlaywrightException("HTTP retried too many times: " + url);
@@ -657,81 +849,135 @@ public class SportyBetOddsFetcher implements Runnable {
         long requestStart = System.currentTimeMillis();
         try {
             APIRequestContext client = getThreadLocalClient(clientKey);
+            if (client == null) {
+                log.info("Client is null for key: {}, retrying...", clientKey);
+                Thread.sleep(100 * (retry + 1));
+                return safeApiGet(url, clientKey, retry + 1);
+            }
+
+            if (!isClientValid(client)) {
+                log.info("Client validation failed, recreating for retry {}", retry + 1);
+                recreateClient(clientKey);
+                Thread.sleep(100 * (retry + 1));
+                return safeApiGet(url, clientKey, retry + 1);
+            }
+
             APIResponse res = client.get(url);
             int status = res.status();
             long requestDuration = System.currentTimeMillis() - requestStart;
 
             requestsSinceLastRotation.incrementAndGet();
 
-            // Detect rate limiting
-            if (status == 429) {
-                int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
-                log.info("Rate limit detected (429) on attempt {} - count: {}, duration: {}ms",
-                        retry + 1, rateLimitCount, requestDuration);
-                Thread.sleep(1000 * (retry + 1)); // Exponential backoff
-                return safeApiGet(url, clientKey, retry + 1);
-            }
-
-            if (status == 401 || status == 403) {
-                int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
-                log.info("Auth/Forbidden error ({}) - possible rate limit, count: {}, duration: {}ms",
-                        status, rateLimitCount, requestDuration);
-                tlNeedsRefresh.set(true);
-                Thread.sleep(150);
-                return safeApiGet(url, clientKey, retry + 1);
-            }
-
-            // Detect suspiciously slow requests (likely throttled)
-            if (requestDuration > SLOW_REQUEST_THRESHOLD_MS) {
-                int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
-                log.info("Suspiciously slow request detected: {}ms (threshold: {}ms) - possible throttling, count: {}",
-                        requestDuration, SLOW_REQUEST_THRESHOLD_MS, rateLimitCount);
-            }
-
-            String body = safeBody(res);
-            if (status < 200 || status >= 300) {
-                log.info("HTTP {} for {} (took {}ms)", status, url, requestDuration);
-                throw new PlaywrightException("HTTP " + status + " on " + url);
-            }
-
-            // Success - reset rate limit counter
-            consecutiveRateLimitErrors.set(0);
-
-            if (requestDuration > 5000) {
-                log.info("Slow API response: {}ms for {}", requestDuration, url);
-            }
-
-            return body;
+            return handleApiResponse(url, clientKey, retry, res, status, requestDuration);
 
         } catch (PlaywrightException e) {
-            String msg = e.getMessage() == null ? "" : e.getMessage();
-            long requestDuration = System.currentTimeMillis() - requestStart;
-
-            if ((msg.contains("Cannot find object to call __adopt__")
-                    || msg.contains("Cannot find command")
-                    || msg.contains("Channel closed"))
-                    && retry < 2) {
-
-                log.info("Client disposal needed, recreating for retry {} (after {}ms)",
-                        retry + 1, requestDuration);
-                Map<String, APIRequestContext> local = threadLocalClients.get();
-                APIRequestContext old = local.remove(clientKey);
-                if (old != null) { try { old.dispose(); } catch (Exception ignore) {} }
-                tlNeedsRefresh.set(false);
-                return safeApiGet(url, clientKey, retry + 1);
-            }
-
-            if (msg.toLowerCase().contains("timeout")) {
-                consecutiveTimeouts.incrementAndGet();
-            }
-
-            log.info("API request failed after {}ms: {}", requestDuration, msg);
-            throw e;
-
+            return handlePlaywrightException(url, clientKey, retry, requestStart, e);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted during API request", ie);
         }
+    }
+
+    private String handleApiResponse(String url, String clientKey, int retry,
+                                     APIResponse res, int status, long requestDuration)
+            throws InterruptedException {
+
+        if (status == 429) {
+            return handleRateLimitResponse(url, clientKey, retry, requestDuration);
+        }
+
+        if (status == 401 || status == 403) {
+            return handleAuthErrorResponse(url, clientKey, retry, status, requestDuration);
+        }
+
+        if (requestDuration > SLOW_REQUEST_THRESHOLD_MS) {
+            detectSlowRequest(requestDuration);
+        }
+
+        String body = safeBody(res);
+        if (status < 200 || status >= 300) {
+            log.info("HTTP {} for {} (took {}ms)", status, url, requestDuration);
+            throw new PlaywrightException("HTTP " + status + " on " + url);
+        }
+
+        consecutiveRateLimitErrors.set(0);
+
+        if (requestDuration > 5000) {
+            log.info("Slow API response: {}ms for {}", requestDuration, url);
+        }
+
+        return body;
+    }
+
+    private String handleRateLimitResponse(String url, String clientKey, int retry,
+                                           long requestDuration) throws InterruptedException {
+        int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
+        log.info("Rate limit detected (429) on attempt {} - count: {}, duration: {}ms",
+                retry + 1, rateLimitCount, requestDuration);
+        Thread.sleep(1000 * (retry + 1));
+        return safeApiGet(url, clientKey, retry + 1);
+    }
+
+    private String handleAuthErrorResponse(String url, String clientKey, int retry,
+                                           int status, long requestDuration) throws InterruptedException {
+        int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
+        log.info("Auth/Forbidden error ({}) - possible rate limit, count: {}, duration: {}ms",
+                status, rateLimitCount, requestDuration);
+        tlNeedsRefresh.set(true);
+        Thread.sleep(150);
+        return safeApiGet(url, clientKey, retry + 1);
+    }
+
+    private void detectSlowRequest(long requestDuration) {
+        int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
+        log.info("Suspiciously slow request detected: {}ms (threshold: {}ms) - possible throttling, count: {}",
+                requestDuration, SLOW_REQUEST_THRESHOLD_MS, rateLimitCount);
+    }
+
+    private String handlePlaywrightException(String url, String clientKey, int retry,
+                                             long requestStart, PlaywrightException e)
+            throws InterruptedException {
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+        long requestDuration = System.currentTimeMillis() - requestStart;
+
+        if (isClientDisposalError(msg) && retry < API_MAX_RETRIES) {
+            log.info("Client disposal detected, recreating for retry {} (after {}ms): {}",
+                    retry + 1, requestDuration, msg);
+
+            recreateClient(clientKey);
+            tlNeedsRefresh.set(true);
+            Thread.sleep(200 * (retry + 1));
+            return safeApiGet(url, clientKey, retry + 1);
+        }
+
+        if (msg.toLowerCase().contains("timeout")) {
+            consecutiveTimeouts.incrementAndGet();
+        }
+
+        log.info("API request failed after {}ms: {}", requestDuration, msg);
+        throw e;
+    }
+
+    private boolean isClientDisposalError(String errorMessage) {
+        return errorMessage.contains("Cannot find object to call __adopt__")
+                || errorMessage.contains("Cannot find command")
+                || errorMessage.contains("Channel closed")
+                || errorMessage.contains("Object doesn't exist")
+                || errorMessage.contains("Target closed");
+    }
+
+    private void recreateClient(String clientKey) {
+        Map<String, APIRequestContext> local = threadLocalClients.get();
+        APIRequestContext old = local.remove(clientKey);
+        if (old != null) {
+            try {
+                old.dispose();
+            } catch (Exception ignore) {}
+        }
+    }
+
+    private boolean isClientValid(APIRequestContext client) {
+        return client != null;
     }
 
     private APIRequestContext getThreadLocalClient(String clientKey) {
@@ -739,51 +985,150 @@ public class SportyBetOddsFetcher implements Runnable {
         Long threadVersion = threadLocalProfileVersion.get();
         Long currentVersion = profileVersion.get();
 
-        // Check if this thread needs to refresh due to profile rotation
-        if (!threadVersion.equals(currentVersion)) {
-            log.info("Thread {} detected profile version change ({} -> {}), refreshing clients",
-                    Thread.currentThread().getName(), threadVersion, currentVersion);
-            local.values().forEach(c -> { try { c.dispose(); } catch (Exception ignored) {} });
-            local.clear();
-            threadLocalProfileVersion.set(currentVersion);
-            tlNeedsRefresh.set(false);
-        }
-
-        if (globalNeedsRefresh.get()) {
-            tlNeedsRefresh.set(true);
-        }
-
-        if (tlNeedsRefresh.get()) {
-            log.info("Refreshing thread-local API clients for thread: {}",
-                    Thread.currentThread().getName());
-            local.values().forEach(c -> { try { c.dispose(); } catch (Exception ignored) {} });
-            local.clear();
-            tlNeedsRefresh.set(false);
-            globalNeedsRefresh.set(false);
-        }
-
         APIRequestContext client = local.get(clientKey);
-        if (client == null) {
-            Playwright pw = playwrightRef.get();
-            if (pw == null) throw new IllegalStateException("Playwright not available");
 
-            log.info("Creating new API client for key: {} on thread: {} with profile version: {}",
-                    clientKey, Thread.currentThread().getName(), currentVersion);
-            client = pw.request().newContext(
-                    new APIRequest.NewContextOptions()
-                            .setExtraHTTPHeaders(buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile))
-                            .setTimeout(API_TIMEOUT_MS)
-            );
+        if (client != null && !validateExistingClient(clientKey, client, local)) {
+            client = null;
+        }
+
+        if (shouldRefreshClient(threadVersion, currentVersion, client)) {
+            client = refreshThreadLocalClient(clientKey, client, local, currentVersion);
+        }
+
+        if (globalNeedsRefresh.get() && client != null) {
+            client = forceClientRefresh(clientKey, client, local);
+        }
+
+        return client;
+    }
+
+    private boolean validateExistingClient(String clientKey, APIRequestContext client,
+                                           Map<String, APIRequestContext> local) {
+        try {
+            if (!isClientValid(client)) {
+                log.info("Client {} is disposed, recreating", clientKey);
+                local.remove(clientKey);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.info("Client {} validation error, recreating: {}", clientKey, e.getMessage());
+            local.remove(clientKey);
+            return false;
+        }
+    }
+
+    private boolean shouldRefreshClient(Long threadVersion, Long currentVersion,
+                                        APIRequestContext client) {
+        return !threadVersion.equals(currentVersion) || client == null;
+    }
+
+    private APIRequestContext refreshThreadLocalClient(String clientKey, APIRequestContext client,
+                                                       Map<String, APIRequestContext> local,
+                                                       Long currentVersion) {
+        log.info("Thread {} refreshing client for key: {} (version: {} -> {})",
+                Thread.currentThread().getName(), clientKey,
+                threadLocalProfileVersion.get(), currentVersion);
+
+        if (client != null) {
+            try {
+                client.dispose();
+            } catch (Exception ignored) {}
+            local.remove(clientKey);
+        }
+
+        client = createNewAPIClient(clientKey);
+        if (client != null) {
             local.put(clientKey, client);
         }
+        threadLocalProfileVersion.set(currentVersion);
+        tlNeedsRefresh.set(false);
+
         return client;
+    }
+
+    private APIRequestContext forceClientRefresh(String clientKey, APIRequestContext client,
+                                                 Map<String, APIRequestContext> local) {
+        log.info("Global refresh requested, recreating client for key: {}", clientKey);
+        try {
+            client.dispose();
+        } catch (Exception ignored) {}
+        local.remove(clientKey);
+        client = createNewAPIClient(clientKey);
+        if (client != null) {
+            local.put(clientKey, client);
+        }
+        globalNeedsRefresh.set(false);
+        return client;
+    }
+
+    private APIRequestContext createNewAPIClient(String clientKey) {
+        try {
+            Playwright pw = playwrightRef.get();
+            if (pw == null) {
+                log.error("Playwright not available for creating new API client");
+                return null;
+            }
+
+            log.info("Creating new API client for key: {} on thread: {} with profile version: {}",
+                    clientKey, Thread.currentThread().getName(), profileVersion.get());
+
+            APIRequest.NewContextOptions options = new APIRequest.NewContextOptions()
+                    .setTimeout(API_TIMEOUT_MS);
+
+            Map<String, String> headers = buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile);
+            if (headers != null && !headers.isEmpty()) {
+                options.setExtraHTTPHeaders(headers);
+            }
+
+            return pw.request().newContext(options);
+        } catch (Exception e) {
+            log.error("Failed to create new API client for key {}: {}", clientKey, e.getMessage());
+            return null;
+        }
+    }
+
+    private void checkThreadLocalClientsHealth() {
+        try {
+            Map<String, APIRequestContext> local = threadLocalClients.get();
+            if (local == null || local.isEmpty()) return;
+
+            List<String> invalidClients = local.entrySet().stream()
+                    .filter(entry -> !isClientHealthy(entry.getValue()))
+                    .map(Map.Entry::getKey)
+                    .toList();
+
+            if (!invalidClients.isEmpty()) {
+                log.info("Cleaning up {} invalid thread-local clients: {}",
+                        invalidClients.size(), invalidClients);
+                invalidClients.forEach(key -> disposeClient(local, key));
+            }
+        } catch (Exception e) {
+            log.info("Thread-local clients health check failed: {}", e.getMessage());
+        }
+    }
+
+    private boolean isClientHealthy(APIRequestContext client) {
+        try {
+            return isClientValid(client);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void disposeClient(Map<String, APIRequestContext> local, String key) {
+        APIRequestContext client = local.remove(key);
+        if (client != null) {
+            try {
+                client.dispose();
+            } catch (Exception ignored) {}
+        }
     }
 
     private void handleNetworkError(String context, PlaywrightException e) {
         int n = consecutiveNetworkErrors.incrementAndGet();
         String msg = e.getMessage() == null ? "" : e.getMessage();
 
-        // Check if it's a rate limit related error
         if (msg.contains("429") || msg.contains("Too Many Requests")) {
             consecutiveRateLimitErrors.incrementAndGet();
             log.info("{} rate limit error (#{}): {}", context, n, msg);
@@ -794,7 +1139,9 @@ public class SportyBetOddsFetcher implements Runnable {
             log.info("{} network error (#{}): {}", context, n, msg);
         }
 
-        if (n >= 3) needsSessionRefresh.set(true);
+        if (n >= 3) {
+            needsSessionRefresh.set(true);
+        }
     }
 
     // ==================== BROWSER CONTEXT BOOTSTRAP ====================
@@ -825,7 +1172,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 .setExtraHTTPHeaders(getAllHeaders(profile)));
     }
 
-    public Map<String, String> getAllHeaders(UserAgentProfile profile) {
+    private Map<String, String> getAllHeaders(UserAgentProfile profile) {
         Map<String, String> all = new HashMap<>();
         if (profile.getHeaders().getStandardHeaders() != null) {
             all.putAll(profile.getHeaders().getStandardHeaders());
@@ -838,12 +1185,13 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private void attachAntiDetection(BrowserContext context, UserAgentProfile profile) {
         log.info("Injecting anti-detection stealth script");
-        log.info("Profile details - Platform: {}, Languages: {}, Hardware: {} cores",
-                profile.getPlatform(),
-                profile.getLanguages(),
-                profile.getHardwareConcurrency());
+        String stealthScript = buildStealthScript(profile);
+        context.addInitScript(stealthScript);
+        log.info("Stealth script injected successfully");
+    }
 
-        String stealthScript = String.format("""
+    private String buildStealthScript(UserAgentProfile profile) {
+        return String.format("""
         // === Profile Configuration ===
         const profile = %s;
 
@@ -894,14 +1242,11 @@ public class SportyBetOddsFetcher implements Runnable {
             if (contextType === '2d') {
                 const context = originalGetContext.call(this, contextType, ...args);
                 if (context) {
-                    // Set fill style from profile
                     context.fillStyle = profile.canvasFillStyle;
                     
-                    // Override toDataURL to add noise
                     const originalToDataURL = context.canvas.toDataURL;
                     context.canvas.toDataURL = function(type, quality) {
                         const imageData = context.getImageData(0, 0, this.width, this.height);
-                        // Add minimal random noise to fingerprint
                         for (let i = 0; i < imageData.data.length; i += 10) {
                             imageData.data[i] = imageData.data[i] + Math.floor(Math.random() * 2);
                         }
@@ -909,11 +1254,9 @@ public class SportyBetOddsFetcher implements Runnable {
                         return originalToDataURL.call(this, type, quality);
                     };
                     
-                    // Override getImageData
                     const originalGetImageData = context.getImageData;
                     context.getImageData = function(...args) {
                         const imageData = originalGetImageData.call(this, ...args);
-                        // Add slight variation
                         for (let i = 0; i < imageData.data.length; i += 100) {
                             imageData.data[i] = imageData.data[i] ^ 1;
                         }
@@ -928,22 +1271,11 @@ public class SportyBetOddsFetcher implements Runnable {
         // === WebGL Fingerprinting Protection ===
         const getParameterProxy = function(originalFunction) {
             return function(parameter) {
-                // Return WebGL values from profile
-                if (parameter === 37445) { // UNMASKED_VENDOR_WEBGL
-                    return profile.webglVendor;
-                }
-                if (parameter === 37446) { // UNMASKED_RENDERER_WEBGL
-                    return profile.webglRenderer;
-                }
-                if (parameter === 7936) { // VENDOR
-                    return profile.webgl.vendor;
-                }
-                if (parameter === 7937) { // RENDERER
-                    return profile.webgl.renderer;
-                }
-                if (parameter === 7938) { // VERSION
-                    return profile.webgl.version;
-                }
+                if (parameter === 37445) return profile.webglVendor;
+                if (parameter === 37446) return profile.webglRenderer;
+                if (parameter === 7936) return profile.webgl.vendor;
+                if (parameter === 7937) return profile.webgl.renderer;
+                if (parameter === 7938) return profile.webgl.version;
                 return originalFunction.call(this, parameter);
             };
         };
@@ -972,7 +1304,6 @@ public class SportyBetOddsFetcher implements Runnable {
         const originalCreateOscillator = OfflineAudioContext.prototype.createOscillator;
         OfflineAudioContext.prototype.createOscillator = function() {
             const oscillator = originalCreateOscillator.call(this);
-            // Use frequency from profile
             oscillator.frequency.value = profile.audioFrequency;
             
             const originalStart = oscillator.start;
@@ -982,7 +1313,7 @@ public class SportyBetOddsFetcher implements Runnable {
             return oscillator;
         };
 
-        // === Hardware Concurrency & Device Memory ===
+        // === Hardware & Device Properties ===
         Object.defineProperty(navigator, 'hardwareConcurrency', {
             get: () => profile.hardwareConcurrency,
             configurable: true
@@ -993,7 +1324,6 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Platform & Language Spoofing ===
         Object.defineProperty(navigator, 'platform', {
             get: () => profile.platform,
             configurable: true
@@ -1025,7 +1355,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Screen Resolution Spoofing ===
+        // === Screen Properties ===
         Object.defineProperty(screen, 'width', {
             get: () => profile.viewport.width,
             configurable: true
@@ -1056,7 +1386,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Connection API Spoofing ===
+        // === Network Connection Spoofing ===
         if ('connection' in navigator) {
             Object.defineProperty(navigator.connection, 'downlink', {
                 get: () => profile.connection.downlink,
@@ -1076,16 +1406,13 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Battery API Spoofing ===
         if ('getBattery' in navigator) {
-            const originalGetBattery = navigator.getBattery;
             navigator.getBattery = function() {
                 return Promise.resolve(profile.battery);
             };
         }
 
         // === Timezone Spoofing ===
-        const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
         Date.prototype.getTimezoneOffset = function() {
-            // Calculate offset based on profile timezone
             const now = new Date();
             const tzString = now.toLocaleString('en-US', { timeZone: profile.timeZone });
             const localDate = new Date(tzString);
@@ -1095,7 +1422,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Geolocation Spoofing ===
         if ('geolocation' in navigator) {
-            const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
             navigator.geolocation.getCurrentPosition = function(success, error, options) {
                 if (success) {
                     success({
@@ -1128,7 +1454,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Media Devices Spoofing ===
         if ('mediaDevices' in navigator) {
-            const originalEnumerateDevices = navigator.mediaDevices.enumerateDevices;
             navigator.mediaDevices.enumerateDevices = function() {
                 return Promise.resolve(profile.mediaDevices);
             };
@@ -1147,7 +1472,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Storage Quota Spoofing ===
         if ('storage' in navigator && 'estimate' in navigator.storage) {
-            const originalEstimate = navigator.storage.estimate;
             navigator.storage.estimate = function() {
                 return Promise.resolve({
                     quota: profile.storage.quota,
@@ -1165,7 +1489,7 @@ public class SportyBetOddsFetcher implements Runnable {
             });
         }
 
-        // Final cleanup
+        // === Final Cleanup ===
         delete window.$cdc_;
         delete window._Selenium_IDE_Recorder;
     """,
@@ -1179,9 +1503,6 @@ public class SportyBetOddsFetcher implements Runnable {
                 profile.getClientHints().getModel(),
                 profile.getClientHints().getUaFullVersion()
         );
-
-        context.addInitScript(stealthScript);
-        log.info("Stealth script injected successfully (script length: {} chars)", stealthScript.length());
     }
 
     private void attachNetworkTaps(Page page, Map<String, String> store) {
@@ -1223,8 +1544,9 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    // ==================== HELPERS ====================
-    private Map<String, String> buildHeaders(String cookieHeader, Map<String, String> harvested, UserAgentProfile profile) {
+    // ==================== UTILITY METHODS ====================
+    private Map<String, String> buildHeaders(String cookieHeader, Map<String, String> harvested,
+                                             UserAgentProfile profile) {
         Map<String, String> h = new HashMap<>();
         if (profile != null) {
             h.put("User-Agent", profile.getUserAgent());
@@ -1234,7 +1556,9 @@ public class SportyBetOddsFetcher implements Runnable {
         h.put("Accept", "application/json");
         h.put("Content-Type", "application/json");
         h.put("X-Requested-With", "XMLHttpRequest");
-        if (harvested != null) h.putAll(harvested);
+        if (harvested != null) {
+            h.putAll(harvested);
+        }
         return h;
     }
 
@@ -1321,15 +1645,25 @@ public class SportyBetOddsFetcher implements Runnable {
         log.info("=== Shutting down (Live Arbing Mode) ===");
         isRunning.set(false);
 
+        shutdownExecutors();
+        eventQueue.clear();
+        contextPool.clear();
+        cleanupThreadLocalClients();
+        closePlaywright();
+
+        log.info("=== Shutdown complete ===");
+    }
+
+    private void shutdownExecutors() {
         scheduler.shutdownNow();
         listFetchExecutor.shutdownNow();
         eventDetailExecutor.shutdownNow();
         processingExecutor.shutdownNow();
         retryExecutor.shutdownNow();
         profileRotationExecutor.shutdownNow();
+    }
 
-        eventQueue.clear();
-
+    private void cleanupThreadLocalClients() {
         Map<String, APIRequestContext> local = threadLocalClients.get();
         if (local != null && !local.isEmpty()) {
             local.values().forEach(c -> {
@@ -1340,14 +1674,14 @@ public class SportyBetOddsFetcher implements Runnable {
             local.clear();
         }
         threadLocalClients.remove();
+    }
 
+    private void closePlaywright() {
         Playwright pw = playwrightRef.getAndSet(null);
         if (pw != null) {
             try {
                 pw.close();
             } catch (Exception ignored) {}
         }
-
-        log.info("=== Shutdown complete ===");
     }
 }
