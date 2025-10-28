@@ -7,8 +7,10 @@ import com.microsoft.playwright.options.*;
 import com.mouse.bet.config.ScraperConfig;
 import com.mouse.bet.detector.ArbDetector;
 import com.mouse.bet.enums.BookMaker;
+import com.mouse.bet.interceptor.SimpleHttpLoggingInterceptor;
 import com.mouse.bet.manager.ProfileManager;
 import com.mouse.bet.model.NormalizedEvent;
+import com.mouse.bet.model.bet9ja.Bet9jaEvent;
 import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.model.sporty.SportyEvent;
 import com.mouse.bet.service.BetLegRetryService;
@@ -17,8 +19,13 @@ import com.mouse.bet.utils.JsonParser;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.ConnectionPool;
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.ResponseBody;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -54,8 +61,8 @@ public class SportyBetOddsFetcher implements Runnable {
     private static final int API_MAX_RETRIES = 2;
     private static final int API_TIMEOUT_MS = 25_000; // default context timeout
     private static final long SCHEDULER_PERIOD_SEC = 3;
-    private static final int EVENT_DETAIL_THREADS = 16;
-    private static final int PROCESSING_THREADS = 100;
+    private static final int EVENT_DETAIL_THREADS = 100;
+    private static final int PROCESSING_THREADS = 50;
     private static final long EVENT_DEDUP_WINDOW_MS = 800;
     private static final int MAX_ACTIVE_FETCHES = 100;
 
@@ -92,18 +99,17 @@ public class SportyBetOddsFetcher implements Runnable {
     private volatile UserAgentProfile profile;
     private final AtomicLong profileVersion = new AtomicLong(0);
 
-    // Context pool for fast rotation
+    // Context pool for fast rotation (used only for header harvesting)
     private final BlockingQueue<ContextWrapper> contextPool = new LinkedBlockingQueue<>(CONTEXT_POOL_SIZE);
     private volatile ContextWrapper activeContext;
 
-    private final ThreadLocal<Map<String, APIRequestContext>> threadLocalClients =
-            ThreadLocal.withInitial(HashMap::new);
-    private final ThreadLocal<Long> threadLocalProfileVersion =
-            ThreadLocal.withInitial(() -> -1L);
+    // OkHttp client management
+    private final ThreadLocal<OkHttpClient> threadLocalClients = ThreadLocal.withInitial(this::createNewOkHttpClient);
+    private final ThreadLocal<Long> threadLocalProfileVersion = ThreadLocal.withInitial(() -> -1L);
+    private volatile OkHttpClient sharedOkHttpClient;
 
     private final AtomicBoolean globalNeedsRefresh = new AtomicBoolean(false);
-    private final ThreadLocal<Boolean> tlNeedsRefresh =
-            ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private final ThreadLocal<Boolean> tlNeedsRefresh = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     private final Map<String, String> harvestedHeaders = new ConcurrentHashMap<>();
     private final AtomicReference<String> cookieHeaderRef = new AtomicReference<>("");
@@ -197,7 +203,6 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void runHealthMonitor() throws InterruptedException {
-        // Lightweight heartbeat every 5 seconds so logs keep moving even under waits
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 log.info("Tick — queued={}, activeFetches={}, rotationInProgress={}, setupOK={}",
@@ -284,11 +289,9 @@ public class SportyBetOddsFetcher implements Runnable {
             throw new IllegalStateException("Playwright not initialized");
         }
 
-        // Create single shared browser (reused for all contexts)
         sharedBrowser = launchBrowser(pw);
         log.info("Shared browser created");
 
-        // Pre-warm the pool
         for (int i = 0; i < CONTEXT_POOL_SIZE; i++) {
             try {
                 ContextWrapper wrapper = createNewContextWrapper();
@@ -320,9 +323,8 @@ public class SportyBetOddsFetcher implements Runnable {
         poolWarmerExecutor.submit(() -> {
             while (isRunning.get()) {
                 try {
-                    // Keep pool topped up and fresh
                     maintainContextPool();
-                    Thread.sleep(10_000); // Check every 10 seconds
+                    Thread.sleep(10_000);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;
@@ -334,7 +336,6 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void maintainContextPool() {
-        // Remove stale contexts
         contextPool.removeIf(wrapper -> {
             if (wrapper.isStale()) {
                 log.info("Removing stale context from pool (age: {}ms)",
@@ -345,7 +346,6 @@ public class SportyBetOddsFetcher implements Runnable {
             return false;
         });
 
-        // Refill pool to capacity
         while (contextPool.size() < CONTEXT_POOL_SIZE) {
             try {
                 ContextWrapper wrapper = createNewContextWrapper();
@@ -370,6 +370,103 @@ public class SportyBetOddsFetcher implements Runnable {
                 log.error("Pool async refill failed: {}", e.getMessage());
             }
         });
+    }
+
+    // ==================== OKHTTP CLIENT MANAGEMENT ====================
+    private OkHttpClient createNewOkHttpClient() {
+        log.info("Creating new OkHttp client for thread: {}", Thread.currentThread().getName());
+
+        ConnectionPool connectionPool = new ConnectionPool(50, 5, TimeUnit.MINUTES);
+
+        return new OkHttpClient.Builder()
+                .connectionPool(connectionPool)
+                .connectTimeout(API_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .readTimeout(API_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .writeTimeout(API_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .retryOnConnectionFailure(true)
+                .addInterceptor(new SimpleHttpLoggingInterceptor())
+                .addInterceptor(new HeadersInterceptor())
+                .build();
+    }
+    //new HeadersInterceptor(profile, harvestedHeaders, SPORT_PAGE, cookieHeaderRef.get()
+    private class HeadersInterceptor implements Interceptor {
+        @Override
+        public okhttp3.Response intercept(Chain chain) throws IOException {
+            okhttp3.Request original = chain.request();
+
+            String cookies = cookieHeaderRef.get();
+            log.debug("Request cookies length: {} bytes", cookies.length());
+            log.debug("Harvested headers count: {}", harvestedHeaders.size());
+
+            // Log if cookies are empty (major red flag)
+            if (cookies.isEmpty()) {
+                log.info("WARNING: No cookies set for request to {}", original.url());
+            }
+
+            okhttp3.Request.Builder builder = original.newBuilder()
+                    .header("User-Agent", profile != null ? profile.getUserAgent() : "Mozilla/5.0")
+                    .header("Referer", SPORT_PAGE)
+                    .header("Cookie", cookies)
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("Accept-Encoding", "gzip")
+                    .header("Content-Type", "application/json")
+                    .header("Connection", "keep-alive")
+                    .header("X-Requested-With", "XMLHttpRequest");
+
+            // Add harvested headers
+            harvestedHeaders.forEach((key, value) -> {
+                if (!key.equals("cookie") && !key.equals("user-agent")) {
+                    builder.header(key, value);
+                }
+            });
+
+            okhttp3.Request builtRequest = builder.build();
+
+            // Log final request headers for debugging
+            log.debug("Final request headers: {}", builtRequest.headers());
+
+            return chain.proceed(builtRequest);
+        }
+    }
+
+    private OkHttpClient getThreadLocalClient() {
+        Long threadVersion = threadLocalProfileVersion.get();
+        Long currentVersion = profileVersion.get();
+
+        if (!threadVersion.equals(currentVersion) || tlNeedsRefresh.get() || globalNeedsRefresh.get()) {
+            log.info("Thread {} refreshing OkHttp client (version: {} -> {})",
+                    Thread.currentThread().getName(), threadVersion, currentVersion);
+
+            OkHttpClient oldClient = threadLocalClients.get();
+            if (oldClient != null) {
+                shutdownOkHttpClient(oldClient);
+            }
+
+            OkHttpClient newClient = createNewOkHttpClient();
+            threadLocalClients.set(newClient);
+            threadLocalProfileVersion.set(currentVersion);
+            tlNeedsRefresh.set(false);
+        }
+
+        return threadLocalClients.get();
+    }
+
+    private void shutdownOkHttpClient(OkHttpClient client) {
+        try {
+            if (client.connectionPool() != null) {
+                client.connectionPool().evictAll();
+            }
+            if (client.dispatcher() != null) {
+                client.dispatcher().executorService().shutdown();
+            }
+            if (client.cache() != null) {
+                client.cache().close();
+            }
+        } catch (Exception e) {
+            log.debug("Error shutting down OkHttp client: {}", e.getMessage());
+        }
     }
 
     // ==================== OPTIMIZED PROFILE ROTATION ====================
@@ -421,13 +518,11 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void performFastProfileRotation() {
-        log.info("=== Fast Profile Rotation (Context Pool) ===");
+        log.info("=== Fast Profile Rotation (Context Pool + OkHttp) ===");
         long startTime = System.currentTimeMillis();
 
-        // Signal threads to pause briefly
         globalNeedsRefresh.set(true);
 
-        // Small delay to allow in-flight requests to complete
         try {
             Thread.sleep(100);
         } catch (InterruptedException ie) {
@@ -435,7 +530,6 @@ public class SportyBetOddsFetcher implements Runnable {
             return;
         }
 
-        // Get pre-warmed context from pool (instant!)
         ContextWrapper newWrapper = contextPool.poll();
 
         if (newWrapper == null) {
@@ -445,19 +539,16 @@ public class SportyBetOddsFetcher implements Runnable {
 
         Page page = null;
         try {
-            // Quick cookie harvest
             page = newWrapper.getContext().newPage();
             Map<String, String> captured = new HashMap<>();
             attachNetworkTaps(page, captured);
 
-            // Fast navigation - just harvest cookies
             page.navigate(SPORT_PAGE, new Page.NavigateOptions()
                     .setTimeout(15_000)
-                    .setWaitUntil(WaitUntilState.DOMCONTENTLOADED)); // Faster than NETWORKIDLE
+                    .setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
 
             String cookieHeader = formatCookies(newWrapper.getContext().cookies());
 
-            // Store old context for cleanup
             ContextWrapper oldContext = activeContext;
 
             // Atomic swap
@@ -470,21 +561,21 @@ public class SportyBetOddsFetcher implements Runnable {
             long newVersion = profileVersion.incrementAndGet();
             resetRateLimitMetrics();
 
+            // Force all threads to recreate OkHttp clients on next request
+            globalNeedsRefresh.set(true);
+
             long duration = System.currentTimeMillis() - startTime;
             log.info("Fast rotation complete in {}ms! Version: {}, cookies: {} bytes, headers: {}",
                     duration, newVersion, cookieHeader.length(), captured.size());
 
-            // Clean up old context
             if (oldContext != null) {
                 safeClose(oldContext.getContext());
             }
 
-            // Trigger background refill
             refillContextPoolAsync();
 
         } catch (Exception e) {
             log.error("Fast rotation failed: {}", e.getMessage(), e);
-            // Return context to pool if we didn't use it
             if (page == null && newWrapper != null) {
                 contextPool.offer(newWrapper);
             }
@@ -580,6 +671,11 @@ public class SportyBetOddsFetcher implements Runnable {
 
             log.info("Setup OK — cookies={} bytes, harvestedHeaders={}",
                     cookieHeader.length(), captured.size());
+
+            // Create initial shared OkHttp client
+            sharedOkHttpClient = createNewOkHttpClient();
+            log.info("Shared OkHttp client created");
+
         } finally {
             safeClose(page);
             safeClose(context);
@@ -599,7 +695,6 @@ public class SportyBetOddsFetcher implements Runnable {
         }
         log.info("Starting schedulers with {}s cadence (live arbing mode)", SCHEDULER_PERIOD_SEC);
 
-        // Non-blocking: schedule the trigger, each sport runs independently with its own timeout
         scheduler.scheduleAtFixedRate(
                 () -> safeWrapper("AllSports", this::fetchAllSportsParallel),
                 0, SCHEDULER_PERIOD_SEC, TimeUnit.SECONDS
@@ -619,7 +714,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         long start = System.currentTimeMillis();
 
-        // Fire-and-forget tasks with their own 30s timeout and INFO logs
         runSportListTask("Football", KEY_FB, KEY_FB);
         runSportListTask("Basketball", KEY_BB, KEY_BB);
         runSportListTask("TableTennis", KEY_TT, KEY_TT);
@@ -634,7 +728,6 @@ public class SportyBetOddsFetcher implements Runnable {
                 .runAsync(() -> fetchSportEventsList(sportName, sportId, clientKey), listFetchExecutor)
                 .orTimeout(30, TimeUnit.SECONDS)
                 .exceptionally(ex -> {
-                    // Per-sport timeout / error logging at INFO to match your pattern
                     if (ex instanceof TimeoutException || (ex.getCause() instanceof TimeoutException)) {
                         int timeouts = consecutiveTimeouts.incrementAndGet();
                         log.info("{}: List fetch timeout after 30s (timeout #{})", sportName, timeouts);
@@ -669,13 +762,10 @@ public class SportyBetOddsFetcher implements Runnable {
 
             processEventsListResponse(sportName, body, clientKey, fetchStart);
 
-        } catch (PlaywrightException e) {
-            long duration = System.currentTimeMillis() - fetchStart;
-            log.error("{}: Network error after {}ms - {}", sportName, duration, e.getMessage());
-            handleNetworkError(sportName, e);
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - fetchStart;
             log.error("{}: List fetch failed after {}ms - {}", sportName, duration, e.getMessage());
+            handleNetworkError(sportName, e);
         }
     }
 
@@ -695,6 +785,11 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void processEventsListResponse(String sportName, String body, String clientKey, long fetchStart) {
+
+        // Add this logging BEFORE extractEventIds
+        log.info("{}: Raw API response length: {} bytes", sportName, body.length());
+        log.info("{}: Response preview: {}", sportName,
+                body.length() > 500 ? body.substring(0, 500) : body);
         List<String> eventIds = extractEventIds(body);
 
         if (eventIds == null || eventIds.isEmpty()) {
@@ -807,6 +902,8 @@ public class SportyBetOddsFetcher implements Runnable {
 
             processingExecutor.submit(() -> {
                 try {
+
+                    //TODO
                     SportyEvent domainEvent = parseEventDetail(body);
                     if (domainEvent != null) {
                         processParsedEvent(domainEvent);
@@ -850,104 +947,139 @@ public class SportyBetOddsFetcher implements Runnable {
         }
     }
 
-    // ==================== HTTP LAYER (THREAD-LOCAL CLIENTS) ====================
-    private String safeApiGet(String url, String clientKey) throws InterruptedException {
-        return safeApiGet(url, clientKey, 0, null);
-    }
-
-    private String safeApiGet(String url, String clientKey, int retry, Integer perRequestTimeoutMs) throws InterruptedException {
+    // ==================== HTTP LAYER (OKHTTP) ====================
+    private String safeApiGet(String url, String clientKey, int retry, Integer perRequestTimeoutMs) {
         if (retry > API_MAX_RETRIES) {
             log.info("HTTP max retries exceeded for: {}", url);
             consecutiveRateLimitErrors.incrementAndGet();
-            throw new PlaywrightException("HTTP retried too many times: " + url);
+            throw new RuntimeException("HTTP retried too many times: " + url);
         }
 
         long requestStart = System.currentTimeMillis();
         try {
-            APIRequestContext client = getThreadLocalClient(clientKey);
-            if (client == null) {
-                log.info("Client is null for key: {}, retrying...", clientKey);
-                Thread.sleep(100 * (retry + 1));
-                return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
-            }
+            OkHttpClient client = getThreadLocalClient();
 
-            if (!isClientValid(client)) {
-                log.info("Client validation failed, recreating for retry {}", retry + 1);
-                recreateClient(clientKey);
-                Thread.sleep(100 * (retry + 1));
-                return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
-            }
-
-            APIResponse res;
+            // Apply per-request timeout if specified
             if (perRequestTimeoutMs != null) {
-                res = client.get(url);
-            } else {
-                res = client.get(url);
+                client = client.newBuilder()
+                        .readTimeout(perRequestTimeoutMs, TimeUnit.MILLISECONDS)
+                        .build();
             }
 
-            int status = res.status();
+            okhttp3.Request request = new okhttp3.Request.Builder()
+                    .url(url)
+                    .get()
+                    .build();
+
+            try (okhttp3.Response response = client.newCall(request).execute()) {
+                int status = response.code();
+                log.info("Response status {}", status);
+                long requestDuration = System.currentTimeMillis() - requestStart;
+
+                requestsSinceLastRotation.incrementAndGet();
+
+                return handleOkHttpResponse(url, clientKey, retry, response, status, requestDuration, perRequestTimeoutMs);
+            }
+
+        } catch (IOException e) {
+            return handleIOException(url, clientKey, retry, requestStart, e, perRequestTimeoutMs);
+        } catch (Exception e) {
             long requestDuration = System.currentTimeMillis() - requestStart;
-
-            requestsSinceLastRotation.incrementAndGet();
-
-            return handleApiResponse(url, clientKey, retry, res, status, requestDuration);
-
-        } catch (PlaywrightException e) {
-            return handlePlaywrightException(url, clientKey, retry, requestStart, e, perRequestTimeoutMs);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted during API request", ie);
+            log.info("API request failed after {}ms: {}", requestDuration, e.getMessage());
+            throw new RuntimeException("API request failed: " + e.getMessage(), e);
         }
     }
 
-    private String handleApiResponse(String url, String clientKey, int retry,
-                                     APIResponse res, int status, long requestDuration)
-            throws InterruptedException {
+    private String handleOkHttpResponse(String url, String clientKey, int retry,
+                                        okhttp3.Response response, int status,
+                                        long requestDuration, Integer perRequestTimeoutMs) {
+        try {
+            if (status == 429) {
+                return handleRateLimitResponse(url, clientKey, retry, requestDuration, perRequestTimeoutMs);
+            }
 
-        if (status == 429) {
-            return handleRateLimitResponse(url, clientKey, retry, requestDuration);
+            if (status == 401 || status == 403) {
+                return handleAuthErrorResponse(url, clientKey, retry, status, requestDuration, perRequestTimeoutMs);
+            }
+
+            if (requestDuration > SLOW_REQUEST_THRESHOLD_MS) {
+                detectSlowRequest(requestDuration);
+            }
+
+            if (status < 200 || status >= 300) {
+                log.info("HTTP {} for {} (took {}ms)", status, url, requestDuration);
+                throw new RuntimeException("HTTP " + status + " on " + url);
+            }
+
+            consecutiveRateLimitErrors.set(0);
+
+            if (requestDuration > 5000) {
+                log.info("Slow API response: {}ms for {}", requestDuration, url);
+            }
+
+
+            ResponseBody body = response.body();
+            if (body == null) {
+                return null;
+            }
+
+            String contentEncoding = response.header("Content-Encoding");
+            long contentLength = body.contentLength();
+
+            log.info("Response headers - Content-Encoding: {}, Content-Length: {}",
+                    contentEncoding, contentLength);
+
+            // If Content-Encoding is null or not "gzip", it's already decompressed
+            if (contentEncoding == null || !contentEncoding.equalsIgnoreCase("gzip")) {
+                log.info("Response is NOT gzip encoded, reading directly");
+                String responseText = body.string();
+                log.info("Read {} bytes directly", responseText.length());
+                return responseText;
+            } else {
+                log.info("Response is still GZIP encoded! Manual decompression needed");
+                byte[] gzipBytes = body.bytes();
+                return JsonParser.decompressGzipToJson(gzipBytes);
+            }
+
+        } catch (IOException e) {
+            log.error("Failed to read response body: {}", e.getMessage());
+            return null;
         }
-
-        if (status == 401 || status == 403) {
-            return handleAuthErrorResponse(url, clientKey, retry, status, requestDuration);
-        }
-
-        if (requestDuration > SLOW_REQUEST_THRESHOLD_MS) {
-            detectSlowRequest(requestDuration);
-        }
-
-        String body = safeBody(res);
-        if (status < 200 || status >= 300) {
-            log.info("HTTP {} for {} (took {}ms)", status, url, requestDuration);
-            throw new PlaywrightException("HTTP " + status + " on " + url);
-        }
-
-        consecutiveRateLimitErrors.set(0);
-
-        if (requestDuration > 5000) {
-            log.info("Slow API response: {}ms for {}", requestDuration, url);
-        }
-
-        return body;
     }
 
     private String handleRateLimitResponse(String url, String clientKey, int retry,
-                                           long requestDuration) throws InterruptedException {
+                                           long requestDuration, Integer perRequestTimeoutMs) {
         int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
         log.info("Rate limit detected (429) on attempt {} - count: {}, duration: {}ms",
                 retry + 1, rateLimitCount, requestDuration);
-        Thread.sleep(1000 * (retry + 1));
-        return safeApiGet(url, clientKey, retry + 1, null);
+
+        try {
+            Thread.sleep(1000 * (retry + 1));
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during rate limit backoff", ie);
+        }
+
+        return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
     }
 
     private String handleAuthErrorResponse(String url, String clientKey, int retry,
-                                           int status, long requestDuration) throws InterruptedException {
+                                           int status, long requestDuration,
+                                           Integer perRequestTimeoutMs) {
         int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
         log.info("Auth/Forbidden error ({}) - possible rate limit, count: {}, duration: {}ms",
                 status, rateLimitCount, requestDuration);
+
         tlNeedsRefresh.set(true);
-        Thread.sleep(150);
-        return safeApiGet(url, clientKey, retry + 1, null);
+
+        try {
+            Thread.sleep(150);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during auth error backoff", ie);
+        }
+
+        return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
     }
 
     private void detectSlowRequest(long requestDuration) {
@@ -956,199 +1088,40 @@ public class SportyBetOddsFetcher implements Runnable {
                 requestDuration, SLOW_REQUEST_THRESHOLD_MS, rateLimitCount);
     }
 
-    private String handlePlaywrightException(String url, String clientKey, int retry,
-                                             long requestStart, PlaywrightException e,
-                                             Integer perRequestTimeoutMs)
-            throws InterruptedException {
+    private String handleIOException(String url, String clientKey, int retry,
+                                     long requestStart, IOException e,
+                                     Integer perRequestTimeoutMs) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
         long requestDuration = System.currentTimeMillis() - requestStart;
 
-        if (isClientDisposalError(msg) && retry < API_MAX_RETRIES) {
-            log.info("Client disposal detected, recreating for retry {} (after {}ms): {}",
-                    retry + 1, requestDuration, msg);
+        if (msg.toLowerCase().contains("timeout")) {
+            consecutiveTimeouts.incrementAndGet();
+            log.info("Request timeout after {}ms: {}", requestDuration, msg);
+        } else if (msg.toLowerCase().contains("connection")) {
+            consecutiveNetworkErrors.incrementAndGet();
+            log.info("Connection error after {}ms: {}", requestDuration, msg);
+        } else {
+            log.info("IO error after {}ms: {}", requestDuration, msg);
+        }
 
-            recreateClient(clientKey);
+        if (retry < API_MAX_RETRIES) {
+            log.info("Retrying request (attempt {}/{})", retry + 1, API_MAX_RETRIES);
             tlNeedsRefresh.set(true);
-            Thread.sleep(200 * (retry + 1));
+
+            try {
+                Thread.sleep(200 * (retry + 1));
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted during retry backoff", ie);
+            }
+
             return safeApiGet(url, clientKey, retry + 1, perRequestTimeoutMs);
         }
 
-        if (msg.toLowerCase().contains("timeout")) {
-            consecutiveTimeouts.incrementAndGet();
-        }
-
-        log.info("API request failed after {}ms: {}", requestDuration, msg);
-        throw e;
+        throw new RuntimeException("API request failed after retries: " + msg, e);
     }
 
-    private boolean isClientDisposalError(String errorMessage) {
-        return errorMessage.contains("Cannot find object to call __adopt__")
-                || errorMessage.contains("Cannot find command")
-                || errorMessage.contains("Channel closed")
-                || errorMessage.contains("Object doesn't exist")
-                || errorMessage.contains("Target closed");
-    }
-
-    private void recreateClient(String clientKey) {
-        Map<String, APIRequestContext> local = threadLocalClients.get();
-        APIRequestContext old = local.remove(clientKey);
-        if (old != null) {
-            try {
-                old.dispose();
-            } catch (Exception ignore) {}
-        }
-    }
-
-    private boolean isClientValid(APIRequestContext client) {
-        return client != null;
-    }
-
-    private APIRequestContext getThreadLocalClient(String clientKey) {
-        Map<String, APIRequestContext> local = threadLocalClients.get();
-        Long threadVersion = threadLocalProfileVersion.get();
-        Long currentVersion = profileVersion.get();
-
-        APIRequestContext client = local.get(clientKey);
-
-        if (client != null && !validateExistingClient(clientKey, client, local)) {
-            client = null;
-        }
-
-        if (shouldRefreshClient(threadVersion, currentVersion, client)) {
-            client = refreshThreadLocalClient(clientKey, client, local, currentVersion);
-        }
-
-        if (globalNeedsRefresh.get() && client != null) {
-            client = forceClientRefresh(clientKey, client, local);
-        }
-
-        return client;
-    }
-
-    private boolean validateExistingClient(String clientKey, APIRequestContext client,
-                                           Map<String, APIRequestContext> local) {
-        try {
-            if (!isClientValid(client)) {
-                log.info("Client {} is disposed, recreating", clientKey);
-                local.remove(clientKey);
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            log.info("Client {} validation error, recreating: {}", clientKey, e.getMessage());
-            local.remove(clientKey);
-            return false;
-        }
-    }
-
-    private boolean shouldRefreshClient(Long threadVersion, Long currentVersion,
-                                        APIRequestContext client) {
-        return !threadVersion.equals(currentVersion) || client == null;
-    }
-
-    private APIRequestContext refreshThreadLocalClient(String clientKey, APIRequestContext client,
-                                                       Map<String, APIRequestContext> local,
-                                                       Long currentVersion) {
-        log.info("Thread {} refreshing client for key: {} (version: {} -> {})",
-                Thread.currentThread().getName(), clientKey,
-                threadLocalProfileVersion.get(), currentVersion);
-
-        if (client != null) {
-            try {
-                client.dispose();
-            } catch (Exception ignored) {}
-            local.remove(clientKey);
-        }
-
-        client = createNewAPIClient(clientKey);
-        if (client != null) {
-            local.put(clientKey, client);
-        }
-        threadLocalProfileVersion.set(currentVersion);
-        tlNeedsRefresh.set(false);
-
-        return client;
-    }
-
-    private APIRequestContext forceClientRefresh(String clientKey, APIRequestContext client,
-                                                 Map<String, APIRequestContext> local) {
-        log.info("Global refresh requested, recreating client for key: {}", clientKey);
-        try {
-            client.dispose();
-        } catch (Exception ignored) {}
-        local.remove(clientKey);
-        client = createNewAPIClient(clientKey);
-        if (client != null) {
-            local.put(clientKey, client);
-        }
-        globalNeedsRefresh.set(false);
-        return client;
-    }
-
-    private APIRequestContext createNewAPIClient(String clientKey) {
-        try {
-            Playwright pw = playwrightRef.get();
-            if (pw == null) {
-                log.error("Playwright not available for creating new API client");
-                return null;
-            }
-
-            log.info("Creating new API client for key: {} on thread: {} with profile version: {}",
-                    clientKey, Thread.currentThread().getName(), profileVersion.get());
-
-            APIRequest.NewContextOptions options = new APIRequest.NewContextOptions()
-                    .setTimeout((double) API_TIMEOUT_MS);
-
-            Map<String, String> headers = buildHeaders(cookieHeaderRef.get(), harvestedHeaders, profile);
-            if (headers != null && !headers.isEmpty()) {
-                options.setExtraHTTPHeaders(headers);
-            }
-
-            return pw.request().newContext(options);
-        } catch (Exception e) {
-            log.error("Failed to create new API client for key {}: {}", clientKey, e.getMessage());
-            return null;
-        }
-    }
-
-    private void checkThreadLocalClientsHealth() {
-        try {
-            Map<String, APIRequestContext> local = threadLocalClients.get();
-            if (local == null || local.isEmpty()) return;
-
-            List<String> invalidClients = local.entrySet().stream()
-                    .filter(entry -> !isClientHealthy(entry.getValue()))
-                    .map(Map.Entry::getKey)
-                    .toList();
-
-            if (!invalidClients.isEmpty()) {
-                log.info("Cleaning up {} invalid thread-local clients: {}",
-                        invalidClients.size(), invalidClients);
-                invalidClients.forEach(key -> disposeClient(local, key));
-            }
-        } catch (Exception e) {
-            log.info("Thread-local clients health check failed: {}", e.getMessage());
-        }
-    }
-
-    private boolean isClientHealthy(APIRequestContext client) {
-        try {
-            return isClientValid(client);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void disposeClient(Map<String, APIRequestContext> local, String key) {
-        APIRequestContext client = local.remove(key);
-        if (client != null) {
-            try {
-                client.dispose();
-            } catch (Exception ignored) {}
-        }
-    }
-
-    private void handleNetworkError(String context, PlaywrightException e) {
+    private void handleNetworkError(String context, Exception e) {
         int n = consecutiveNetworkErrors.incrementAndGet();
         String msg = e.getMessage() == null ? "" : e.getMessage();
 
@@ -1164,6 +1137,25 @@ public class SportyBetOddsFetcher implements Runnable {
 
         if (n >= 3) {
             needsSessionRefresh.set(true);
+        }
+    }
+
+    private void checkThreadLocalClientsHealth() {
+        try {
+            OkHttpClient client = threadLocalClients.get();
+            if (client != null) {
+                // Check connection pool health
+                ConnectionPool pool = client.connectionPool();
+                if (pool != null) {
+                    int idle = pool.idleConnectionCount();
+                    if (idle > 0) {
+                        log.debug("Thread {} has {} idle connections",
+                                Thread.currentThread().getName(), idle);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Thread-local client health check failed: {}", e.getMessage());
         }
     }
 
@@ -1532,7 +1524,7 @@ public class SportyBetOddsFetcher implements Runnable {
         page.onResponse(resp -> {
             String url = resp.url();
             int status = resp.status();
-            if ((url.contains("prematch") || url.contains("odds")) && status >= 200 && status < 400) {
+            if ((url.contains("/feapi/PalimpsestLiveAjax/")) && status >= 200 && status < 400) {
                 Map<String, String> headers = resp.headers();
                 headers.forEach((k, v) -> {
                     String key = k.toLowerCase(Locale.ROOT);
@@ -1568,25 +1560,8 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     // ==================== UTILITY METHODS ====================
-    private Map<String, String> buildHeaders(String cookieHeader, Map<String, String> harvested,
-                                             UserAgentProfile profile) {
-        Map<String, String> h = new HashMap<>();
-        if (profile != null) {
-            h.put("User-Agent", profile.getUserAgent());
-        }
-        h.put("Referer", SPORT_PAGE);
-        h.put("Cookie", cookieHeader);
-        h.put("Accept", "application/json");
-        h.put("Content-Type", "application/json");
-        h.put("X-Requested-With", "XMLHttpRequest");
-        if (harvested != null) {
-            h.putAll(harvested);
-        }
-        return h;
-    }
-
     private List<String> extractEventIds(String body) {
-        return JsonParser.extractEventIds(body);
+        return JsonParser.extractBet9jaEventIdsAsStrings(body);
     }
 
     private boolean isLiveEvent(String responseBody, String eventId) {
@@ -1624,14 +1599,6 @@ public class SportyBetOddsFetcher implements Runnable {
                 .orElse("");
     }
 
-    private String safeBody(APIResponse res) {
-        try {
-            return res.text();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     private void safeClose(AutoCloseable c) {
         if (c == null) return;
         try {
@@ -1665,46 +1632,102 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void cleanup() {
-        log.info("=== Shutting down (Live Arbing Mode) ===");
+        log.info("=== Shutting down (OkHttp + Live Arbing Mode) ===");
         isRunning.set(false);
 
         shutdownExecutors();
         eventQueue.clear();
-        contextPool.clear();
+        cleanupContextPool();
         cleanupThreadLocalClients();
+        cleanupSharedOkHttpClient();
         closePlaywright();
 
         log.info("=== Shutdown complete ===");
     }
 
     private void shutdownExecutors() {
+        log.info("Shutting down executors...");
         scheduler.shutdownNow();
         listFetchExecutor.shutdownNow();
         eventDetailExecutor.shutdownNow();
         processingExecutor.shutdownNow();
         retryExecutor.shutdownNow();
         profileRotationExecutor.shutdownNow();
+        poolWarmerExecutor.shutdownNow();
+
+        try {
+            scheduler.awaitTermination(5, TimeUnit.SECONDS);
+            listFetchExecutor.awaitTermination(5, TimeUnit.SECONDS);
+            eventDetailExecutor.awaitTermination(5, TimeUnit.SECONDS);
+            processingExecutor.awaitTermination(5, TimeUnit.SECONDS);
+            retryExecutor.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            log.warn("Timeout waiting for executors to terminate");
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void cleanupContextPool() {
+        log.info("Cleaning up context pool...");
+        contextPool.forEach(wrapper -> {
+            try {
+                if (wrapper != null && wrapper.getContext() != null) {
+                    wrapper.getContext().close();
+                }
+            } catch (Exception e) {
+                log.debug("Error closing context: {}", e.getMessage());
+            }
+        });
+        contextPool.clear();
+
+        if (activeContext != null && activeContext.getContext() != null) {
+            try {
+                activeContext.getContext().close();
+            } catch (Exception e) {
+                log.debug("Error closing active context: {}", e.getMessage());
+            }
+        }
     }
 
     private void cleanupThreadLocalClients() {
-        Map<String, APIRequestContext> local = threadLocalClients.get();
-        if (local != null && !local.isEmpty()) {
-            local.values().forEach(c -> {
-                try {
-                    c.dispose();
-                } catch (Exception ignored) {}
-            });
-            local.clear();
+        log.info("Cleaning up thread-local OkHttp clients...");
+        OkHttpClient client = threadLocalClients.get();
+        if (client != null) {
+            shutdownOkHttpClient(client);
         }
         threadLocalClients.remove();
+        threadLocalProfileVersion.remove();
+        tlNeedsRefresh.remove();
+    }
+
+    private void cleanupSharedOkHttpClient() {
+        log.info("Cleaning up shared OkHttp client...");
+        if (sharedOkHttpClient != null) {
+            shutdownOkHttpClient(sharedOkHttpClient);
+            sharedOkHttpClient = null;
+        }
     }
 
     private void closePlaywright() {
+        log.info("Closing Playwright...");
+
+        if (sharedBrowser != null) {
+            try {
+                sharedBrowser.close();
+                sharedBrowser = null;
+            } catch (Exception e) {
+                log.debug("Error closing shared browser: {}", e.getMessage());
+            }
+        }
+
         Playwright pw = playwrightRef.getAndSet(null);
         if (pw != null) {
             try {
                 pw.close();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.debug("Error closing Playwright: {}", e.getMessage());
+            }
         }
     }
+
 }

@@ -10,6 +10,7 @@ import com.mouse.bet.model.NormalizedOutcome;
 import com.mouse.bet.model.bet9ja.Bet9jaEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.EnumSet;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Slf4j
+@Service
 public class Bet9jaService implements OddService<Bet9jaEvent> {
 
     private final ArbDetector arbDetector;
