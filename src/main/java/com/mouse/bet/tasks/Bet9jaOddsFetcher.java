@@ -492,30 +492,20 @@ public class Bet9jaOddsFetcher implements Runnable {
                 log.warn("⚠️ WARNING: No cookies set for request to {}", original.url());
             }
 
-            // ✅ EXACT headers from Network tab
             Request.Builder builder = original.newBuilder()
                     // SportyBet custom headers
                     .header("operid", "2")
                     .header("platform", "web")
                     .header("clientid", "web")
 
-                    // Accept headers
                     .header("Accept", "*/*")
                     .header("Accept-Language", "en")  // Changed from "en-US,en;q=0.9" to match exactly
                     .header("Accept-Encoding", "gzip, deflate, br, zstd")
 
-                    // Content-Type
                     .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 
-                    // Referer (NO Origin - it's not in the real request)
                     .header("Referer", SPORT_PAGE)
 
-                    // sec-ch-ua headers
-                    .header("sec-ch-ua", profile.getHeaders().getClientHintsHeaders().get("Sec-CH-UA"))
-                    .header("sec-ch-ua-mobile", profile.getHeaders().getClientHintsHeaders().get("Sec-CH-UA-Mobile"))
-                    .header("sec-ch-ua-platform", profile.getHeaders().getClientHintsHeaders().get("Sec-CH-UA-Platform"))
-
-                    // sec-fetch headers (CORRECT for API XHR)
                     .header("sec-fetch-dest", "empty")
                     .header("sec-fetch-mode", "same-origin")
                     .header("sec-fetch-site", "same-origin")
@@ -533,9 +523,9 @@ public class Bet9jaOddsFetcher implements Runnable {
             // Only add authorization/token headers from harvested
             harvestedHeaders.forEach((key, value) -> {
                 String lowerKey = key.toLowerCase();
-                if (lowerKey.equals("authorization") ||
-                        lowerKey.equals("x-csrf-token") ||
-                        lowerKey.equals("x-api-key") ||
+                if (lowerKey.equals("sec-ch-ua") ||
+                        lowerKey.equals("sec-ch-ua-mobile") ||
+                        lowerKey.equals("sec-ch-ua-platform") ||
                         (lowerKey.startsWith("x-") && lowerKey.contains("token"))) {
                     builder.header(key, value);
                 }
@@ -1734,17 +1724,64 @@ public class Bet9jaOddsFetcher implements Runnable {
     }
 
     private void attachNetworkTaps(Page page, Map<String, String> store) {
+        // ✅ Only capture headers from API requests, NOT page navigation
+        page.onRequest(request -> {
+            String url = request.url();
+            String resourceType = request.resourceType(); // ✅ Check resource type
+
+            // ✅ CRITICAL: Only capture from XHR/fetch requests to the API
+            if (url.contains("/api/ng/factsCenter/") &&
+                    (resourceType.equals("xhr") || resourceType.equals("fetch"))) {
+
+                Map<String, String> headers = request.headers();
+                log.info("📤 Capturing XHR/API REQUEST headers from: {}", url);
+
+                int capturedCount = 0;
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    String key = entry.getKey().toLowerCase(Locale.ROOT);
+                    String value = entry.getValue();
+
+                    // ✅ Capture headers from API calls
+                    if (key.equals("platform") ||
+                            key.startsWith("sec-ch-ua")) {
+
+                        store.put(key, value);
+                        capturedCount++;
+
+                        String displayValue = value.length() > 100 ?
+                                value.substring(0, 100) + "..." : value;
+                        log.info("   ✅ Stored: {} = {}", key, displayValue);
+                    }
+                }
+
+                log.info("   📊 Captured {} headers from XHR request", capturedCount);
+            }
+        });
+
+        // Capture RESPONSE headers
         page.onResponse(resp -> {
             String url = resp.url();
             int status = resp.status();
-            if ((url.contains("/feapi/PalimpsestLiveAjax/")) && status >= 200 && status < 400) {
+
+            if (url.contains("/api/ng/factsCenter/") && status >= 200 && status < 400) {
                 Map<String, String> headers = resp.headers();
-                headers.forEach((k, v) -> {
-                    String key = k.toLowerCase(Locale.ROOT);
-                    if (key.equals("authorization") || key.equals("x-csrf-token") || key.equals("set-cookie")) {
-                        store.put(key, v);
+                log.info("📥 Successful API response from: {} (status: {})", url, status);
+
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    String key = entry.getKey().toLowerCase(Locale.ROOT);
+                    String value = entry.getValue();
+
+                    if (key.equals("authorization") ||
+                            key.equals("x-csrf-token") ||
+                            key.equals("set-cookie") ||
+                            key.contains("token")) {
+
+                        store.put(key, value);
+                        String displayValue = value.length() > 50 ?
+                                value.substring(0, 50) + "..." : value;
+                        log.info("   ✅ Stored response: {} = {}", key, displayValue);
                     }
-                });
+                }
             }
         });
     }

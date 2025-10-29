@@ -12,8 +12,10 @@ import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.interceptor.SimpleHttpLoggingInterceptor;
 import com.mouse.bet.manager.ProfileManager;
 import com.mouse.bet.model.NormalizedEvent;
+import com.mouse.bet.model.bet9ja.Bet9jaEvent;
 import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.model.sporty.SportyEvent;
+import com.mouse.bet.service.Bet9jaService;
 import com.mouse.bet.service.BetLegRetryService;
 import com.mouse.bet.service.SportyBetService;
 import com.mouse.bet.utils.JsonParser;
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
 @Component
 public class SportyBetOddsFetcher implements Runnable {
 
+    // ==================== DEPENDENCIES ====================
     // ==================== DEPENDENCIES ====================
     private final ScraperConfig scraperConfig;
     private final ProfileManager profileManager;
@@ -134,7 +137,7 @@ public class SportyBetOddsFetcher implements Runnable {
     private final AtomicInteger activeDetailFetches = new AtomicInteger(0);
     private final Map<String, Long> lastFetchTime = new ConcurrentHashMap<>();
     private final Map<String, Long> lastRequestTime = new ConcurrentHashMap<>();
-    private final Map<String, Long> requestStartTimes = new ConcurrentHashMap<>();  // Track request start times
+    private final Map<String, Long> requestStartTimes = new ConcurrentHashMap<>();  // ✅ Track request start times
 
     // Rate limit metrics
     private final AtomicInteger consecutiveRateLimitErrors = new AtomicInteger(0);
@@ -177,7 +180,7 @@ public class SportyBetOddsFetcher implements Runnable {
         @Getter private final String clientKey;
         private final boolean isLive;
         @Getter private final long timestamp;
-        @Getter private final long requestSentTime;  // Track when request was sent
+        @Getter private final long requestSentTime;  // ✅ Track when request was sent
 
         public EventFetchTask(String eventId, String clientKey, boolean isLive, long requestSentTime) {
             this.eventId = eventId;
@@ -195,7 +198,7 @@ public class SportyBetOddsFetcher implements Runnable {
     // ==================== MAIN RUN ====================
     @Override
     public void run() {
-        log.info("=== Starting SportyBetOddsFetcher (Live Arb Optimized) ===");
+        log.info("=== Starting Bet9jaOddsFetcher (Live Arb Optimized) ===");
         log.info("InitialCadence={}s, Dedup={}ms, StaleThreshold={}ms, DetailThreads={}, ProcessingThreads={}",
                 MIN_SCHEDULER_PERIOD_SEC, EVENT_DEDUP_WINDOW_MS, STALE_DATA_THRESHOLD_MS,
                 EVENT_DETAIL_THREADS, PROCESSING_THREADS);
@@ -329,6 +332,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 active, queued, netErrors, rateLimitErrors, timeouts, requests,
                 timeSinceRotation / 1000, poolSize, avgResponseTime, currentCadence, setupCompleted.get());
 
+        // ✅ CRITICAL ALERT for slow responses
         if (avgResponseTime > 5000) {
             log.error("❌❌❌ CRITICAL: Average response time {}ms - LIVE ARB INEFFECTIVE! ❌❌❌",
                     avgResponseTime);
@@ -481,8 +485,6 @@ public class SportyBetOddsFetcher implements Runnable {
                 .build();
     }
 
-    //new HeadersInterceptor(profile, harvestedHeaders, SPORT_PAGE, cookieHeaderRef.get()
-
     private class HeadersInterceptor implements Interceptor {
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
@@ -493,40 +495,20 @@ public class SportyBetOddsFetcher implements Runnable {
                 log.warn("⚠️ WARNING: No cookies set for request to {}", original.url());
             }
 
-            UserAgentProfile.Headers headers = profile.getHeaders();
-
-            if (headers == null) {
-                log.info("❌❌----> http client is receiving null sechua headers ");
-
-            }
-
-
-            // ✅ EXACT headers from Network tab
-//            assert headers != null;
             Request.Builder builder = original.newBuilder()
                     // SportyBet custom headers
                     .header("operid", "2")
                     .header("platform", "web")
                     .header("clientid", "web")
 
-                    // Accept headers
                     .header("Accept", "*/*")
                     .header("Accept-Language", "en")  // Changed from "en-US,en;q=0.9" to match exactly
                     .header("Accept-Encoding", "gzip, deflate, br, zstd")
 
-                    // Content-Type
                     .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 
-                    // Referer (NO Origin - it's not in the real request)
                     .header("Referer", SPORT_PAGE)
 
-                    // sec-ch-ua headers
-                    .header("sec-ch-ua",headers == null ? "\"Microsoft Edge\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\""
-                            : headers.getClientHintsHeaders().get("Sec-CH-UA"))
-                    .header("sec-ch-ua-mobile",headers == null ? "?0" : headers.getClientHintsHeaders().get("Sec-CH-UA-Mobile"))
-                    .header("sec-ch-ua-platform",headers == null ? "\"Windows\"" : headers.getClientHintsHeaders().get("Sec-CH-UA-Platform"))
-
-                    // sec-fetch headers (CORRECT for API XHR)
                     .header("sec-fetch-dest", "empty")
                     .header("sec-fetch-mode", "same-origin")
                     .header("sec-fetch-site", "same-origin")
@@ -544,9 +526,9 @@ public class SportyBetOddsFetcher implements Runnable {
             // Only add authorization/token headers from harvested
             harvestedHeaders.forEach((key, value) -> {
                 String lowerKey = key.toLowerCase();
-                if (lowerKey.equals("authorization") ||
-                        lowerKey.equals("x-csrf-token") ||
-                        lowerKey.equals("x-api-key") ||
+                if (lowerKey.equals("sec-ch-ua") ||
+                        lowerKey.equals("sec-ch-ua-mobile") ||
+                        lowerKey.equals("sec-ch-ua-platform") ||
                         (lowerKey.startsWith("x-") && lowerKey.contains("token"))) {
                     builder.header(key, value);
                 }
@@ -569,7 +551,6 @@ public class SportyBetOddsFetcher implements Runnable {
             return chain.proceed(builtRequest);
         }
     }
-
     private OkHttpClient getThreadLocalClient() {
         Long threadVersion = threadLocalProfileVersion.get();
         Long currentVersion = profileVersion.get();
@@ -924,7 +905,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 });
     }
 
-    // Track request start time and response time
+    // ✅ Track request start time and response time
     private void fetchSportEventsList(String sportName, String sportId, String clientKey) {
         long fetchStart = System.currentTimeMillis();
         requestStartTimes.put(clientKey, fetchStart);
@@ -944,12 +925,12 @@ public class SportyBetOddsFetcher implements Runnable {
             //Record response time for adaptive cadence
             recordResponseTime(apiDuration);
 
-
+            // ✅ ALERT if too slow
             if (apiDuration > 5000) {
                 log.error("❌ CRITICAL: {} response took {}ms - TOO SLOW FOR LIVE ARB!",
                         sportName, apiDuration);
             } else if (apiDuration > 3000) {
-                log.info("⚠️ WARNING: {} response took {}ms - approaching threshold",
+                log.warn("⚠️ WARNING: {} response took {}ms - approaching threshold",
                         sportName, apiDuration);
             } else {
                 log.info("✅ {}: Response received in {}ms", sportName, apiDuration);
@@ -1190,7 +1171,7 @@ public class SportyBetOddsFetcher implements Runnable {
                         .build();
             }
 
-            okhttp3.Request request = new okhttp3.Request.Builder()
+            Request request = new Request.Builder()
                     .url(url)
                     .get()
                     .build();
@@ -1245,6 +1226,8 @@ public class SportyBetOddsFetcher implements Runnable {
             if (body == null) {
                 return null;
             }
+
+//            log.info("Response body {}", body.string());
 
             String contentEncoding = response.header("Content-Encoding");
             long contentLength = body.contentLength();
@@ -1479,14 +1462,11 @@ public class SportyBetOddsFetcher implements Runnable {
             if (contextType === '2d') {
                 const context = originalGetContext.call(this, contextType, ...args);
                 if (context) {
-                    // Set fill style from profile
                     context.fillStyle = profile.canvasFillStyle;
                     
-                    // Override toDataURL to add noise
                     const originalToDataURL = context.canvas.toDataURL;
                     context.canvas.toDataURL = function(type, quality) {
                         const imageData = context.getImageData(0, 0, this.width, this.height);
-                        // Add minimal random noise to fingerprint
                         for (let i = 0; i < imageData.data.length; i += 10) {
                             imageData.data[i] = imageData.data[i] + Math.floor(Math.random() * 2);
                         }
@@ -1494,11 +1474,9 @@ public class SportyBetOddsFetcher implements Runnable {
                         return originalToDataURL.call(this, type, quality);
                     };
                     
-                    // Override getImageData
                     const originalGetImageData = context.getImageData;
                     context.getImageData = function(...args) {
                         const imageData = originalGetImageData.call(this, ...args);
-                        // Add slight variation
                         for (let i = 0; i < imageData.data.length; i += 100) {
                             imageData.data[i] = imageData.data[i] ^ 1;
                         }
@@ -1513,22 +1491,11 @@ public class SportyBetOddsFetcher implements Runnable {
         // === WebGL Fingerprinting Protection ===
         const getParameterProxy = function(originalFunction) {
             return function(parameter) {
-                // Return WebGL values from profile
-                if (parameter === 37445) { // UNMASKED_VENDOR_WEBGL
-                    return profile.webglVendor;
-                }
-                if (parameter === 37446) { // UNMASKED_RENDERER_WEBGL
-                    return profile.webglRenderer;
-                }
-                if (parameter === 7936) { // VENDOR
-                    return profile.webgl.vendor;
-                }
-                if (parameter === 7937) { // RENDERER
-                    return profile.webgl.renderer;
-                }
-                if (parameter === 7938) { // VERSION
-                    return profile.webgl.version;
-                }
+                if (parameter === 37445) return profile.webglVendor;
+                if (parameter === 37446) return profile.webglRenderer;
+                if (parameter === 7936) return profile.webgl.vendor;
+                if (parameter === 7937) return profile.webgl.renderer;
+                if (parameter === 7938) return profile.webgl.version;
                 return originalFunction.call(this, parameter);
             };
         };
@@ -1557,7 +1524,6 @@ public class SportyBetOddsFetcher implements Runnable {
         const originalCreateOscillator = OfflineAudioContext.prototype.createOscillator;
         OfflineAudioContext.prototype.createOscillator = function() {
             const oscillator = originalCreateOscillator.call(this);
-            // Use frequency from profile
             oscillator.frequency.value = profile.audioFrequency;
             
             const originalStart = oscillator.start;
@@ -1567,7 +1533,7 @@ public class SportyBetOddsFetcher implements Runnable {
             return oscillator;
         };
 
-        // === Hardware Concurrency & Device Memory ===
+        // === Hardware & Device Properties ===
         Object.defineProperty(navigator, 'hardwareConcurrency', {
             get: () => profile.hardwareConcurrency,
             configurable: true
@@ -1578,7 +1544,6 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Platform & Language Spoofing ===
         Object.defineProperty(navigator, 'platform', {
             get: () => profile.platform,
             configurable: true
@@ -1610,7 +1575,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Screen Resolution Spoofing ===
+        // === Screen Properties ===
         Object.defineProperty(screen, 'width', {
             get: () => profile.viewport.width,
             configurable: true
@@ -1641,7 +1606,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Connection API Spoofing ===
+        // === Network Connection Spoofing ===
         if ('connection' in navigator) {
             Object.defineProperty(navigator.connection, 'downlink', {
                 get: () => profile.connection.downlink,
@@ -1661,16 +1626,13 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Battery API Spoofing ===
         if ('getBattery' in navigator) {
-            const originalGetBattery = navigator.getBattery;
             navigator.getBattery = function() {
                 return Promise.resolve(profile.battery);
             };
         }
 
         // === Timezone Spoofing ===
-        const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
         Date.prototype.getTimezoneOffset = function() {
-            // Calculate offset based on profile timezone
             const now = new Date();
             const tzString = now.toLocaleString('en-US', { timeZone: profile.timeZone });
             const localDate = new Date(tzString);
@@ -1680,7 +1642,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Geolocation Spoofing ===
         if ('geolocation' in navigator) {
-            const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
             navigator.geolocation.getCurrentPosition = function(success, error, options) {
                 if (success) {
                     success({
@@ -1713,7 +1674,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Media Devices Spoofing ===
         if ('mediaDevices' in navigator) {
-            const originalEnumerateDevices = navigator.mediaDevices.enumerateDevices;
             navigator.mediaDevices.enumerateDevices = function() {
                 return Promise.resolve(profile.mediaDevices);
             };
@@ -1732,7 +1692,6 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Storage Quota Spoofing ===
         if ('storage' in navigator && 'estimate' in navigator.storage) {
-            const originalEstimate = navigator.storage.estimate;
             navigator.storage.estimate = function() {
                 return Promise.resolve({
                     quota: profile.storage.quota,
@@ -1750,7 +1709,7 @@ public class SportyBetOddsFetcher implements Runnable {
             });
         }
 
-        // Final cleanup
+        // === Final Cleanup ===
         delete window.$cdc_;
         delete window._Selenium_IDE_Recorder;
     """,
@@ -1764,21 +1723,52 @@ public class SportyBetOddsFetcher implements Runnable {
                 profile.getClientHints().getModel(),
                 profile.getClientHints().getUaFullVersion()
         );
-
     }
 
     private void attachNetworkTaps(Page page, Map<String, String> store) {
+        // ✅ Only capture headers from API requests, NOT page navigation
+        page.onRequest(request -> {
+            String url = request.url();
+            String resourceType = request.resourceType(); // ✅ Check resource type
 
-        // ✅ Capture RESPONSE headers (for tokens, csrf, etc.)
+            // ✅ CRITICAL: Only capture from XHR/fetch requests to the API
+            if (url.contains("/api/ng/factsCenter/") &&
+                    (resourceType.equals("xhr") || resourceType.equals("fetch"))) {
+
+                Map<String, String> headers = request.headers();
+                log.info("📤 Capturing XHR/API REQUEST headers from: {}", url);
+
+                int capturedCount = 0;
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    String key = entry.getKey().toLowerCase(Locale.ROOT);
+                    String value = entry.getValue();
+
+                    // ✅ Capture headers from API calls
+                    if (key.equals("platform") ||
+                            key.startsWith("sec-ch-ua")) {
+
+                        store.put(key, value);
+                        capturedCount++;
+
+                        String displayValue = value.length() > 100 ?
+                                value.substring(0, 100) + "..." : value;
+                        log.info("   ✅ Stored: {} = {}", key, displayValue);
+                    }
+                }
+
+                log.info("   📊 Captured {} headers from XHR request", capturedCount);
+            }
+        });
+
+        // Capture RESPONSE headers
         page.onResponse(resp -> {
             String url = resp.url();
             int status = resp.status();
 
-            if (url.contains("/api/ng/factsCenter/liveOrPrematchEvents?sportId") && status >= 200 && status < 400) {
+            if (url.contains("/api/ng/factsCenter/") && status >= 200 && status < 400) {
                 Map<String, String> headers = resp.headers();
-                log.info("📥 Successful response from: {} (status: {})", url, status);
+                log.info("📥 Successful API response from: {} (status: {})", url, status);
 
-                int capturedCount = 0;
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
                     String key = entry.getKey().toLowerCase(Locale.ROOT);
                     String value = entry.getValue();
@@ -1786,23 +1776,13 @@ public class SportyBetOddsFetcher implements Runnable {
                     if (key.equals("authorization") ||
                             key.equals("x-csrf-token") ||
                             key.equals("set-cookie") ||
-                            key.equals("x-request-id") ||
-                            key.equals("x-trace-id") ||
-                            key.equals("x-api-key") ||
                             key.contains("token")) {
 
                         store.put(key, value);
-                        capturedCount++;
-
-                        // Truncate sensitive values for logging
                         String displayValue = value.length() > 50 ?
                                 value.substring(0, 50) + "..." : value;
                         log.info("   ✅ Stored response: {} = {}", key, displayValue);
                     }
-                }
-
-                if (capturedCount > 0) {
-                    log.info("   📊 Response headers captured: {}", capturedCount);
                 }
             }
         });
@@ -1848,7 +1828,6 @@ public class SportyBetOddsFetcher implements Runnable {
                 "_t", String.valueOf(System.currentTimeMillis())
         ));
     }
-
 
     private String buildUrl(String base, Map<String, String> params) {
         StringBuilder sb = new StringBuilder(base);
