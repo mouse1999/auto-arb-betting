@@ -478,44 +478,86 @@ public class Bet9jaOddsFetcher implements Runnable {
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)
                 .addInterceptor(new SimpleHttpLoggingInterceptor())
-                .addInterceptor(new HeadersInterceptor(profile, harvestedHeaders, SPORT_PAGE, cookieHeaderRef.get()))
+                .addInterceptor(new HeadersInterceptor())
                 .build();
     }
 
-//    private class HeadersInterceptor implements Interceptor {
-//        @Override
-//        public okhttp3.Response intercept(Chain chain) throws IOException {
-//            Request original = chain.request();
-//
-//            String cookies = cookieHeaderRef.get();
-//
-//            if (cookies.isEmpty()) {
-//                log.warn("WARNING: No cookies set for request to {}", original.url());
-//            }
-//
-//            Request.Builder builder = original.newBuilder()
-//                    .header("User-Agent", profile != null ? profile.getUserAgent() : "Mozilla/5.0")
-//                    .header("Referer", SPORT_PAGE)
-//                    .header("Cookie", cookies)
-//                    .header("Accept", "application/json, text/plain, */*")
-//                    .header("Accept-Encoding", "gzip")
-//                    .header("Content-Type", "application/json")
-//                    .header("Connection", "keep-alive")
-//                    .header("X-Requested-With", "XMLHttpRequest");
-//
-//            // Add harvested headers (skip accept-encoding)
-//            harvestedHeaders.forEach((key, value) -> {
-//                String lowerKey = key.toLowerCase();
-//                if (!lowerKey.equals("cookie") &&
-//                        !lowerKey.equals("user-agent") &&
-//                        !lowerKey.equals("accept-encoding")) {
-//                    builder.header(key, value);
-//                }
-//            });
-//
-//            return chain.proceed(builder.build());
-//        }
-//    }
+    private class HeadersInterceptor implements Interceptor {
+        @Override
+        public okhttp3.Response intercept(Chain chain) throws IOException {
+            Request original = chain.request();
+            String cookies = cookieHeaderRef.get();
+
+            if (cookies.isEmpty()) {
+                log.warn("⚠️ WARNING: No cookies set for request to {}", original.url());
+            }
+
+            // ✅ EXACT headers from Network tab
+            Request.Builder builder = original.newBuilder()
+                    // SportyBet custom headers
+                    .header("operid", "2")
+                    .header("platform", "web")
+                    .header("clientid", "web")
+
+                    // Accept headers
+                    .header("Accept", "*/*")
+                    .header("Accept-Language", "en")  // Changed from "en-US,en;q=0.9" to match exactly
+                    .header("Accept-Encoding", "gzip, deflate, br, zstd")
+
+                    // Content-Type
+                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+
+                    // Referer (NO Origin - it's not in the real request)
+                    .header("Referer", SPORT_PAGE)
+
+                    // sec-ch-ua headers
+                    .header("sec-ch-ua", profile.getHeaders().getClientHintsHeaders().get("Sec-CH-UA"))
+                    .header("sec-ch-ua-mobile", profile.getHeaders().getClientHintsHeaders().get("Sec-CH-UA-Mobile"))
+                    .header("sec-ch-ua-platform", profile.getHeaders().getClientHintsHeaders().get("Sec-CH-UA-Platform"))
+
+                    // sec-fetch headers (CORRECT for API XHR)
+                    .header("sec-fetch-dest", "empty")
+                    .header("sec-fetch-mode", "same-origin")
+                    .header("sec-fetch-site", "same-origin")
+
+                    // Priority
+                    .header("Priority", "u=1, i")
+
+                    // User Agent
+                    .header("User-Agent", profile != null ? profile.getUserAgent() :
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0")
+
+                    // Cookies
+                    .header("Cookie", cookies);
+
+            // Only add authorization/token headers from harvested
+            harvestedHeaders.forEach((key, value) -> {
+                String lowerKey = key.toLowerCase();
+                if (lowerKey.equals("authorization") ||
+                        lowerKey.equals("x-csrf-token") ||
+                        lowerKey.equals("x-api-key") ||
+                        (lowerKey.startsWith("x-") && lowerKey.contains("token"))) {
+                    builder.header(key, value);
+                }
+            });
+
+            Request builtRequest = builder.build();
+
+            // Log first request only
+            if (log.isInfoEnabled() && requestsSinceLastRotation.get() == 0) {
+                log.info("📤 FINAL REQUEST HEADERS:");
+                Headers finalHeaders = builtRequest.headers();
+                for (int i = 0; i < finalHeaders.size(); i++) {
+                    log.info("   {} = {}", finalHeaders.name(i),
+                            finalHeaders.value(i).length() > 80 ?
+                                    finalHeaders.value(i).substring(0, 80) + "..." :
+                                    finalHeaders.value(i));
+                }
+            }
+
+            return chain.proceed(builtRequest);
+        }
+    }
 
     private OkHttpClient getThreadLocalClient() {
         Long threadVersion = threadLocalProfileVersion.get();
@@ -755,9 +797,29 @@ public class Bet9jaOddsFetcher implements Runnable {
             harvestedHeaders.clear();
             harvestedHeaders.putAll(captured);
 
-            log.info("Setup OK — cookies={} bytes, harvestedHeaders={}",
-                    cookieHeader.length(), captured.size());
+            log.info("=== CAPTURED HEADERS SUMMARY ===");
+            log.info("Cookies: {} bytes", cookieHeader.length());
+            log.info("Headers count: {}", harvestedHeaders.size());
 
+            boolean hasOperid = harvestedHeaders.containsKey("operid");
+            boolean hasPlatform = harvestedHeaders.containsKey("platform");
+            boolean hasSecChUa = harvestedHeaders.containsKey("sec-ch-ua");
+            boolean hasSecFetchMode = harvestedHeaders.containsKey("sec-fetch-mode");
+
+            log.info("Has operid: {}", hasOperid);
+            log.info("Has platform: {}", hasPlatform);
+            log.info("Has sec-ch-ua: {}", hasSecChUa);
+            log.info("Has sec-fetch-mode: {}", hasSecFetchMode);
+
+            if (!hasOperid || !hasPlatform) {
+                log.error("❌ CRITICAL: Missing operid or platform headers!");
+            }
+            if (!hasSecChUa || !hasSecFetchMode) {
+                log.info("⚠️ WARNING: Missing sec-ch-ua or sec-fetch headers!");
+            }
+
+            log.info("All captured headers: {}", harvestedHeaders.keySet());
+            log.info("================================");
             // Create initial shared OkHttp client
             sharedOkHttpClient = createNewOkHttpClient();
             log.info("Shared OkHttp client created");
@@ -1172,6 +1234,8 @@ public class Bet9jaOddsFetcher implements Runnable {
             if (body == null) {
                 return null;
             }
+
+            log.info("Response body {}", body.string());
 
             String contentEncoding = response.header("Content-Encoding");
             long contentLength = body.contentLength();
