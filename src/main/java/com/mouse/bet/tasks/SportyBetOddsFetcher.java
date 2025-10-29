@@ -1479,11 +1479,14 @@ public class SportyBetOddsFetcher implements Runnable {
             if (contextType === '2d') {
                 const context = originalGetContext.call(this, contextType, ...args);
                 if (context) {
+                    // Set fill style from profile
                     context.fillStyle = profile.canvasFillStyle;
                     
+                    // Override toDataURL to add noise
                     const originalToDataURL = context.canvas.toDataURL;
                     context.canvas.toDataURL = function(type, quality) {
                         const imageData = context.getImageData(0, 0, this.width, this.height);
+                        // Add minimal random noise to fingerprint
                         for (let i = 0; i < imageData.data.length; i += 10) {
                             imageData.data[i] = imageData.data[i] + Math.floor(Math.random() * 2);
                         }
@@ -1491,9 +1494,11 @@ public class SportyBetOddsFetcher implements Runnable {
                         return originalToDataURL.call(this, type, quality);
                     };
                     
+                    // Override getImageData
                     const originalGetImageData = context.getImageData;
                     context.getImageData = function(...args) {
                         const imageData = originalGetImageData.call(this, ...args);
+                        // Add slight variation
                         for (let i = 0; i < imageData.data.length; i += 100) {
                             imageData.data[i] = imageData.data[i] ^ 1;
                         }
@@ -1508,11 +1513,22 @@ public class SportyBetOddsFetcher implements Runnable {
         // === WebGL Fingerprinting Protection ===
         const getParameterProxy = function(originalFunction) {
             return function(parameter) {
-                if (parameter === 37445) return profile.webglVendor;
-                if (parameter === 37446) return profile.webglRenderer;
-                if (parameter === 7936) return profile.webgl.vendor;
-                if (parameter === 7937) return profile.webgl.renderer;
-                if (parameter === 7938) return profile.webgl.version;
+                // Return WebGL values from profile
+                if (parameter === 37445) { // UNMASKED_VENDOR_WEBGL
+                    return profile.webglVendor;
+                }
+                if (parameter === 37446) { // UNMASKED_RENDERER_WEBGL
+                    return profile.webglRenderer;
+                }
+                if (parameter === 7936) { // VENDOR
+                    return profile.webgl.vendor;
+                }
+                if (parameter === 7937) { // RENDERER
+                    return profile.webgl.renderer;
+                }
+                if (parameter === 7938) { // VERSION
+                    return profile.webgl.version;
+                }
                 return originalFunction.call(this, parameter);
             };
         };
@@ -1541,6 +1557,7 @@ public class SportyBetOddsFetcher implements Runnable {
         const originalCreateOscillator = OfflineAudioContext.prototype.createOscillator;
         OfflineAudioContext.prototype.createOscillator = function() {
             const oscillator = originalCreateOscillator.call(this);
+            // Use frequency from profile
             oscillator.frequency.value = profile.audioFrequency;
             
             const originalStart = oscillator.start;
@@ -1550,7 +1567,7 @@ public class SportyBetOddsFetcher implements Runnable {
             return oscillator;
         };
 
-        // === Hardware & Device Properties ===
+        // === Hardware Concurrency & Device Memory ===
         Object.defineProperty(navigator, 'hardwareConcurrency', {
             get: () => profile.hardwareConcurrency,
             configurable: true
@@ -1561,6 +1578,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
+        // === Platform & Language Spoofing ===
         Object.defineProperty(navigator, 'platform', {
             get: () => profile.platform,
             configurable: true
@@ -1592,7 +1610,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Screen Properties ===
+        // === Screen Resolution Spoofing ===
         Object.defineProperty(screen, 'width', {
             get: () => profile.viewport.width,
             configurable: true
@@ -1623,7 +1641,7 @@ public class SportyBetOddsFetcher implements Runnable {
             configurable: true
         });
 
-        // === Network Connection Spoofing ===
+        // === Connection API Spoofing ===
         if ('connection' in navigator) {
             Object.defineProperty(navigator.connection, 'downlink', {
                 get: () => profile.connection.downlink,
@@ -1643,13 +1661,16 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Battery API Spoofing ===
         if ('getBattery' in navigator) {
+            const originalGetBattery = navigator.getBattery;
             navigator.getBattery = function() {
                 return Promise.resolve(profile.battery);
             };
         }
 
         // === Timezone Spoofing ===
+        const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
         Date.prototype.getTimezoneOffset = function() {
+            // Calculate offset based on profile timezone
             const now = new Date();
             const tzString = now.toLocaleString('en-US', { timeZone: profile.timeZone });
             const localDate = new Date(tzString);
@@ -1659,6 +1680,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Geolocation Spoofing ===
         if ('geolocation' in navigator) {
+            const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
             navigator.geolocation.getCurrentPosition = function(success, error, options) {
                 if (success) {
                     success({
@@ -1691,6 +1713,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Media Devices Spoofing ===
         if ('mediaDevices' in navigator) {
+            const originalEnumerateDevices = navigator.mediaDevices.enumerateDevices;
             navigator.mediaDevices.enumerateDevices = function() {
                 return Promise.resolve(profile.mediaDevices);
             };
@@ -1709,6 +1732,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // === Storage Quota Spoofing ===
         if ('storage' in navigator && 'estimate' in navigator.storage) {
+            const originalEstimate = navigator.storage.estimate;
             navigator.storage.estimate = function() {
                 return Promise.resolve({
                     quota: profile.storage.quota,
@@ -1726,7 +1750,7 @@ public class SportyBetOddsFetcher implements Runnable {
             });
         }
 
-        // === Final Cleanup ===
+        // Final cleanup
         delete window.$cdc_;
         delete window._Selenium_IDE_Recorder;
     """,
@@ -1740,6 +1764,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 profile.getClientHints().getModel(),
                 profile.getClientHints().getUaFullVersion()
         );
+
     }
 
     private void attachNetworkTaps(Page page, Map<String, String> store) {
