@@ -15,11 +15,11 @@ public class AutoArbBettingApplication {
 	public static void main(String[] args) {
 		ConfigurableApplicationContext context = SpringApplication.run(AutoArbBettingApplication.class, args);
 //		Bet9jaOddsFetcher fetcher = context.getBean(Bet9jaOddsFetcher.class);
-		SportyBetOddsFetcher fetcher = context.getBean(SportyBetOddsFetcher.class);
+//		SportyBetOddsFetcher fetcher = context.getBean(SportyBetOddsFetcher.class);
 
 
 
-		fetcher.run();
+//		fetcher.run();
 	}
 
 

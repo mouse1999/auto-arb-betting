@@ -1,5 +1,6 @@
 package com.mouse.bet.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mouse.bet.model.bet9ja.Bet9jaEvent;
@@ -62,19 +63,51 @@ public class JsonParser {
     }
 
 
-    public static Bet9jaEvent deserializeBet9jaEvent(String json, ObjectMapper objectMapper){
-        if (json == null || json.isBlank() || objectMapper == null) return null;
-        try {
-            JsonNode root = objectMapper.readTree(json);
-            if (root == null) return null;
-            JsonNode d = root.path("D");
-            if (d.isMissingNode() || d.isNull()) return null;
-            return objectMapper.readerFor(Bet9jaEvent.class).readValue(d);
-        } catch (Exception e) {
-            // Log if you want; returning null keeps the callsite simple
+    public static Bet9jaEvent parseEvent(String jsonString, ObjectMapper objectMapper)
+             {
+
+        if (jsonString == null || jsonString.isEmpty()) {
+            log.warn("JSON string is null or empty");
             return null;
         }
 
+        if (objectMapper == null) {
+            throw new IllegalArgumentException("ObjectMapper cannot be null");
+        }
+
+        try {
+            // Parse the full JSON
+            JsonNode rootNode = objectMapper.readTree(jsonString);
+
+            // Extract the "D" node
+            JsonNode dNode = rootNode.path("D");
+
+            // Check if D node exists
+            if (dNode.isMissingNode()) {
+                log.warn("Node 'D' not found in JSON");
+                return null;
+            }
+
+            // Check if D is an object
+            if (!dNode.isObject()) {
+                log.warn("Node 'D' is not an object. Type: {}", dNode.getNodeType());
+                return null;
+            }
+
+            // Deserialize to Bet9jaEvent
+            Bet9jaEvent event = objectMapper.treeToValue(dNode, Bet9jaEvent.class);
+
+            if (log.isDebugEnabled() && event != null) {
+                log.debug("Successfully parsed Bet9jaEvent. ID: {}",
+                        event.getEventHeader() != null ? event.getEventHeader().getId() : "unknown");
+            }
+
+            return event;
+
+        } catch (IOException e) {
+            log.error("Failed to parse JSON to Bet9jaEvent: {}", e.getMessage());
+            return null;
+        }
     }
 
     public static MSportEvent deserializeMSportEvent(){
@@ -134,14 +167,13 @@ public class JsonParser {
      * Optimized for speed with minimal overhead
      */
     public static String decompressGzipToJson(byte[] gzipBytes) throws IOException {
+
         if (gzipBytes == null || gzipBytes.length == 0) {
             return "";
         }
 
-        // Estimate decompressed size
+        // Attempt to decompress the bytes, assuming they are GZIP due to the OkHttp configuration.
         int estimatedSize = gzipBytes.length * 4;
-
-        // 32KB buffer for maximum throughput
         byte[] buffer = new byte[BUFFER_SIZE];
 
         try (GZIPInputStream gzipStream = new GZIPInputStream(
@@ -149,15 +181,25 @@ public class JsonParser {
              ByteArrayOutputStream output = new ByteArrayOutputStream(estimatedSize)) {
 
             int len;
+            // Read compressed data into the buffer and write decompressed data to the output stream
             while ((len = gzipStream.read(buffer)) > 0) {
                 output.write(buffer, 0, len);
             }
 
+            // Return the successfully decompressed JSON string
             return output.toString(StandardCharsets.UTF_8);
 
         } catch (IOException e) {
-            log.error("GZIP decompression failed: {}", e.getMessage());
-            throw e;
+            // If GZIPInputStream fails, the data was likely uncompressed or corrupted.
+            log.error("GZIP stream failed. Attempting fallback to plain text. Error: {}", e.getMessage());
+
+            // **Fallback:** Attempt to decode as plain UTF-8 text.
+            try {
+                return new String(gzipBytes, StandardCharsets.UTF_8);
+            } catch (Exception ex) {
+                // If even plain text conversion fails, throw a specific exception.
+                throw new IOException("Decompression failed and fallback to plain text failed.", ex);
+            }
         }
     }
 

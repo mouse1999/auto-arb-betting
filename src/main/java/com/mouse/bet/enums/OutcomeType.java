@@ -506,6 +506,108 @@ public enum OutcomeType {
 
 
     //BASKETBALL
+    // Starting the range from 120.5
+
+    OVER_120_5("OVER_120.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_120_5("UNDER_120.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_121_5("OVER_121.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_121_5("UNDER_121.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_122_5("OVER_122.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_122_5("UNDER_122.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_123_5("OVER_123.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_123_5("UNDER_123.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_124_5("OVER_124.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_124_5("UNDER_124.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_125_5("OVER_125.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_125_5("UNDER_125.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_126_5("OVER_126.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_126_5("UNDER_126.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_127_5("OVER_127.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_127_5("UNDER_127.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_128_5("OVER_128.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_128_5("UNDER_128.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_129_5("OVER_129.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_129_5("UNDER_129.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_130_5("OVER_130.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_130_5("UNDER_130.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_131_5("OVER_131.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_131_5("UNDER_131.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_132_5("OVER_132.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_132_5("UNDER_132.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_133_5("OVER_133.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_133_5("UNDER_133.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_134_5("OVER_134.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_134_5("UNDER_134.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_135_5("OVER_135.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_135_5("UNDER_135.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_136_5("OVER_136.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_136_5("UNDER_136.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_137_5("OVER_137.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_137_5("UNDER_137.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_138_5("OVER_138.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_138_5("UNDER_138.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_139_5("OVER_139.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_139_5("UNDER_139.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_140_5("OVER_140.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_140_5("UNDER_140.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_141_5("OVER_141.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_141_5("UNDER_141.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_142_5("OVER_142.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_142_5("UNDER_142.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_143_5("OVER_143.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_143_5("UNDER_143.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_144_5("OVER_144.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_144_5("UNDER_144.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_145_5("OVER_145.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_145_5("UNDER_145.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_146_5("OVER_146.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_146_5("UNDER_146.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_147_5("OVER_147.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_147_5("UNDER_147.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_148_5("OVER_148.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_148_5("UNDER_148.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_149_5("OVER_149.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_149_5("UNDER_149.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_150_5("OVER_150.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_150_5("UNDER_150.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_151_5("OVER_151.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_151_5("UNDER_151.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_152_5("OVER_152.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_152_5("UNDER_152.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_153_5("OVER_153.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_153_5("UNDER_153.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_154_5("OVER_154.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_154_5("UNDER_154.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_155_5("OVER_155.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_155_5("UNDER_155.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_156_5("OVER_156.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_156_5("UNDER_156.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_157_5("OVER_157.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_157_5("UNDER_157.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_158_5("OVER_158.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_158_5("UNDER_158.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_159_5("OVER_159.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_159_5("UNDER_159.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_160_5("OVER_160.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_160_5("UNDER_160.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_161_5("OVER_161.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_161_5("UNDER_161.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_162_5("OVER_162.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_162_5("UNDER_162.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_163_5("OVER_163.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_163_5("UNDER_163.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_164_5("OVER_164.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_164_5("UNDER_164.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_165_5("OVER_165.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_165_5("UNDER_165.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_166_5("OVER_166.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_166_5("UNDER_166.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_167_5("OVER_167.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_167_5("UNDER_167.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_168_5("OVER_168.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_168_5("UNDER_168.5", MarketCategory.OVER_UNDER_TOTAL),
+
+    // Your provided list starts here
     OVER_169_5("OVER_169.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_169_5("UNDER_169.5", MarketCategory.OVER_UNDER_TOTAL),
     OVER_170_5("OVER_170.5", MarketCategory.OVER_UNDER_TOTAL),
@@ -532,33 +634,149 @@ public enum OutcomeType {
     UNDER_180_5("UNDER_180.5", MarketCategory.OVER_UNDER_TOTAL),
     OVER_181_5("OVER_181.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_181_5("UNDER_181.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_182_5("OVER_182.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_182_5("UNDER_182.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_183_5("OVER_183.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_183_5("UNDER_183.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_184_5("OVER_184.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_184_5("UNDER_184.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_185_5("OVER_185.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_185_5("UNDER_185.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_186_5("OVER_186.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_186_5("UNDER_186.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_187_5("OVER_187.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_187_5("UNDER_187.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_188_5("OVER_188.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_188_5("UNDER_188.5", MarketCategory.OVER_UNDER_TOTAL),
-
     OVER_189_5("OVER_189.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_189_5("UNDER_189.5", MarketCategory.OVER_UNDER_TOTAL),
 
+    // Your provided list ends here
     OVER_190_5("OVER_190.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_190_5("UNDER_190.5", MarketCategory.OVER_UNDER_TOTAL),
+
+    // Continuing to 250.5
+    OVER_191_5("OVER_191.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_191_5("UNDER_191.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_192_5("OVER_192.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_192_5("UNDER_192.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_193_5("OVER_193.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_193_5("UNDER_193.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_194_5("OVER_194.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_194_5("UNDER_194.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_195_5("OVER_195.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_195_5("UNDER_195.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_196_5("OVER_196.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_196_5("UNDER_196.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_197_5("OVER_197.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_197_5("UNDER_197.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_198_5("OVER_198.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_198_5("UNDER_198.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_199_5("OVER_199.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_199_5("UNDER_199.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_200_5("OVER_200.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_200_5("UNDER_200.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_201_5("OVER_201.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_201_5("UNDER_201.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_202_5("OVER_202.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_202_5("UNDER_202.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_203_5("OVER_203.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_203_5("UNDER_203.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_204_5("OVER_204.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_204_5("UNDER_204.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_205_5("OVER_205.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_205_5("UNDER_205.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_206_5("OVER_206.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_206_5("UNDER_206.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_207_5("OVER_207.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_207_5("UNDER_207.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_208_5("OVER_208.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_208_5("UNDER_208.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_209_5("OVER_209.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_209_5("UNDER_209.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_210_5("OVER_210.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_210_5("UNDER_210.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_211_5("OVER_211.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_211_5("UNDER_211.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_212_5("OVER_212.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_212_5("UNDER_212.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_213_5("OVER_213.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_213_5("UNDER_213.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_214_5("OVER_214.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_214_5("UNDER_214.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_215_5("OVER_215.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_215_5("UNDER_215.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_216_5("OVER_216.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_216_5("UNDER_216.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_217_5("OVER_217.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_217_5("UNDER_217.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_218_5("OVER_218.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_218_5("UNDER_218.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_219_5("OVER_219.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_219_5("UNDER_219.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_220_5("OVER_220.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_220_5("UNDER_220.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_221_5("OVER_221.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_221_5("UNDER_221.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_222_5("OVER_222.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_222_5("UNDER_222.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_223_5("OVER_223.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_223_5("UNDER_223.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_224_5("OVER_224.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_224_5("UNDER_224.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_225_5("OVER_225.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_225_5("UNDER_225.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_226_5("OVER_226.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_226_5("UNDER_226.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_227_5("OVER_227.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_227_5("UNDER_227.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_228_5("OVER_228.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_228_5("UNDER_228.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_229_5("OVER_229.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_229_5("UNDER_229.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_230_5("OVER_230.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_230_5("UNDER_230.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_231_5("OVER_231.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_231_5("UNDER_231.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_232_5("OVER_232.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_232_5("UNDER_232.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_233_5("OVER_233.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_233_5("UNDER_233.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_234_5("OVER_234.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_234_5("UNDER_234.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_235_5("OVER_235.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_235_5("UNDER_235.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_236_5("OVER_236.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_236_5("UNDER_236.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_237_5("OVER_237.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_237_5("UNDER_237.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_238_5("OVER_238.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_238_5("UNDER_238.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_239_5("OVER_239.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_239_5("UNDER_239.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_240_5("OVER_240.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_240_5("UNDER_240.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_241_5("OVER_241.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_241_5("UNDER_241.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_242_5("OVER_242.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_242_5("UNDER_242.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_243_5("OVER_243.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_243_5("UNDER_243.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_244_5("OVER_244.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_244_5("UNDER_244.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_245_5("OVER_245.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_245_5("UNDER_245.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_246_5("OVER_246.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_246_5("UNDER_246.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_247_5("OVER_247.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_247_5("UNDER_247.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_248_5("OVER_248.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_248_5("UNDER_248.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_249_5("OVER_249.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_249_5("UNDER_249.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_250_5("OVER_250.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_250_5("UNDER_250.5", MarketCategory.OVER_UNDER_TOTAL),
+
 
 
 
@@ -831,6 +1049,269 @@ public enum OutcomeType {
         UNDER_3_5.opposite = OVER_3_5;
         OVER_4_5.opposite = UNDER_4_5;
         UNDER_4_5.opposite = OVER_4_5;
+
+        OVER_120_5.opposite = UNDER_120_5;
+        UNDER_120_5.opposite = OVER_120_5;
+        OVER_121_5.opposite = UNDER_121_5;
+        UNDER_121_5.opposite = OVER_121_5;
+        OVER_122_5.opposite = UNDER_122_5;
+        UNDER_122_5.opposite = OVER_122_5;
+        OVER_123_5.opposite = UNDER_123_5;
+        UNDER_123_5.opposite = OVER_123_5;
+        OVER_124_5.opposite = UNDER_124_5;
+        UNDER_124_5.opposite = OVER_124_5;
+        OVER_125_5.opposite = UNDER_125_5;
+        UNDER_125_5.opposite = OVER_125_5;
+        OVER_126_5.opposite = UNDER_126_5;
+        UNDER_126_5.opposite = OVER_126_5;
+        OVER_127_5.opposite = UNDER_127_5;
+        UNDER_127_5.opposite = OVER_127_5;
+        OVER_128_5.opposite = UNDER_128_5;
+        UNDER_128_5.opposite = OVER_128_5;
+        OVER_129_5.opposite = UNDER_129_5;
+        UNDER_129_5.opposite = OVER_129_5;
+        OVER_130_5.opposite = UNDER_130_5;
+        UNDER_130_5.opposite = OVER_130_5;
+        OVER_131_5.opposite = UNDER_131_5;
+        UNDER_131_5.opposite = OVER_131_5;
+        OVER_132_5.opposite = UNDER_132_5;
+        UNDER_132_5.opposite = OVER_132_5;
+        OVER_133_5.opposite = UNDER_133_5;
+        UNDER_133_5.opposite = OVER_133_5;
+        OVER_134_5.opposite = UNDER_134_5;
+        UNDER_134_5.opposite = OVER_134_5;
+        OVER_135_5.opposite = UNDER_135_5;
+        UNDER_135_5.opposite = OVER_135_5;
+        OVER_136_5.opposite = UNDER_136_5;
+        UNDER_136_5.opposite = OVER_136_5;
+        OVER_137_5.opposite = UNDER_137_5;
+        UNDER_137_5.opposite = OVER_137_5;
+        OVER_138_5.opposite = UNDER_138_5;
+        UNDER_138_5.opposite = OVER_138_5;
+        OVER_139_5.opposite = UNDER_139_5;
+        UNDER_139_5.opposite = OVER_139_5;
+        OVER_140_5.opposite = UNDER_140_5;
+        UNDER_140_5.opposite = OVER_140_5;
+        OVER_141_5.opposite = UNDER_141_5;
+        UNDER_141_5.opposite = OVER_141_5;
+        OVER_142_5.opposite = UNDER_142_5;
+        UNDER_142_5.opposite = OVER_142_5;
+        OVER_143_5.opposite = UNDER_143_5;
+        UNDER_143_5.opposite = OVER_143_5;
+        OVER_144_5.opposite = UNDER_144_5;
+        UNDER_144_5.opposite = OVER_144_5;
+        OVER_145_5.opposite = UNDER_145_5;
+        UNDER_145_5.opposite = OVER_145_5;
+        OVER_146_5.opposite = UNDER_146_5;
+        UNDER_146_5.opposite = OVER_146_5;
+        OVER_147_5.opposite = UNDER_147_5;
+        UNDER_147_5.opposite = OVER_147_5;
+        OVER_148_5.opposite = UNDER_148_5;
+        UNDER_148_5.opposite = OVER_148_5;
+        OVER_149_5.opposite = UNDER_149_5;
+        UNDER_149_5.opposite = OVER_149_5;
+        OVER_150_5.opposite = UNDER_150_5;
+        UNDER_150_5.opposite = OVER_150_5;
+        OVER_151_5.opposite = UNDER_151_5;
+        UNDER_151_5.opposite = OVER_151_5;
+        OVER_152_5.opposite = UNDER_152_5;
+        UNDER_152_5.opposite = OVER_152_5;
+        OVER_153_5.opposite = UNDER_153_5;
+        UNDER_153_5.opposite = OVER_153_5;
+        OVER_154_5.opposite = UNDER_154_5;
+        UNDER_154_5.opposite = OVER_154_5;
+        OVER_155_5.opposite = UNDER_155_5;
+        UNDER_155_5.opposite = OVER_155_5;
+        OVER_156_5.opposite = UNDER_156_5;
+        UNDER_156_5.opposite = OVER_156_5;
+        OVER_157_5.opposite = UNDER_157_5;
+        UNDER_157_5.opposite = OVER_157_5;
+        OVER_158_5.opposite = UNDER_158_5;
+        UNDER_158_5.opposite = OVER_158_5;
+        OVER_159_5.opposite = UNDER_159_5;
+        UNDER_159_5.opposite = OVER_159_5;
+        OVER_160_5.opposite = UNDER_160_5;
+        UNDER_160_5.opposite = OVER_160_5;
+        OVER_161_5.opposite = UNDER_161_5;
+        UNDER_161_5.opposite = OVER_161_5;
+        OVER_162_5.opposite = UNDER_162_5;
+        UNDER_162_5.opposite = OVER_162_5;
+        OVER_163_5.opposite = UNDER_163_5;
+        UNDER_163_5.opposite = OVER_163_5;
+        OVER_164_5.opposite = UNDER_164_5;
+        UNDER_164_5.opposite = OVER_164_5;
+        OVER_165_5.opposite = UNDER_165_5;
+        UNDER_165_5.opposite = OVER_165_5;
+        OVER_166_5.opposite = UNDER_166_5;
+        UNDER_166_5.opposite = OVER_166_5;
+        OVER_167_5.opposite = UNDER_167_5;
+        UNDER_167_5.opposite = OVER_167_5;
+        OVER_168_5.opposite = UNDER_168_5;
+        UNDER_168_5.opposite = OVER_168_5;
+        OVER_169_5.opposite = UNDER_169_5;
+        UNDER_169_5.opposite = OVER_169_5;
+        OVER_170_5.opposite = UNDER_170_5;
+        UNDER_170_5.opposite = OVER_170_5;
+        OVER_171_5.opposite = UNDER_171_5;
+        UNDER_171_5.opposite = OVER_171_5;
+        OVER_172_5.opposite = UNDER_172_5;
+        UNDER_172_5.opposite = OVER_172_5;
+        OVER_173_5.opposite = UNDER_173_5;
+        UNDER_173_5.opposite = OVER_173_5;
+        OVER_174_5.opposite = UNDER_174_5;
+        UNDER_174_5.opposite = OVER_174_5;
+        OVER_175_5.opposite = UNDER_175_5;
+        UNDER_175_5.opposite = OVER_175_5;
+        OVER_176_5.opposite = UNDER_176_5;
+        UNDER_176_5.opposite = OVER_176_5;
+        OVER_177_5.opposite = UNDER_177_5;
+        UNDER_177_5.opposite = OVER_177_5;
+        OVER_178_5.opposite = UNDER_178_5;
+        UNDER_178_5.opposite = OVER_178_5;
+        OVER_179_5.opposite = UNDER_179_5;
+        UNDER_179_5.opposite = OVER_179_5;
+        OVER_180_5.opposite = UNDER_180_5;
+        UNDER_180_5.opposite = OVER_180_5;
+        OVER_181_5.opposite = UNDER_181_5;
+        UNDER_181_5.opposite = OVER_181_5;
+        OVER_182_5.opposite = UNDER_182_5;
+        UNDER_182_5.opposite = OVER_182_5;
+        OVER_183_5.opposite = UNDER_183_5;
+        UNDER_183_5.opposite = OVER_183_5;
+        OVER_184_5.opposite = UNDER_184_5;
+        UNDER_184_5.opposite = OVER_184_5;
+        OVER_185_5.opposite = UNDER_185_5;
+        UNDER_185_5.opposite = OVER_185_5;
+        OVER_186_5.opposite = UNDER_186_5;
+        UNDER_186_5.opposite = OVER_186_5;
+        OVER_187_5.opposite = UNDER_187_5;
+        UNDER_187_5.opposite = OVER_187_5;
+        OVER_188_5.opposite = UNDER_188_5;
+        UNDER_188_5.opposite = OVER_188_5;
+        OVER_189_5.opposite = UNDER_189_5;
+        UNDER_189_5.opposite = OVER_189_5;
+        OVER_190_5.opposite = UNDER_190_5;
+        UNDER_190_5.opposite = OVER_190_5;
+        OVER_191_5.opposite = UNDER_191_5;
+        UNDER_191_5.opposite = OVER_191_5;
+        OVER_192_5.opposite = UNDER_192_5;
+        UNDER_192_5.opposite = OVER_192_5;
+        OVER_193_5.opposite = UNDER_193_5;
+        UNDER_193_5.opposite = OVER_193_5;
+        OVER_194_5.opposite = UNDER_194_5;
+        UNDER_194_5.opposite = OVER_194_5;
+        OVER_195_5.opposite = UNDER_195_5;
+        UNDER_195_5.opposite = OVER_195_5;
+        OVER_196_5.opposite = UNDER_196_5;
+        UNDER_196_5.opposite = OVER_196_5;
+        OVER_197_5.opposite = UNDER_197_5;
+        UNDER_197_5.opposite = OVER_197_5;
+        OVER_198_5.opposite = UNDER_198_5;
+        UNDER_198_5.opposite = OVER_198_5;
+        OVER_199_5.opposite = UNDER_199_5;
+        UNDER_199_5.opposite = OVER_199_5;
+        OVER_200_5.opposite = UNDER_200_5;
+        UNDER_200_5.opposite = OVER_200_5;
+        OVER_201_5.opposite = UNDER_201_5;
+        UNDER_201_5.opposite = OVER_201_5;
+        OVER_202_5.opposite = UNDER_202_5;
+        UNDER_202_5.opposite = OVER_202_5;
+        OVER_203_5.opposite = UNDER_203_5;
+        UNDER_203_5.opposite = OVER_203_5;
+        OVER_204_5.opposite = UNDER_204_5;
+        UNDER_204_5.opposite = OVER_204_5;
+        OVER_205_5.opposite = UNDER_205_5;
+        UNDER_205_5.opposite = OVER_205_5;
+        OVER_206_5.opposite = UNDER_206_5;
+        UNDER_206_5.opposite = OVER_206_5;
+        OVER_207_5.opposite = UNDER_207_5;
+        UNDER_207_5.opposite = OVER_207_5;
+        OVER_208_5.opposite = UNDER_208_5;
+        UNDER_208_5.opposite = OVER_208_5;
+        OVER_209_5.opposite = UNDER_209_5;
+        UNDER_209_5.opposite = OVER_209_5;
+        OVER_210_5.opposite = UNDER_210_5;
+        UNDER_210_5.opposite = OVER_210_5;
+        OVER_211_5.opposite = UNDER_211_5;
+        UNDER_211_5.opposite = OVER_211_5;
+        OVER_212_5.opposite = UNDER_212_5;
+        UNDER_212_5.opposite = OVER_212_5;
+        OVER_213_5.opposite = UNDER_213_5;
+        UNDER_213_5.opposite = OVER_213_5;
+        OVER_214_5.opposite = UNDER_214_5;
+        UNDER_214_5.opposite = OVER_214_5;
+        OVER_215_5.opposite = UNDER_215_5;
+        UNDER_215_5.opposite = OVER_215_5;
+        OVER_216_5.opposite = UNDER_216_5;
+        UNDER_216_5.opposite = OVER_216_5;
+        OVER_217_5.opposite = UNDER_217_5;
+        UNDER_217_5.opposite = OVER_217_5;
+        OVER_218_5.opposite = UNDER_218_5;
+        UNDER_218_5.opposite = OVER_218_5;
+        OVER_219_5.opposite = UNDER_219_5;
+        UNDER_219_5.opposite = OVER_219_5;
+        OVER_220_5.opposite = UNDER_220_5;
+        UNDER_220_5.opposite = OVER_220_5;
+        OVER_221_5.opposite = UNDER_221_5;
+        UNDER_221_5.opposite = OVER_221_5;
+        OVER_222_5.opposite = UNDER_222_5;
+        UNDER_222_5.opposite = OVER_222_5;
+        OVER_223_5.opposite = UNDER_223_5;
+        UNDER_223_5.opposite = OVER_223_5;
+        OVER_224_5.opposite = UNDER_224_5;
+        UNDER_224_5.opposite = OVER_224_5;
+        OVER_225_5.opposite = UNDER_225_5;
+        UNDER_225_5.opposite = OVER_225_5;
+        OVER_226_5.opposite = UNDER_226_5;
+        UNDER_226_5.opposite = OVER_226_5;
+        OVER_227_5.opposite = UNDER_227_5;
+        UNDER_227_5.opposite = OVER_227_5;
+        OVER_228_5.opposite = UNDER_228_5;
+        UNDER_228_5.opposite = OVER_228_5;
+        OVER_229_5.opposite = UNDER_229_5;
+        UNDER_229_5.opposite = OVER_229_5;
+        OVER_230_5.opposite = UNDER_230_5;
+        UNDER_230_5.opposite = OVER_230_5;
+        OVER_231_5.opposite = UNDER_231_5;
+        UNDER_231_5.opposite = OVER_231_5;
+        OVER_232_5.opposite = UNDER_232_5;
+        UNDER_232_5.opposite = OVER_232_5;
+        OVER_233_5.opposite = UNDER_233_5;
+        UNDER_233_5.opposite = OVER_233_5;
+        OVER_234_5.opposite = UNDER_234_5;
+        UNDER_234_5.opposite = OVER_234_5;
+        OVER_235_5.opposite = UNDER_235_5;
+        UNDER_235_5.opposite = OVER_235_5;
+        OVER_236_5.opposite = UNDER_236_5;
+        UNDER_236_5.opposite = OVER_236_5;
+        OVER_237_5.opposite = UNDER_237_5;
+        UNDER_237_5.opposite = OVER_237_5;
+        OVER_238_5.opposite = UNDER_238_5;
+        UNDER_238_5.opposite = OVER_238_5;
+        OVER_239_5.opposite = UNDER_239_5;
+        UNDER_239_5.opposite = OVER_239_5;
+        OVER_240_5.opposite = UNDER_240_5;
+        UNDER_240_5.opposite = OVER_240_5;
+        OVER_241_5.opposite = UNDER_241_5;
+        UNDER_241_5.opposite = OVER_241_5;
+        OVER_242_5.opposite = UNDER_242_5;
+        UNDER_242_5.opposite = OVER_242_5;
+        OVER_243_5.opposite = UNDER_243_5;
+        UNDER_243_5.opposite = OVER_243_5;
+        OVER_244_5.opposite = UNDER_244_5;
+        UNDER_244_5.opposite = OVER_244_5;
+        OVER_245_5.opposite = UNDER_245_5;
+        UNDER_245_5.opposite = OVER_245_5;
+        OVER_246_5.opposite = UNDER_246_5;
+        UNDER_246_5.opposite = OVER_246_5;
+        OVER_247_5.opposite = UNDER_247_5;
+        UNDER_247_5.opposite = OVER_247_5;
+        OVER_248_5.opposite = UNDER_248_5;
+        UNDER_248_5.opposite = OVER_248_5;
+        OVER_249_5.opposite = UNDER_249_5;
+        UNDER_249_5.opposite = OVER_249_5;
+        OVER_250_5.opposite = UNDER_250_5;
+        UNDER_250_5.opposite = OVER_250_5;
 
         BOTH_TEAMS_TO_SCORE_YES.opposite = BOTH_TEAMS_TO_SCORE_NO;
         BOTH_TEAMS_TO_SCORE_NO.opposite = BOTH_TEAMS_TO_SCORE_YES;

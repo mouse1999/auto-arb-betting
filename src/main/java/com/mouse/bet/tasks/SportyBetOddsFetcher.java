@@ -16,6 +16,7 @@ import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.model.sporty.SportyEvent;
 import com.mouse.bet.service.BetLegRetryService;
 import com.mouse.bet.service.SportyBetService;
+import com.mouse.bet.utils.DecompressionUtil;
 import com.mouse.bet.utils.JsonParser;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -479,7 +480,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
         // ✅ AGGRESSIVE connection pooling for live arbing
         ConnectionPool connectionPool = new ConnectionPool(
-                200,           // max idle connections
+                500,           // max idle connections
                 5,             // keep-alive duration
                 TimeUnit.MINUTES
         );
@@ -502,47 +503,71 @@ public class SportyBetOddsFetcher implements Runnable {
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
             Request original = chain.request();
-
             String cookies = cookieHeaderRef.get();
-            if (cookies == null) {
-                cookies = "";
+
+            if (cookies.isEmpty()) {
+                log.warn("⚠️ WARNING: No cookies set for request to {}", original.url());
             }
 
             Request.Builder builder = original.newBuilder()
+                    // SportyBet custom headers
                     .header("operid", "2")
                     .header("platform", "web")
                     .header("clientid", "web")
+
                     .header("Accept", "*/*")
-                    .header("Accept-Language", "en")
-                    .header("Accept-Encoding", "gzip, deflate, br, zstd")
+                    .header("Accept-Language", "en")  // Changed from "en-US,en;q=0.9" to match exactly
+//                    .header("Accept-Encoding", "gzip, deflate, br, zstd")
+//                    .header("OkHttp-Content-Encoding", "identity")
+
                     .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+
                     .header("Referer", SPORT_PAGE)
+
                     .header("sec-fetch-dest", "empty")
                     .header("sec-fetch-mode", "same-origin")
                     .header("sec-fetch-site", "same-origin")
+
+                    // Priority
                     .header("Priority", "u=1, i")
-                    .header("User-Agent", profile.getUserAgent())
+
+                    // User Agent
+                    .header("User-Agent", profile != null ? profile.getUserAgent() :
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0")
+
+                    // Cookies
                     .header("Cookie", cookies);
 
-            if (!harvestedHeaders.isEmpty()) {
-                harvestedHeaders.forEach((key, value) -> {
-                    if (key != null && value != null) {
-                        String lowerKey = key.toLowerCase();
-                        if (lowerKey.equals("sec-ch-ua") ||
-                                lowerKey.equals("sec-ch-ua-mobile") ||
-                                lowerKey.equals("sec-ch-ua-platform") ||
-                                (lowerKey.startsWith("x-") && lowerKey.contains("token"))) {
-                            builder.header(key, value);
-                        }
-                    }
-                });
+            // Only add authorization/token headers from harvested
+            harvestedHeaders.forEach((key, value) -> {
+                String lowerKey = key.toLowerCase();
+                if (lowerKey.equals("sec-ch-ua") ||
+                        lowerKey.equals("sec-ch-ua-mobile") ||
+                        lowerKey.equals("sec-ch-ua-platform") ||
+                        (lowerKey.startsWith("x-") && lowerKey.contains("token"))) {
+                    builder.header(key, value);
+                }
+            });
+
+            Request builtRequest = builder.build();
+
+            // Log first request only
+            if (log.isInfoEnabled() && requestsSinceLastRotation.get() == 0) {
+                log.info("📤 FINAL REQUEST HEADERS:");
+                Headers finalHeaders = builtRequest.headers();
+                for (int i = 0; i < finalHeaders.size(); i++) {
+                    log.info("   {} = {}", finalHeaders.name(i),
+                            finalHeaders.value(i).length() > 80 ?
+                                    finalHeaders.value(i).substring(0, 80) + "..." :
+                                    finalHeaders.value(i));
+                }
             }
 
-            return chain.proceed(builder.build());
+            return chain.proceed(builtRequest);
         }
     }
 
-    // ✅ Simplified - just return shared client
+    //  just return shared client
     private OkHttpClient getThreadLocalClient() {
         if (sharedOkHttpClient == null) {
             synchronized (this) {
@@ -824,11 +849,11 @@ public class SportyBetOddsFetcher implements Runnable {
 
         long start = System.currentTimeMillis();
 
-        if (footballFetchInProgress.compareAndSet(false, true)) {
-            runSportListTaskWithFlag("Football", KEY_FB, KEY_FB, footballFetchInProgress);
-        } else {
-            log.warn("⚠️ Skipping Football fetch - previous request still in progress");
-        }
+//        if (footballFetchInProgress.compareAndSet(false, true)) {
+//            runSportListTaskWithFlag("Football", KEY_FB, KEY_FB, footballFetchInProgress);
+//        } else {
+//            log.warn("⚠️ Skipping Football fetch - previous request still in progress");
+//        }
 
         if (basketballFetchInProgress.compareAndSet(false, true)) {
             runSportListTaskWithFlag("Basketball", KEY_BB, KEY_BB, basketballFetchInProgress);
@@ -836,11 +861,11 @@ public class SportyBetOddsFetcher implements Runnable {
             log.warn("⚠️ Skipping Basketball fetch - previous request still in progress");
         }
 
-        if (tableTennisFetchInProgress.compareAndSet(false, true)) {
-            runSportListTaskWithFlag("TableTennis", KEY_TT, KEY_TT, tableTennisFetchInProgress);
-        } else {
-            log.warn("⚠️ Skipping TableTennis fetch - previous request still in progress");
-        }
+//        if (tableTennisFetchInProgress.compareAndSet(false, true)) {
+//            runSportListTaskWithFlag("TableTennis", KEY_TT, KEY_TT, tableTennisFetchInProgress);
+//        } else {
+//            log.warn("⚠️ Skipping TableTennis fetch - previous request still in progress");
+//        }
 
         long duration = System.currentTimeMillis() - start;
         log.info("All sports fetch cycle triggered in {}ms [queue={}, active={}]",
@@ -886,6 +911,7 @@ public class SportyBetOddsFetcher implements Runnable {
             log.info("{}: Fetching events list from API...", sportName);
 
             String body = safeApiGet(url, clientKey, 0, LIST_API_TIMEOUT_MS);
+
             long apiDuration = System.currentTimeMillis() - fetchStart;
 
             recordResponseTime(apiDuration);
@@ -1181,22 +1207,28 @@ public class SportyBetOddsFetcher implements Runnable {
                 return null;
             }
 
-            String contentEncoding = response.header("Content-Encoding");
-            long contentLength = body.contentLength();
-
-            log.debug("Response headers - Content-Encoding: {}, Content-Length: {}",
-                    contentEncoding, contentLength);
-
-            if (contentEncoding == null || !contentEncoding.equalsIgnoreCase("gzip")) {
-                log.debug("Response is NOT gzip encoded, reading directly");
-                String responseText = body.string();
-                log.debug("Read {} bytes directly", responseText.length());
-                return responseText;
-            } else {
-                log.debug("Response is still GZIP encoded! Manual decompression needed");
-                byte[] gzipBytes = body.bytes();
-                return JsonParser.decompressGzipToJson(gzipBytes);
-            }
+//            String contentEncoding = response.header("Content-Encoding");
+//
+//            log.debug("Response headers - Content-Encoding: {}", contentEncoding);
+//
+//            // Read body bytes ONCE and reuse
+//            byte[] bodyBytes = body.bytes();  // Read once
+//            log.debug("Read {} bytes from response body", bodyBytes.length);
+//
+//            //Check if response is gzip based on Content-Encoding header OR magic bytes
+//            boolean isGzipHeader = "gzip".equalsIgnoreCase(contentEncoding);
+//            boolean isGzipMagic = bodyBytes.length >= 2 &&
+//                    (bodyBytes[0] & 0xFF) == 0x1F &&
+//                    (bodyBytes[1] & 0xFF) == 0x8B;
+//
+//            if (isGzipHeader || isGzipMagic) {
+//                log.debug("Response is GZIP encoded, decompressing...");
+//                return JsonParser.decompressGzipToJson(bodyBytes);
+//            } else {
+//                log.debug("Response is NOT gzip encoded, reading as plain text");
+//                return new String(bodyBytes, StandardCharsets.UTF_8);
+//            }
+            return DecompressionUtil.decompressResponse(response);
 
         } catch (IOException e) {
             log.error("Failed to read response body: {}", e.getMessage());
@@ -1680,6 +1712,41 @@ public class SportyBetOddsFetcher implements Runnable {
     }
 
     private void attachNetworkTaps(Page page, Map<String, String> store) {
+        // ✅ Only capture headers from API requests, NOT page navigation
+        page.onRequest(request -> {
+            String url = request.url();
+            String resourceType = request.resourceType();
+
+            // ✅ CRITICAL: Only capture from XHR/fetch requests to the API
+            if (url.contains("/api/ng/factsCenter/") &&
+                    (resourceType.equals("xhr") || resourceType.equals("fetch"))) {
+
+                Map<String, String> headers = request.headers();
+                log.info("📤 Capturing XHR/API REQUEST headers from: {}", url);
+
+                int capturedCount = 0;
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    String key = entry.getKey().toLowerCase(Locale.ROOT);
+                    String value = entry.getValue();
+
+                    // ✅ Capture headers from API calls
+                    if (key.equals("platform") ||
+                            key.startsWith("sec-ch-ua")) {
+
+                        store.put(key, value);
+                        capturedCount++;
+
+                        String displayValue = value.length() > 100 ?
+                                value.substring(0, 100) + "..." : value;
+                        log.info("   ✅ Stored: {} = {}", key, displayValue);
+                    }
+                }
+
+                log.info("   📊 Captured {} headers from XHR request", capturedCount);
+            }
+        });
+
+        // Capture RESPONSE headers
         page.onResponse(resp -> {
             String url = resp.url();
             int status = resp.status();
@@ -1694,6 +1761,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
                     if (key.equals("authorization") ||
                             key.equals("x-csrf-token") ||
+                            key.equals("set-cookie") ||
                             key.contains("token")) {
 
                         store.put(key, value);
@@ -1705,6 +1773,7 @@ public class SportyBetOddsFetcher implements Runnable {
             }
         });
     }
+
 
     private void performInitialNavigationWithRetry(Page page) {
         int attempt = 0;

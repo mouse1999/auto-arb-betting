@@ -12,46 +12,45 @@ import java.util.stream.Collectors;
 @Getter
 public enum SportyMarketType implements MarketType {
 
-    // 1X2 (Match Odds) FOOTBALL
+    // ========================================================================
+    // FOOTBALL MARKETS
+    // ========================================================================
+
+    // --- 1X2 (Match Odds) ---
     MATCH_ODDS_HOME("1", null, "HOME", MarketCategory.MATCH_RESULT, OutcomeType.HOME),
     MATCH_ODDS_DRAW("1", null, "DRAW", MarketCategory.MATCH_RESULT, OutcomeType.DRAW),
     MATCH_ODDS_AWAY("1", null, "AWAY", MarketCategory.MATCH_RESULT, OutcomeType.AWAY),
 
-    // Double Chance
+    // --- Double Chance ---
     DOUBLE_CHANCE_HOME_DRAW("10", null, "HOME_OR_DRAW", MarketCategory.DOUBLE_CHANCE, OutcomeType.HOME_OR_DRAW),
     DOUBLE_CHANCE_HOME_AWAY("10", null, "HOME_OR_AWAY", MarketCategory.DOUBLE_CHANCE, OutcomeType.HOME_OR_AWAY),
     DOUBLE_CHANCE_DRAW_AWAY("10", null, "DRAW_OR_AWAY", MarketCategory.DOUBLE_CHANCE, OutcomeType.DRAW_OR_AWAY),
 
-    // Draw No Bet
+    // --- Draw No Bet ---
     DRAW_NO_BET_HOME("11", null, "HOME", MarketCategory.DRAW_NO_BET, OutcomeType.HOME_DNB),
     DRAW_NO_BET_AWAY("11", null, "AWAY", MarketCategory.DRAW_NO_BET, OutcomeType.AWAY_DNB),
 
-    ASIAN_HANDICAP_HOME_MINUS_1_5("16", "hcp=-1.5","HOME_(-1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_1_5),
-    ASIAN_HANDICAP_AWAY_PLUS_1_5("16", "hcp=-1.5", "AWAY_(+1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_1_5),
-    ASIAN_HANDICAP_HOME_MINUS_2_5("16", "hcp=-2.5","HOME_(-2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_2_5),
-    ASIAN_HANDICAP_AWAY_PLUS_2_5("16", "hcp=-2.5", "AWAY_(+2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_2_5),
-    ASIAN_HANDICAP_HOME_MINUS_3_5("16", "hcp=-3.5","HOME_(-3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_3_5),
-    ASIAN_HANDICAP_AWAY_PLUS_3_5("16", "hcp=-3.5", "AWAY_(+3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_3_5),
-    ASIAN_HANDICAP_HOME_MINUS_4_5("16", "hcp=-4.5","HOME_(-4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_4_5),
-    ASIAN_HANDICAP_AWAY_PLUS_4_5("16", "hcp=-4.5", "AWAY_(+4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_4_5),
+    // --- Over/Under Full Time (0.5 to 4.5) ---
+    OVER_UNDER_0_5_OVER("18", "total=0.5", "OVER_0.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_0_5),
+    OVER_UNDER_0_5_UNDER("18", "total=0.5", "UNDER_0.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_0_5),
+    OVER_UNDER_1_5_OVER("18", "total=1.5", "OVER_1.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_1_5),
+    OVER_UNDER_1_5_UNDER("18", "total=1.5", "UNDER_1.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_1_5),
+    OVER_UNDER_2_5_OVER("18", "total=2.5", "OVER_2.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_2_5),
+    OVER_UNDER_2_5_UNDER("18", "total=2.5", "UNDER_2.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_2_5),
+    OVER_UNDER_3_5_OVER("18", "total=3.5", "OVER_3.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_3_5),
+    OVER_UNDER_3_5_UNDER("18", "total=3.5", "UNDER_3.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_3_5),
+    OVER_UNDER_4_5_OVER("18", "total=4.5", "OVER_4.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_4_5),
+    OVER_UNDER_4_5_UNDER("18", "total=4.5", "UNDER_4.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_4_5),
 
-    //ASIAN HANDICAP +ve
+    // --- Both Teams to Score (GG/NG) ---
+    BTTS_YES("29", null, "BOTH_TEAMS_TO_SCORE_YES", MarketCategory.BTTS, OutcomeType.BOTH_TEAMS_TO_SCORE_YES),
+    BTTS_NO("29", null, "BOTH_TEAMS_TO_SCORE_NO", MarketCategory.BTTS, OutcomeType.BOTH_TEAMS_TO_SCORE_NO),
 
-    ASIAN_HANDICAP_HOME_PLUS_0_5("16", "hcp=0.5","HOME_(+0.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_0_5),
-    ASIAN_HANDICAP_AWAY_MINUS_0_5("16", "hcp=0.5", "AWAY_(-0.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_0_5),
+    // --- Odd/Even ---
+    ODD_EVEN_ODD("26", null, "ODD", MarketCategory.ODD_EVEN, OutcomeType.ODD),
+    ODD_EVEN_EVEN("26", null, "EVEN", MarketCategory.ODD_EVEN, OutcomeType.EVEN),
 
-    ASIAN_HANDICAP_HOME_PLUS_1_5("16", "hcp=1.5","HOME_(+1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_1_5),
-    ASIAN_HANDICAP_AWAY_MINUS_1_5("16", "hcp=1.5", "AWAY_(-1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_1_5),
-
-    ASIAN_HANDICAP_HOME_PLUS_2_5("16", "hcp=2.5","HOME_(+2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_2_5),
-    ASIAN_HANDICAP_AWAY_MINUS_2_5("16", "hcp=2.5", "AWAY_(-2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_2_5),
-
-    ASIAN_HANDICAP_HOME_PLUS_3_5("16", "hcp=3.5","HOME_(+3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_3_5),
-    ASIAN_HANDICAP_AWAY_MINUS_3_5("16", "hcp=3.5", "AWAY_(-3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_3_5),
-
-    ASIAN_HANDICAP_HOME_PLUS_4_5("16", "hcp=4.5","HOME_(+4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_4_5),
-    ASIAN_HANDICAP_AWAY_MINUS_4_5("16", "hcp=4.5", "AWAY_(-4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_4_5),
-
+    // --- 1st Half Over/Under (1.5 to 3.5) ---
     IST_HALF_OVER_UNDER_15_OVER("68", "total=1.5", "OVER_1.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.IST_HALF_OVER_15),
     IST_HALF_OVER_UNDER_15_UNDER("68", "total=1.5", "UNDER_1.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.IST_HALF_UNDER_15),
     IST_HALF_OVER_UNDER_25_OVER("68", "total=2.5", "OVER_2.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.IST_HALF_OVER_25),
@@ -59,6 +58,7 @@ public enum SportyMarketType implements MarketType {
     IST_HALF_OVER_UNDER_35_OVER("68", "total=3.5", "OVER_3.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.IST_HALF_OVER_35),
     IST_HALF_OVER_UNDER_35_UNDER("68", "total=3.5", "UNDER_3.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.IST_HALF_UNDER_35),
 
+    // --- 2nd Half Over/Under (0.5 to 3.5) ---
     SECOND_HALF_OVER_UNDER_05_OVER("90", "total=0.5", "OVER_0.5", MarketCategory.OVER_UNDER_2NDHALF, OutcomeType.SECOND_HALF_OVER_05),
     SECOND_HALF_OVER_UNDER_05_UNDER("90", "total=0.5", "UNDER_0.5", MarketCategory.OVER_UNDER_2NDHALF, OutcomeType.SECOND_HALF_UNDER_05),
     SECOND_HALF_OVER_UNDER_15_OVER("90", "total=1.5", "OVER_1.5", MarketCategory.OVER_UNDER_2NDHALF, OutcomeType.SECOND_HALF_OVER_15),
@@ -68,39 +68,135 @@ public enum SportyMarketType implements MarketType {
     SECOND_HALF_OVER_UNDER_35_OVER("90", "total=3.5", "OVER_3.5", MarketCategory.OVER_UNDER_2NDHALF, OutcomeType.SECOND_HALF_OVER_35),
     SECOND_HALF_OVER_UNDER_35_UNDER("90", "total=3.5", "UNDER_3.5", MarketCategory.OVER_UNDER_2NDHALF, OutcomeType.SECOND_HALF_UNDER_35),
 
+    // --- Asian Handicap (Negative: -4.5 to -0.5) ---
+    ASIAN_HANDICAP_HOME_MINUS_4_5("16", "hcp=-4.5", "HOME_(-4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_4_5),
+    ASIAN_HANDICAP_AWAY_PLUS_4_5("16", "hcp=-4.5", "AWAY_(+4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_4_5),
+    ASIAN_HANDICAP_HOME_MINUS_3_5("16", "hcp=-3.5", "HOME_(-3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_3_5),
+    ASIAN_HANDICAP_AWAY_PLUS_3_5("16", "hcp=-3.5", "AWAY_(+3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_3_5),
+    ASIAN_HANDICAP_HOME_MINUS_2_5("16", "hcp=-2.5", "HOME_(-2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_2_5),
+    ASIAN_HANDICAP_AWAY_PLUS_2_5("16", "hcp=-2.5", "AWAY_(+2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_2_5),
+    ASIAN_HANDICAP_HOME_MINUS_1_5("16", "hcp=-1.5", "HOME_(-1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_1_5),
+    ASIAN_HANDICAP_AWAY_PLUS_1_5("16", "hcp=-1.5", "AWAY_(+1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_1_5),
 
-    // Over/Under - The specifier (e.g., "total=2.5") is the key differentiator
-    OVER_UNDER_0_5_OVER("18", "total=0.5", "OVER_0.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_0_5),
-    OVER_UNDER_0_5_UNDER("18", "total=0.5", "UNDER_0.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_0_5),
+    // --- Asian Handicap (Positive: +0.5 to +4.5) ---
+    ASIAN_HANDICAP_HOME_PLUS_0_5("16", "hcp=0.5", "HOME_(+0.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_0_5),
+    ASIAN_HANDICAP_AWAY_MINUS_0_5("16", "hcp=0.5", "AWAY_(-0.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_0_5),
+    ASIAN_HANDICAP_HOME_PLUS_1_5("16", "hcp=1.5", "HOME_(+1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_1_5),
+    ASIAN_HANDICAP_AWAY_MINUS_1_5("16", "hcp=1.5", "AWAY_(-1.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_1_5),
+    ASIAN_HANDICAP_HOME_PLUS_2_5("16", "hcp=2.5", "HOME_(+2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_2_5),
+    ASIAN_HANDICAP_AWAY_MINUS_2_5("16", "hcp=2.5", "AWAY_(-2.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_2_5),
+    ASIAN_HANDICAP_HOME_PLUS_3_5("16", "hcp=3.5", "HOME_(+3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_3_5),
+    ASIAN_HANDICAP_AWAY_MINUS_3_5("16", "hcp=3.5", "AWAY_(-3.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_3_5),
+    ASIAN_HANDICAP_HOME_PLUS_4_5("16", "hcp=4.5", "HOME_(+4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_4_5),
+    ASIAN_HANDICAP_AWAY_MINUS_4_5("16", "hcp=4.5", "AWAY_(-4.5)", MarketCategory.ASIAN_HANDICAP_FULLTIME, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_4_5),
 
-    OVER_UNDER_1_5_OVER("18", "total=1.5", "OVER_1.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_1_5),
-    OVER_UNDER_1_5_UNDER("18", "total=1.5", "UNDER_1.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_1_5),
+    // ========================================================================
+    // BASKETBALL MARKETS
+    // ========================================================================
 
-    OVER_UNDER_2_5_OVER("18", "total=2.5", "OVER_2.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_2_5),
-    OVER_UNDER_2_5_UNDER("18", "total=2.5", "UNDER_2.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_2_5),
-
-    OVER_UNDER_3_5_OVER("18", "total=3.5", "OVER_3.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_3_5),
-    OVER_UNDER_3_5_UNDER("18", "total=3.5", "UNDER_3.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_3_5),
-
-    OVER_UNDER_4_5_OVER("18", "total=4.5", "OVER_4.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_4_5),
-    OVER_UNDER_4_5_UNDER("18", "total=4.5", "UNDER_4.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_4_5),
-
-    // Both Teams to Score (GG/NG)
-    BTTS_YES("29", null, "BOTH_TEAMS_TO_SCORE_YES", MarketCategory.BTTS, OutcomeType.BOTH_TEAMS_TO_SCORE_YES),
-    BTTS_NO("29", null, "BOTH_TEAMS_TO_SCORE_NO", MarketCategory.BTTS, OutcomeType.BOTH_TEAMS_TO_SCORE_NO),
-
-    // Odd/Even
-    ODD_EVEN_ODD("26", null, "ODD", MarketCategory.ODD_EVEN, OutcomeType.ODD),
-    ODD_EVEN_EVEN("26", null, "EVEN", MarketCategory.ODD_EVEN, OutcomeType.EVEN),
-
-
-    //BASKETBALL
-
-    // 1. Match Winner (ID: 219) - Two-Way Outcome (incl. overtime)
+    // --- Match Winner (Two-Way, incl. OT) ---
     BASKETBALL_WINNER_HOME("219", null, "HOME_WINNER_OT", MarketCategory.BASKETBALL_MATCH_WINNER, OutcomeType.HOME),
     BASKETBALL_WINNER_AWAY("219", null, "AWAY_WINNER_OT", MarketCategory.BASKETBALL_MATCH_WINNER, OutcomeType.AWAY),
 
-    // 2. Full Match Over/Under (ID: 225) - (incl. overtime)
+    // --- Full Time Over/Under (120.5 to 250.5) ---
+    BASKETBALL_FT_OU_120_5_OVER("225", "total=120.5", "OVER_120.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_120_5),
+    BASKETBALL_FT_OU_120_5_UNDER("225", "total=120.5", "UNDER_120.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_120_5),
+    BASKETBALL_FT_OU_121_5_OVER("225", "total=121.5", "OVER_121.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_121_5),
+    BASKETBALL_FT_OU_121_5_UNDER("225", "total=121.5", "UNDER_121.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_121_5),
+    BASKETBALL_FT_OU_122_5_OVER("225", "total=122.5", "OVER_122.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_122_5),
+    BASKETBALL_FT_OU_122_5_UNDER("225", "total=122.5", "UNDER_122.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_122_5),
+    BASKETBALL_FT_OU_123_5_OVER("225", "total=123.5", "OVER_123.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_123_5),
+    BASKETBALL_FT_OU_123_5_UNDER("225", "total=123.5", "UNDER_123.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_123_5),
+    BASKETBALL_FT_OU_124_5_OVER("225", "total=124.5", "OVER_124.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_124_5),
+    BASKETBALL_FT_OU_124_5_UNDER("225", "total=124.5", "UNDER_124.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_124_5),
+    BASKETBALL_FT_OU_125_5_OVER("225", "total=125.5", "OVER_125.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_125_5),
+    BASKETBALL_FT_OU_125_5_UNDER("225", "total=125.5", "UNDER_125.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_125_5),
+    BASKETBALL_FT_OU_126_5_OVER("225", "total=126.5", "OVER_126.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_126_5),
+    BASKETBALL_FT_OU_126_5_UNDER("225", "total=126.5", "UNDER_126.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_126_5),
+    BASKETBALL_FT_OU_127_5_OVER("225", "total=127.5", "OVER_127.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_127_5),
+    BASKETBALL_FT_OU_127_5_UNDER("225", "total=127.5", "UNDER_127.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_127_5),
+    BASKETBALL_FT_OU_128_5_OVER("225", "total=128.5", "OVER_128.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_128_5),
+    BASKETBALL_FT_OU_128_5_UNDER("225", "total=128.5", "UNDER_128.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_128_5),
+    BASKETBALL_FT_OU_129_5_OVER("225", "total=129.5", "OVER_129.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_129_5),
+    BASKETBALL_FT_OU_129_5_UNDER("225", "total=129.5", "UNDER_129.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_129_5),
+    BASKETBALL_FT_OU_130_5_OVER("225", "total=130.5", "OVER_130.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_130_5),
+    BASKETBALL_FT_OU_130_5_UNDER("225", "total=130.5", "UNDER_130.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_130_5),
+    BASKETBALL_FT_OU_131_5_OVER("225", "total=131.5", "OVER_131.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_131_5),
+    BASKETBALL_FT_OU_131_5_UNDER("225", "total=131.5", "UNDER_131.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_131_5),
+    BASKETBALL_FT_OU_132_5_OVER("225", "total=132.5", "OVER_132.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_132_5),
+    BASKETBALL_FT_OU_132_5_UNDER("225", "total=132.5", "UNDER_132.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_132_5),
+    BASKETBALL_FT_OU_133_5_OVER("225", "total=133.5", "OVER_133.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_133_5),
+    BASKETBALL_FT_OU_133_5_UNDER("225", "total=133.5", "UNDER_133.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_133_5),
+    BASKETBALL_FT_OU_134_5_OVER("225", "total=134.5", "OVER_134.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_134_5),
+    BASKETBALL_FT_OU_134_5_UNDER("225", "total=134.5", "UNDER_134.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_134_5),
+    BASKETBALL_FT_OU_135_5_OVER("225", "total=135.5", "OVER_135.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_135_5),
+    BASKETBALL_FT_OU_135_5_UNDER("225", "total=135.5", "UNDER_135.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_135_5),
+    BASKETBALL_FT_OU_136_5_OVER("225", "total=136.5", "OVER_136.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_136_5),
+    BASKETBALL_FT_OU_136_5_UNDER("225", "total=136.5", "UNDER_136.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_136_5),
+    BASKETBALL_FT_OU_137_5_OVER("225", "total=137.5", "OVER_137.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_137_5),
+    BASKETBALL_FT_OU_137_5_UNDER("225", "total=137.5", "UNDER_137.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_137_5),
+    BASKETBALL_FT_OU_138_5_OVER("225", "total=138.5", "OVER_138.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_138_5),
+    BASKETBALL_FT_OU_138_5_UNDER("225", "total=138.5", "UNDER_138.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_138_5),
+    BASKETBALL_FT_OU_139_5_OVER("225", "total=139.5", "OVER_139.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_139_5),
+    BASKETBALL_FT_OU_139_5_UNDER("225", "total=139.5", "UNDER_139.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_139_5),
+    BASKETBALL_FT_OU_140_5_OVER("225", "total=140.5", "OVER_140.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_140_5),
+    BASKETBALL_FT_OU_140_5_UNDER("225", "total=140.5", "UNDER_140.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_140_5),
+    BASKETBALL_FT_OU_141_5_OVER("225", "total=141.5", "OVER_141.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_141_5),
+    BASKETBALL_FT_OU_141_5_UNDER("225", "total=141.5", "UNDER_141.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_141_5),
+    BASKETBALL_FT_OU_142_5_OVER("225", "total=142.5", "OVER_142.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_142_5),
+    BASKETBALL_FT_OU_142_5_UNDER("225", "total=142.5", "UNDER_142.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_142_5),
+    BASKETBALL_FT_OU_143_5_OVER("225", "total=143.5", "OVER_143.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_143_5),
+    BASKETBALL_FT_OU_143_5_UNDER("225", "total=143.5", "UNDER_143.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_143_5),
+    BASKETBALL_FT_OU_144_5_OVER("225", "total=144.5", "OVER_144.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_144_5),
+    BASKETBALL_FT_OU_144_5_UNDER("225", "total=144.5", "UNDER_144.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_144_5),
+    BASKETBALL_FT_OU_145_5_OVER("225", "total=145.5", "OVER_145.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_145_5),
+    BASKETBALL_FT_OU_145_5_UNDER("225", "total=145.5", "UNDER_145.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_145_5),
+    BASKETBALL_FT_OU_146_5_OVER("225", "total=146.5", "OVER_146.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_146_5),
+    BASKETBALL_FT_OU_146_5_UNDER("225", "total=146.5", "UNDER_146.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_146_5),
+    BASKETBALL_FT_OU_147_5_OVER("225", "total=147.5", "OVER_147.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_147_5),
+    BASKETBALL_FT_OU_147_5_UNDER("225", "total=147.5", "UNDER_147.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_147_5),
+    BASKETBALL_FT_OU_148_5_OVER("225", "total=148.5", "OVER_148.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_148_5),
+    BASKETBALL_FT_OU_148_5_UNDER("225", "total=148.5", "UNDER_148.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_148_5),
+    BASKETBALL_FT_OU_149_5_OVER("225", "total=149.5", "OVER_149.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_149_5),
+    BASKETBALL_FT_OU_149_5_UNDER("225", "total=149.5", "UNDER_149.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_149_5),
+    BASKETBALL_FT_OU_150_5_OVER("225", "total=150.5", "OVER_150.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_150_5),
+    BASKETBALL_FT_OU_150_5_UNDER("225", "total=150.5", "UNDER_150.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_150_5),
+    BASKETBALL_FT_OU_151_5_OVER("225", "total=151.5", "OVER_151.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_151_5),
+    BASKETBALL_FT_OU_151_5_UNDER("225", "total=151.5", "UNDER_151.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_151_5),
+    BASKETBALL_FT_OU_152_5_OVER("225", "total=152.5", "OVER_152.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_152_5),
+    BASKETBALL_FT_OU_152_5_UNDER("225", "total=152.5", "UNDER_152.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_152_5),
+    BASKETBALL_FT_OU_153_5_OVER("225", "total=153.5", "OVER_153.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_153_5),
+    BASKETBALL_FT_OU_153_5_UNDER("225", "total=153.5", "UNDER_153.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_153_5),
+    BASKETBALL_FT_OU_154_5_OVER("225", "total=154.5", "OVER_154.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_154_5),
+    BASKETBALL_FT_OU_154_5_UNDER("225", "total=154.5", "UNDER_154.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_154_5),
+    BASKETBALL_FT_OU_155_5_OVER("225", "total=155.5", "OVER_155.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_155_5),
+    BASKETBALL_FT_OU_155_5_UNDER("225", "total=155.5", "UNDER_155.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_155_5),
+    BASKETBALL_FT_OU_156_5_OVER("225", "total=156.5", "OVER_156.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_156_5),
+    BASKETBALL_FT_OU_156_5_UNDER("225", "total=156.5", "UNDER_156.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_156_5),
+    BASKETBALL_FT_OU_157_5_OVER("225", "total=157.5", "OVER_157.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_157_5),
+    BASKETBALL_FT_OU_157_5_UNDER("225", "total=157.5", "UNDER_157.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_157_5),
+    BASKETBALL_FT_OU_158_5_OVER("225", "total=158.5", "OVER_158.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_158_5),
+    BASKETBALL_FT_OU_158_5_UNDER("225", "total=158.5", "UNDER_158.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_158_5),
+    BASKETBALL_FT_OU_159_5_OVER("225", "total=159.5", "OVER_159.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_159_5),
+    BASKETBALL_FT_OU_159_5_UNDER("225", "total=159.5", "UNDER_159.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_159_5),
+    BASKETBALL_FT_OU_160_5_OVER("225", "total=160.5", "OVER_160.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_160_5),
+    BASKETBALL_FT_OU_160_5_UNDER("225", "total=160.5", "UNDER_160.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_160_5),
+    BASKETBALL_FT_OU_161_5_OVER("225", "total=161.5", "OVER_161.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_161_5),
+    BASKETBALL_FT_OU_161_5_UNDER("225", "total=161.5", "UNDER_161.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_161_5),
+    BASKETBALL_FT_OU_162_5_OVER("225", "total=162.5", "OVER_162.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_162_5),
+    BASKETBALL_FT_OU_162_5_UNDER("225", "total=162.5", "UNDER_162.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_162_5),
+    BASKETBALL_FT_OU_163_5_OVER("225", "total=163.5", "OVER_163.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_163_5),
+    BASKETBALL_FT_OU_163_5_UNDER("225", "total=163.5", "UNDER_163.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_163_5),
+    BASKETBALL_FT_OU_164_5_OVER("225", "total=164.5", "OVER_164.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_164_5),
+    BASKETBALL_FT_OU_164_5_UNDER("225", "total=164.5", "UNDER_164.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_164_5),
+    BASKETBALL_FT_OU_165_5_OVER("225", "total=165.5", "OVER_165.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_165_5),
+    BASKETBALL_FT_OU_165_5_UNDER("225", "total=165.5", "UNDER_165.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_165_5),
+    BASKETBALL_FT_OU_166_5_OVER("225", "total=166.5", "OVER_166.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_166_5),
+    BASKETBALL_FT_OU_166_5_UNDER("225", "total=166.5", "UNDER_166.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_166_5),
+    BASKETBALL_FT_OU_167_5_OVER("225", "total=167.5", "OVER_167.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_167_5),
+    BASKETBALL_FT_OU_167_5_UNDER("225", "total=167.5", "UNDER_167.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_167_5),
+    BASKETBALL_FT_OU_168_5_OVER("225", "total=168.5", "OVER_168.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_168_5),
+    BASKETBALL_FT_OU_168_5_UNDER("225", "total=168.5", "UNDER_168.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_168_5),
     BASKETBALL_FT_OU_169_5_OVER("225", "total=169.5", "OVER_169.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_169_5),
     BASKETBALL_FT_OU_169_5_UNDER("225", "total=169.5", "UNDER_169.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_169_5),
     BASKETBALL_FT_OU_170_5_OVER("225", "total=170.5", "OVER_170.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_170_5),
@@ -123,9 +219,150 @@ public enum SportyMarketType implements MarketType {
     BASKETBALL_FT_OU_178_5_UNDER("225", "total=178.5", "UNDER_178.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_178_5),
     BASKETBALL_FT_OU_179_5_OVER("225", "total=179.5", "OVER_179.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_179_5),
     BASKETBALL_FT_OU_179_5_UNDER("225", "total=179.5", "UNDER_179.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_179_5),
+    BASKETBALL_FT_OU_180_5_OVER("225", "total=180.5", "OVER_180.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_180_5),
+    BASKETBALL_FT_OU_180_5_UNDER("225", "total=180.5", "UNDER_180.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_180_5),
+    BASKETBALL_FT_OU_181_5_OVER("225", "total=181.5", "OVER_181.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_181_5),
+    BASKETBALL_FT_OU_181_5_UNDER("225", "total=181.5", "UNDER_181.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_181_5),
+    BASKETBALL_FT_OU_182_5_OVER("225", "total=182.5", "OVER_182.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_182_5),
+    BASKETBALL_FT_OU_182_5_UNDER("225", "total=182.5", "UNDER_182.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_182_5),
+    BASKETBALL_FT_OU_183_5_OVER("225", "total=183.5", "OVER_183.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_183_5),
+    BASKETBALL_FT_OU_183_5_UNDER("225", "total=183.5", "UNDER_183.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_183_5),
+    BASKETBALL_FT_OU_184_5_OVER("225", "total=184.5", "OVER_184.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_184_5),
+    BASKETBALL_FT_OU_184_5_UNDER("225", "total=184.5", "UNDER_184.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_184_5),
+    BASKETBALL_FT_OU_185_5_OVER("225", "total=185.5", "OVER_185.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_185_5),
+    BASKETBALL_FT_OU_185_5_UNDER("225", "total=185.5", "UNDER_185.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_185_5),
+    BASKETBALL_FT_OU_186_5_OVER("225", "total=186.5", "OVER_186.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_186_5),
+    BASKETBALL_FT_OU_186_5_UNDER("225", "total=186.5", "UNDER_186.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_186_5),
+    BASKETBALL_FT_OU_187_5_OVER("225", "total=187.5", "OVER_187.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_187_5),
+    BASKETBALL_FT_OU_187_5_UNDER("225", "total=187.5", "UNDER_187.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_187_5),
+    BASKETBALL_FT_OU_188_5_OVER("225", "total=188.5", "OVER_188.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_188_5),
+    BASKETBALL_FT_OU_188_5_UNDER("225", "total=188.5", "UNDER_188.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_188_5),
+    BASKETBALL_FT_OU_189_5_OVER("225", "total=189.5", "OVER_189.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_189_5),
+    BASKETBALL_FT_OU_189_5_UNDER("225", "total=189.5", "UNDER_189.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_189_5),
+    BASKETBALL_FT_OU_190_5_OVER("225", "total=190.5", "OVER_190.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_190_5),
+    BASKETBALL_FT_OU_190_5_UNDER("225", "total=190.5", "UNDER_190.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_190_5),
+    BASKETBALL_FT_OU_191_5_OVER("225", "total=191.5", "OVER_191.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_191_5),
+    BASKETBALL_FT_OU_191_5_UNDER("225", "total=191.5", "UNDER_191.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_191_5),
+    BASKETBALL_FT_OU_192_5_OVER("225", "total=192.5", "OVER_192.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_192_5),
+    BASKETBALL_FT_OU_192_5_UNDER("225", "total=192.5", "UNDER_192.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_192_5),
+    BASKETBALL_FT_OU_193_5_OVER("225", "total=193.5", "OVER_193.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_193_5),
+    BASKETBALL_FT_OU_193_5_UNDER("225", "total=193.5", "UNDER_193.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_193_5),
+    BASKETBALL_FT_OU_194_5_OVER("225", "total=194.5", "OVER_194.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_194_5),
+    BASKETBALL_FT_OU_194_5_UNDER("225", "total=194.5", "UNDER_194.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_194_5),
+    BASKETBALL_FT_OU_195_5_OVER("225", "total=195.5", "OVER_195.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_195_5),
+    BASKETBALL_FT_OU_195_5_UNDER("225", "total=195.5", "UNDER_195.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_195_5),
+    BASKETBALL_FT_OU_196_5_OVER("225", "total=196.5", "OVER_196.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_196_5),
+    BASKETBALL_FT_OU_196_5_UNDER("225", "total=196.5", "UNDER_196.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_196_5),
+    BASKETBALL_FT_OU_197_5_OVER("225", "total=197.5", "OVER_197.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_197_5),
+    BASKETBALL_FT_OU_197_5_UNDER("225", "total=197.5", "UNDER_197.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_197_5),
+    BASKETBALL_FT_OU_198_5_OVER("225", "total=198.5", "OVER_198.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_198_5),
+    BASKETBALL_FT_OU_198_5_UNDER("225", "total=198.5", "UNDER_198.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_198_5),
+    BASKETBALL_FT_OU_199_5_OVER("225", "total=199.5", "OVER_199.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_199_5),
+    BASKETBALL_FT_OU_199_5_UNDER("225", "total=199.5", "UNDER_199.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_199_5),
+    BASKETBALL_FT_OU_200_5_OVER("225", "total=200.5", "OVER_200.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_200_5),
+    BASKETBALL_FT_OU_200_5_UNDER("225", "total=200.5", "UNDER_200.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_200_5),
+    BASKETBALL_FT_OU_201_5_OVER("225", "total=201.5", "OVER_201.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_201_5),
+    BASKETBALL_FT_OU_201_5_UNDER("225", "total=201.5", "UNDER_201.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_201_5),
+    BASKETBALL_FT_OU_202_5_OVER("225", "total=202.5", "OVER_202.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_202_5),
+    BASKETBALL_FT_OU_202_5_UNDER("225", "total=202.5", "UNDER_202.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_202_5),
+    BASKETBALL_FT_OU_203_5_OVER("225", "total=203.5", "OVER_203.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_203_5),
+    BASKETBALL_FT_OU_203_5_UNDER("225", "total=203.5", "UNDER_203.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_203_5),
+    BASKETBALL_FT_OU_204_5_OVER("225", "total=204.5", "OVER_204.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_204_5),
+    BASKETBALL_FT_OU_204_5_UNDER("225", "total=204.5", "UNDER_204.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_204_5),
+    BASKETBALL_FT_OU_205_5_OVER("225", "total=205.5", "OVER_205.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_205_5),
+    BASKETBALL_FT_OU_205_5_UNDER("225", "total=205.5", "UNDER_205.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_205_5),
+    BASKETBALL_FT_OU_206_5_OVER("225", "total=206.5", "OVER_206.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_206_5),
+    BASKETBALL_FT_OU_206_5_UNDER("225", "total=206.5", "UNDER_206.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_206_5),
+    BASKETBALL_FT_OU_207_5_OVER("225", "total=207.5", "OVER_207.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_207_5),
+    BASKETBALL_FT_OU_207_5_UNDER("225", "total=207.5", "UNDER_207.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_207_5),
+    BASKETBALL_FT_OU_208_5_OVER("225", "total=208.5", "OVER_208.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_208_5),
+    BASKETBALL_FT_OU_208_5_UNDER("225", "total=208.5", "UNDER_208.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_208_5),
+    BASKETBALL_FT_OU_209_5_OVER("225", "total=209.5", "OVER_209.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_209_5),
+    BASKETBALL_FT_OU_209_5_UNDER("225", "total=209.5", "UNDER_209.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_209_5),
+    BASKETBALL_FT_OU_210_5_OVER("225", "total=210.5", "OVER_210.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_210_5),
+    BASKETBALL_FT_OU_210_5_UNDER("225", "total=210.5", "UNDER_210.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_210_5),
+    BASKETBALL_FT_OU_211_5_OVER("225", "total=211.5", "OVER_211.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_211_5),
+    BASKETBALL_FT_OU_211_5_UNDER("225", "total=211.5", "UNDER_211.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_211_5),
+    BASKETBALL_FT_OU_212_5_OVER("225", "total=212.5", "OVER_212.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_212_5),
+    BASKETBALL_FT_OU_212_5_UNDER("225", "total=212.5", "UNDER_212.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_212_5),
+    BASKETBALL_FT_OU_213_5_OVER("225", "total=213.5", "OVER_213.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_213_5),
+    BASKETBALL_FT_OU_213_5_UNDER("225", "total=213.5", "UNDER_213.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_213_5),
+    BASKETBALL_FT_OU_214_5_OVER("225", "total=214.5", "OVER_214.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_214_5),
+    BASKETBALL_FT_OU_214_5_UNDER("225", "total=214.5", "UNDER_214.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_214_5),
+    BASKETBALL_FT_OU_215_5_OVER("225", "total=215.5", "OVER_215.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_215_5),
+    BASKETBALL_FT_OU_215_5_UNDER("225", "total=215.5", "UNDER_215.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_215_5),
+    BASKETBALL_FT_OU_216_5_OVER("225", "total=216.5", "OVER_216.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_216_5),
+    BASKETBALL_FT_OU_216_5_UNDER("225", "total=216.5", "UNDER_216.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_216_5),
+    BASKETBALL_FT_OU_217_5_OVER("225", "total=217.5", "OVER_217.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_217_5),
+    BASKETBALL_FT_OU_217_5_UNDER("225", "total=217.5", "UNDER_217.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_217_5),
+    BASKETBALL_FT_OU_218_5_OVER("225", "total=218.5", "OVER_218.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_218_5),
+    BASKETBALL_FT_OU_218_5_UNDER("225", "total=218.5", "UNDER_218.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_218_5),
+    BASKETBALL_FT_OU_219_5_OVER("225", "total=219.5", "OVER_219.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_219_5),
+    BASKETBALL_FT_OU_219_5_UNDER("225", "total=219.5", "UNDER_219.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_219_5),
+    BASKETBALL_FT_OU_220_5_OVER("225", "total=220.5", "OVER_220.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_220_5),
+    BASKETBALL_FT_OU_220_5_UNDER("225", "total=220.5", "UNDER_220.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_220_5),
+    BASKETBALL_FT_OU_221_5_OVER("225", "total=221.5", "OVER_221.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_221_5),
+    BASKETBALL_FT_OU_221_5_UNDER("225", "total=221.5", "UNDER_221.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_221_5),
+    BASKETBALL_FT_OU_222_5_OVER("225", "total=222.5", "OVER_222.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_222_5),
+    BASKETBALL_FT_OU_222_5_UNDER("225", "total=222.5", "UNDER_222.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_222_5),
+    BASKETBALL_FT_OU_223_5_OVER("225", "total=223.5", "OVER_223.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_223_5),
+    BASKETBALL_FT_OU_223_5_UNDER("225", "total=223.5", "UNDER_223.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_223_5),
+    BASKETBALL_FT_OU_224_5_OVER("225", "total=224.5", "OVER_224.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_224_5),
+    BASKETBALL_FT_OU_224_5_UNDER("225", "total=224.5", "UNDER_224.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_224_5),
+    BASKETBALL_FT_OU_225_5_OVER("225", "total=225.5", "OVER_225.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_225_5),
+    BASKETBALL_FT_OU_225_5_UNDER("225", "total=225.5", "UNDER_225.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_225_5),
+    BASKETBALL_FT_OU_226_5_OVER("225", "total=226.5", "OVER_226.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_226_5),
+    BASKETBALL_FT_OU_226_5_UNDER("225", "total=226.5", "UNDER_226.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_226_5),
+    BASKETBALL_FT_OU_227_5_OVER("225", "total=227.5", "OVER_227.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_227_5),
+    BASKETBALL_FT_OU_227_5_UNDER("225", "total=227.5", "UNDER_227.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_227_5),
+    BASKETBALL_FT_OU_228_5_OVER("225", "total=228.5", "OVER_228.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_228_5),
+    BASKETBALL_FT_OU_228_5_UNDER("225", "total=228.5", "UNDER_228.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_228_5),
+    BASKETBALL_FT_OU_229_5_OVER("225", "total=229.5", "OVER_229.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_229_5),
+    BASKETBALL_FT_OU_229_5_UNDER("225", "total=229.5", "UNDER_229.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_229_5),
+    BASKETBALL_FT_OU_230_5_OVER("225", "total=230.5", "OVER_230.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_230_5),
+    BASKETBALL_FT_OU_230_5_UNDER("225", "total=230.5", "UNDER_230.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_230_5),
+    BASKETBALL_FT_OU_231_5_OVER("225", "total=231.5", "OVER_231.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_231_5),
+    BASKETBALL_FT_OU_231_5_UNDER("225", "total=231.5", "UNDER_231.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_231_5),
+    BASKETBALL_FT_OU_232_5_OVER("225", "total=232.5", "OVER_232.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_232_5),
+    BASKETBALL_FT_OU_232_5_UNDER("225", "total=232.5", "UNDER_232.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_232_5),
+    BASKETBALL_FT_OU_233_5_OVER("225", "total=233.5", "OVER_233.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_233_5),
+    BASKETBALL_FT_OU_233_5_UNDER("225", "total=233.5", "UNDER_233.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_233_5),
+    BASKETBALL_FT_OU_234_5_OVER("225", "total=234.5", "OVER_234.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_234_5),
+    BASKETBALL_FT_OU_234_5_UNDER("225", "total=234.5", "UNDER_234.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_234_5),
+    BASKETBALL_FT_OU_235_5_OVER("225", "total=235.5", "OVER_235.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_235_5),
+    BASKETBALL_FT_OU_235_5_UNDER("225", "total=235.5", "UNDER_235.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_235_5),
+    BASKETBALL_FT_OU_236_5_OVER("225", "total=236.5", "OVER_236.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_236_5),
+    BASKETBALL_FT_OU_236_5_UNDER("225", "total=236.5", "UNDER_236.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_236_5),
+    BASKETBALL_FT_OU_237_5_OVER("225", "total=237.5", "OVER_237.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_237_5),
+    BASKETBALL_FT_OU_237_5_UNDER("225", "total=237.5", "UNDER_237.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_237_5),
+    BASKETBALL_FT_OU_238_5_OVER("225", "total=238.5", "OVER_238.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_238_5),
+    BASKETBALL_FT_OU_238_5_UNDER("225", "total=238.5", "UNDER_238.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_238_5),
+    BASKETBALL_FT_OU_239_5_OVER("225", "total=239.5", "OVER_239.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_239_5),
+    BASKETBALL_FT_OU_239_5_UNDER("225", "total=239.5", "UNDER_239.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_239_5),
+    BASKETBALL_FT_OU_240_5_OVER("225", "total=240.5", "OVER_240.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_240_5),
+    BASKETBALL_FT_OU_240_5_UNDER("225", "total=240.5", "UNDER_240.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_240_5),
+    BASKETBALL_FT_OU_241_5_OVER("225", "total=241.5", "OVER_241.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_241_5),
+    BASKETBALL_FT_OU_241_5_UNDER("225", "total=241.5", "UNDER_241.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_241_5),
+    BASKETBALL_FT_OU_242_5_OVER("225", "total=242.5", "OVER_242.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_242_5),
+    BASKETBALL_FT_OU_242_5_UNDER("225", "total=242.5", "UNDER_242.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_242_5),
+    BASKETBALL_FT_OU_243_5_OVER("225", "total=243.5", "OVER_243.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_243_5),
+    BASKETBALL_FT_OU_243_5_UNDER("225", "total=243.5", "UNDER_243.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_243_5),
+    BASKETBALL_FT_OU_244_5_OVER("225", "total=244.5", "OVER_244.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_244_5),
+    BASKETBALL_FT_OU_244_5_UNDER("225", "total=244.5", "UNDER_244.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_244_5),
+    BASKETBALL_FT_OU_245_5_OVER("225", "total=245.5", "OVER_245.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_245_5),
+    BASKETBALL_FT_OU_245_5_UNDER("225", "total=245.5", "UNDER_245.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_245_5),
+    BASKETBALL_FT_OU_246_5_OVER("225", "total=246.5", "OVER_246.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_246_5),
+    BASKETBALL_FT_OU_246_5_UNDER("225", "total=246.5", "UNDER_246.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_246_5),
+    BASKETBALL_FT_OU_247_5_OVER("225", "total=247.5", "OVER_247.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_247_5),
+    BASKETBALL_FT_OU_247_5_UNDER("225", "total=247.5", "UNDER_247.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_247_5),
+    BASKETBALL_FT_OU_248_5_OVER("225", "total=248.5", "OVER_248.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_248_5),
+    BASKETBALL_FT_OU_248_5_UNDER("225", "total=248.5", "UNDER_248.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_248_5),
+    BASKETBALL_FT_OU_249_5_OVER("225", "total=249.5", "OVER_249.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_249_5),
+    BASKETBALL_FT_OU_249_5_UNDER("225", "total=249.5", "UNDER_249.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_249_5),
+    BASKETBALL_FT_OU_250_5_OVER("225", "total=250.5", "OVER_250.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_250_5),
+    BASKETBALL_FT_OU_250_5_UNDER("225", "total=250.5", "UNDER_250.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_250_5),
 
-
-    // 3. 1st Half Over/Under (ID: 68)
+    // --- 1st Half Over/Under (84.5 to 90.5) ---
     BASKETBALL_1H_OU_84_5_OVER("68", "total=84.5", "OVER_84.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.BASKETBALL_1H_OVER_84_5),
     BASKETBALL_1H_OU_84_5_UNDER("68", "total=84.5", "UNDER_84.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.BASKETBALL_1H_UNDER_84_5),
     BASKETBALL_1H_OU_85_5_OVER("68", "total=85.5", "OVER_85.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.BASKETBALL_1H_OVER_85_5),
@@ -141,8 +378,8 @@ public enum SportyMarketType implements MarketType {
     BASKETBALL_1H_OU_90_5_OVER("68", "total=90.5", "OVER_90.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.BASKETBALL_1H_OVER_90_5),
     BASKETBALL_1H_OU_90_5_UNDER("68", "total=90.5", "UNDER_90.5", MarketCategory.OVER_UNDER_1STHALF, OutcomeType.BASKETBALL_1H_UNDER_90_5),
 
-    // 4. Quarter Over/Under (ID: 236)
-    // Quarter 1 Over/Under (30.5 to 41.5)
+    // --- Quarter Over/Under (Q1-Q4: 30.5 to 41.5) ---
+    // Quarter 1
     BASKETBALL_Q1_OU_30_5_OVER("236", "total=30.5|quarternr=1", "OVER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q1_OVER_30_5),
     BASKETBALL_Q1_OU_30_5_UNDER("236", "total=30.5|quarternr=1", "UNDER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q1_UNDER_30_5),
     BASKETBALL_Q1_OU_31_5_OVER("236", "total=31.5|quarternr=1", "OVER_31.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q1_OVER_31_5),
@@ -168,8 +405,7 @@ public enum SportyMarketType implements MarketType {
     BASKETBALL_Q1_OU_41_5_OVER("236", "total=41.5|quarternr=1", "OVER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q1_OVER_41_5),
     BASKETBALL_Q1_OU_41_5_UNDER("236", "total=41.5|quarternr=1", "UNDER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q1_UNDER_41_5),
 
-
-    // Quarter 2 Over/Under (30.5 to 41.5)
+    // Quarter 2
     BASKETBALL_Q2_OU_30_5_OVER("236", "total=30.5|quarternr=2", "OVER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q2_OVER_30_5),
     BASKETBALL_Q2_OU_30_5_UNDER("236", "total=30.5|quarternr=2", "UNDER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q2_UNDER_30_5),
     BASKETBALL_Q2_OU_31_5_OVER("236", "total=31.5|quarternr=2", "OVER_31.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q2_OVER_31_5),
@@ -195,8 +431,7 @@ public enum SportyMarketType implements MarketType {
     BASKETBALL_Q2_OU_41_5_OVER("236", "total=41.5|quarternr=2", "OVER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q2_OVER_41_5),
     BASKETBALL_Q2_OU_41_5_UNDER("236", "total=41.5|quarternr=2", "UNDER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q2_UNDER_41_5),
 
-
-    // Quarter 3 Over/Under (30.5 to 41.5)
+    // Quarter 3
     BASKETBALL_Q3_OU_30_5_OVER("236", "total=30.5|quarternr=3", "OVER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q3_OVER_30_5),
     BASKETBALL_Q3_OU_30_5_UNDER("236", "total=30.5|quarternr=3", "UNDER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q3_UNDER_30_5),
     BASKETBALL_Q3_OU_31_5_OVER("236", "total=31.5|quarternr=3", "OVER_31.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q3_OVER_31_5),
@@ -222,7 +457,7 @@ public enum SportyMarketType implements MarketType {
     BASKETBALL_Q3_OU_41_5_OVER("236", "total=41.5|quarternr=3", "OVER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q3_OVER_41_5),
     BASKETBALL_Q3_OU_41_5_UNDER("236", "total=41.5|quarternr=3", "UNDER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q3_UNDER_41_5),
 
-    // Quarter 4 Over/Under (30.5 to 41.5)
+    // Quarter 4
     BASKETBALL_Q4_OU_30_5_OVER("236", "total=30.5|quarternr=4", "OVER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q4_OVER_30_5),
     BASKETBALL_Q4_OU_30_5_UNDER("236", "total=30.5|quarternr=4", "UNDER_30.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q4_UNDER_30_5),
     BASKETBALL_Q4_OU_31_5_OVER("236", "total=31.5|quarternr=4", "OVER_31.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q4_OVER_31_5),
@@ -247,304 +482,164 @@ public enum SportyMarketType implements MarketType {
     BASKETBALL_Q4_OU_40_5_UNDER("236", "total=40.5|quarternr=4", "UNDER_40.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q4_UNDER_40_5),
     BASKETBALL_Q4_OU_41_5_OVER("236", "total=41.5|quarternr=4", "OVER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q4_OVER_41_5),
     BASKETBALL_Q4_OU_41_5_UNDER("236", "total=41.5|quarternr=4", "UNDER_41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER, OutcomeType.BASKETBALL_Q4_UNDER_41_5),
-    // Handicap -35.5
+
+    // --- Handicap (Negative: -35.5 to -0.5) ---
     BASKETBALL_HCP_MINUS_35_5_HOME("223", "hcp=-35.5", "HOME_(-35.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_35_5),
     BASKETBALL_HCP_PLUS_35_5_AWAY("223", "hcp=-35.5", "AWAY_(+35.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_35_5),
-
-    // Handicap -34.5
     BASKETBALL_HCP_MINUS_34_5_HOME("223", "hcp=-34.5", "HOME_(-34.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_34_5),
     BASKETBALL_HCP_PLUS_34_5_AWAY("223", "hcp=-34.5", "AWAY_(+34.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_34_5),
-
-    // Handicap -33.5
     BASKETBALL_HCP_MINUS_33_5_HOME("223", "hcp=-33.5", "HOME_(-33.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_33_5),
     BASKETBALL_HCP_PLUS_33_5_AWAY("223", "hcp=-33.5", "AWAY_(+33.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_33_5),
-
-    // Handicap -32.5
     BASKETBALL_HCP_MINUS_32_5_HOME("223", "hcp=-32.5", "HOME_(-32.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_32_5),
     BASKETBALL_HCP_PLUS_32_5_AWAY("223", "hcp=-32.5", "AWAY_(+32.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_32_5),
-
-    // Handicap -31.5
     BASKETBALL_HCP_MINUS_31_5_HOME("223", "hcp=-31.5", "HOME_(-31.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_31_5),
     BASKETBALL_HCP_PLUS_31_5_AWAY("223", "hcp=-31.5", "AWAY_(+31.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_31_5),
-
-    // Handicap -30.5
     BASKETBALL_HCP_MINUS_30_5_HOME("223", "hcp=-30.5", "HOME_(-30.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_30_5),
     BASKETBALL_HCP_PLUS_30_5_AWAY("223", "hcp=-30.5", "AWAY_(+30.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_30_5),
-
-    // Handicap -29.5
     BASKETBALL_HCP_MINUS_29_5_HOME("223", "hcp=-29.5", "HOME_(-29.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_29_5),
     BASKETBALL_HCP_PLUS_29_5_AWAY("223", "hcp=-29.5", "AWAY_(+29.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_29_5),
-
-    // Handicap -28.5
     BASKETBALL_HCP_MINUS_28_5_HOME("223", "hcp=-28.5", "HOME_(-28.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_28_5),
     BASKETBALL_HCP_PLUS_28_5_AWAY("223", "hcp=-28.5", "AWAY_(+28.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_28_5),
-
-    // Handicap -27.5
     BASKETBALL_HCP_MINUS_27_5_HOME("223", "hcp=-27.5", "HOME_(-27.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_27_5),
     BASKETBALL_HCP_PLUS_27_5_AWAY("223", "hcp=-27.5", "AWAY_(+27.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_27_5),
-
-    // Handicap -26.5
     BASKETBALL_HCP_MINUS_26_5_HOME("223", "hcp=-26.5", "HOME_(-26.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_26_5),
     BASKETBALL_HCP_PLUS_26_5_AWAY("223", "hcp=-26.5", "AWAY_(+26.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_26_5),
-
-    // Handicap -25.5
     BASKETBALL_HCP_MINUS_25_5_HOME("223", "hcp=-25.5", "HOME_(-25.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_25_5),
     BASKETBALL_HCP_PLUS_25_5_AWAY("223", "hcp=-25.5", "AWAY_(+25.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_25_5),
-
-    // Handicap -24.5
     BASKETBALL_HCP_MINUS_24_5_HOME("223", "hcp=-24.5", "HOME_(-24.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_24_5),
     BASKETBALL_HCP_PLUS_24_5_AWAY("223", "hcp=-24.5", "AWAY_(+24.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_24_5),
-
-    // Handicap -23.5
     BASKETBALL_HCP_MINUS_23_5_HOME("223", "hcp=-23.5", "HOME_(-23.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_23_5),
     BASKETBALL_HCP_PLUS_23_5_AWAY("223", "hcp=-23.5", "AWAY_(+23.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_23_5),
-
-    // Handicap -22.5
     BASKETBALL_HCP_MINUS_22_5_HOME("223", "hcp=-22.5", "HOME_(-22.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_22_5),
     BASKETBALL_HCP_PLUS_22_5_AWAY("223", "hcp=-22.5", "AWAY_(+22.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_22_5),
-
-    // Handicap -21.5
     BASKETBALL_HCP_MINUS_21_5_HOME("223", "hcp=-21.5", "HOME_(-21.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_21_5),
     BASKETBALL_HCP_PLUS_21_5_AWAY("223", "hcp=-21.5", "AWAY_(+21.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_21_5),
-
-    // Handicap -20.5
     BASKETBALL_HCP_MINUS_20_5_HOME("223", "hcp=-20.5", "HOME_(-20.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_20_5),
     BASKETBALL_HCP_PLUS_20_5_AWAY("223", "hcp=-20.5", "AWAY_(+20.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_20_5),
-
-    // Handicap -19.5
     BASKETBALL_HCP_MINUS_19_5_HOME("223", "hcp=-19.5", "HOME_(-19.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_19_5),
     BASKETBALL_HCP_PLUS_19_5_AWAY("223", "hcp=-19.5", "AWAY_(+19.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_19_5),
-
-    // Handicap -18.5
     BASKETBALL_HCP_MINUS_18_5_HOME("223", "hcp=-18.5", "HOME_(-18.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_18_5),
     BASKETBALL_HCP_PLUS_18_5_AWAY("223", "hcp=-18.5", "AWAY_(+18.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_18_5),
-
-    // Handicap -17.5
     BASKETBALL_HCP_MINUS_17_5_HOME("223", "hcp=-17.5", "HOME_(-17.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_17_5),
     BASKETBALL_HCP_PLUS_17_5_AWAY("223", "hcp=-17.5", "AWAY_(+17.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_17_5),
-
-    // Handicap -16.5
     BASKETBALL_HCP_MINUS_16_5_HOME("223", "hcp=-16.5", "HOME_(-16.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_16_5),
     BASKETBALL_HCP_PLUS_16_5_AWAY("223", "hcp=-16.5", "AWAY_(+16.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_16_5),
-
-    // Handicap -15.5
     BASKETBALL_HCP_MINUS_15_5_HOME("223", "hcp=-15.5", "HOME_(-15.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_15_5),
     BASKETBALL_HCP_PLUS_15_5_AWAY("223", "hcp=-15.5", "AWAY_(+15.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_15_5),
-
-    // Handicap -14.5
     BASKETBALL_HCP_MINUS_14_5_HOME("223", "hcp=-14.5", "HOME_(-14.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_14_5),
     BASKETBALL_HCP_PLUS_14_5_AWAY("223", "hcp=-14.5", "AWAY_(+14.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_14_5),
-
-    // Handicap -13.5
     BASKETBALL_HCP_MINUS_13_5_HOME("223", "hcp=-13.5", "HOME_(-13.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_13_5),
     BASKETBALL_HCP_PLUS_13_5_AWAY("223", "hcp=-13.5", "AWAY_(+13.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_13_5),
-
-    // Handicap -12.5
     BASKETBALL_HCP_MINUS_12_5_HOME("223", "hcp=-12.5", "HOME_(-12.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_12_5),
     BASKETBALL_HCP_PLUS_12_5_AWAY("223", "hcp=-12.5", "AWAY_(+12.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_12_5),
-
-    // Handicap -11.5
     BASKETBALL_HCP_MINUS_11_5_HOME("223", "hcp=-11.5", "HOME_(-11.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_11_5),
     BASKETBALL_HCP_PLUS_11_5_AWAY("223", "hcp=-11.5", "AWAY_(+11.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_11_5),
-
-    // Handicap -10.5
     BASKETBALL_HCP_MINUS_10_5_HOME("223", "hcp=-10.5", "HOME_(-10.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_10_5),
     BASKETBALL_HCP_PLUS_10_5_AWAY("223", "hcp=-10.5", "AWAY_(+10.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_10_5),
-
-    // Handicap -9.5
     BASKETBALL_HCP_MINUS_9_5_HOME("223", "hcp=-9.5", "HOME_(-9.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_9_5),
     BASKETBALL_HCP_PLUS_9_5_AWAY("223", "hcp=-9.5", "AWAY_(+9.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_9_5),
-
-    // Handicap -8.5
     BASKETBALL_HCP_MINUS_8_5_HOME("223", "hcp=-8.5", "HOME_(-8.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_8_5),
     BASKETBALL_HCP_PLUS_8_5_AWAY("223", "hcp=-8.5", "AWAY_(+8.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_8_5),
-
-    // Handicap -7.5
     BASKETBALL_HCP_MINUS_7_5_HOME("223", "hcp=-7.5", "HOME_(-7.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_7_5),
     BASKETBALL_HCP_PLUS_7_5_AWAY("223", "hcp=-7.5", "AWAY_(+7.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_7_5),
-
-    // Handicap -6.5
     BASKETBALL_HCP_MINUS_6_5_HOME("223", "hcp=-6.5", "HOME_(-6.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_6_5),
     BASKETBALL_HCP_PLUS_6_5_AWAY("223", "hcp=-6.5", "AWAY_(+6.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_6_5),
-
-    // Handicap -5.5
     BASKETBALL_HCP_MINUS_5_5_HOME("223", "hcp=-5.5", "HOME_(-5.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_5_5),
     BASKETBALL_HCP_PLUS_5_5_AWAY("223", "hcp=-5.5", "AWAY_(+5.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_5_5),
-
-    // Handicap -4.5
     BASKETBALL_HCP_MINUS_4_5_HOME("223", "hcp=-4.5", "HOME_(-4.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_4_5),
     BASKETBALL_HCP_PLUS_4_5_AWAY("223", "hcp=-4.5", "AWAY_(+4.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_4_5),
-
-    // Handicap -3.5
     BASKETBALL_HCP_MINUS_3_5_HOME("223", "hcp=-3.5", "HOME_(-3.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_3_5),
     BASKETBALL_HCP_PLUS_3_5_AWAY("223", "hcp=-3.5", "AWAY_(+3.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_3_5),
-
-    // Handicap -2.5
     BASKETBALL_HCP_MINUS_2_5_HOME("223", "hcp=-2.5", "HOME_(-2.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_2_5),
     BASKETBALL_HCP_PLUS_2_5_AWAY("223", "hcp=-2.5", "AWAY_(+2.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_2_5),
-
-    // Handicap -1.5
     BASKETBALL_HCP_MINUS_1_5_HOME("223", "hcp=-1.5", "HOME_(-1.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_1_5),
     BASKETBALL_HCP_PLUS_1_5_AWAY("223", "hcp=-1.5", "AWAY_(+1.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_1_5),
-
-    // Handicap -0.5
     BASKETBALL_HCP_MINUS_0_5_HOME("223", "hcp=-0.5", "HOME_(-0.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_MINUS_0_5),
     BASKETBALL_HCP_PLUS_0_5_AWAY("223", "hcp=-0.5", "AWAY_(+0.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_PLUS_0_5),
-    // ----------------------------------------------------------------------
-    // --- POSITIVE HANDICAPS: +0.5 up to +35.5 (Home: PLUS / Away: MINUS) ---
-    // ----------------------------------------------------------------------
 
-    // Handicap +0.5
+    // --- Handicap (Positive: +0.5 to +35.5) ---
     BASKETBALL_HCP_PLUS_0_5_HOME("223", "hcp=0.5", "HOME_(+0.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_0_5),
     BASKETBALL_HCP_MINUS_0_5_AWAY("223", "hcp=0.5", "AWAY_(-0.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_0_5),
-
-    // Handicap +1.5
     BASKETBALL_HCP_PLUS_1_5_HOME("223", "hcp=1.5", "HOME_(+1.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_1_5),
     BASKETBALL_HCP_MINUS_1_5_AWAY("223", "hcp=1.5", "AWAY_(-1.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_1_5),
-
-    // Handicap +2.5
     BASKETBALL_HCP_PLUS_2_5_HOME("223", "hcp=2.5", "HOME_(+2.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_2_5),
     BASKETBALL_HCP_MINUS_2_5_AWAY("223", "hcp=2.5", "AWAY_(-2.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_2_5),
-
-    // Handicap +3.5
     BASKETBALL_HCP_PLUS_3_5_HOME("223", "hcp=3.5", "HOME_(+3.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_3_5),
     BASKETBALL_HCP_MINUS_3_5_AWAY("223", "hcp=3.5", "AWAY_(-3.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_3_5),
-
-    // Handicap +4.5
     BASKETBALL_HCP_PLUS_4_5_HOME("223", "hcp=4.5", "HOME_(+4.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_4_5),
     BASKETBALL_HCP_MINUS_4_5_AWAY("223", "hcp=4.5", "AWAY_(-4.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_4_5),
-
-    // Handicap +5.5
     BASKETBALL_HCP_PLUS_5_5_HOME("223", "hcp=5.5", "HOME_(+5.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_5_5),
     BASKETBALL_HCP_MINUS_5_5_AWAY("223", "hcp=5.5", "AWAY_(-5.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_5_5),
-
-    // Handicap +6.5
     BASKETBALL_HCP_PLUS_6_5_HOME("223", "hcp=6.5", "HOME_(+6.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_6_5),
     BASKETBALL_HCP_MINUS_6_5_AWAY("223", "hcp=6.5", "AWAY_(-6.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_6_5),
-
-    // Handicap +7.5
     BASKETBALL_HCP_PLUS_7_5_HOME("223", "hcp=7.5", "HOME_(+7.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_7_5),
     BASKETBALL_HCP_MINUS_7_5_AWAY("223", "hcp=7.5", "AWAY_(-7.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_7_5),
-
-    // Handicap +8.5
     BASKETBALL_HCP_PLUS_8_5_HOME("223", "hcp=8.5", "HOME_(+8.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_8_5),
     BASKETBALL_HCP_MINUS_8_5_AWAY("223", "hcp=8.5", "AWAY_(-8.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_8_5),
-
-    // Handicap +9.5
     BASKETBALL_HCP_PLUS_9_5_HOME("223", "hcp=9.5", "HOME_(+9.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_9_5),
     BASKETBALL_HCP_MINUS_9_5_AWAY("223", "hcp=9.5", "AWAY_(-9.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_9_5),
-
-    // Handicap +10.5
     BASKETBALL_HCP_PLUS_10_5_HOME("223", "hcp=10.5", "HOME_(+10.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_10_5),
     BASKETBALL_HCP_MINUS_10_5_AWAY("223", "hcp=10.5", "AWAY_(-10.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_10_5),
-
-    // Handicap +11.5
     BASKETBALL_HCP_PLUS_11_5_HOME("223", "hcp=11.5", "HOME_(+11.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_11_5),
     BASKETBALL_HCP_MINUS_11_5_AWAY("223", "hcp=11.5", "AWAY_(-11.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_11_5),
-
-    // Handicap +12.5
     BASKETBALL_HCP_PLUS_12_5_HOME("223", "hcp=12.5", "HOME_(+12.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_12_5),
     BASKETBALL_HCP_MINUS_12_5_AWAY("223", "hcp=12.5", "AWAY_(-12.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_12_5),
-
-    // Handicap +13.5
     BASKETBALL_HCP_PLUS_13_5_HOME("223", "hcp=13.5", "HOME_(+13.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_13_5),
     BASKETBALL_HCP_MINUS_13_5_AWAY("223", "hcp=13.5", "AWAY_(-13.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_13_5),
-
-    // Handicap +14.5
     BASKETBALL_HCP_PLUS_14_5_HOME("223", "hcp=14.5", "HOME_(+14.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_14_5),
     BASKETBALL_HCP_MINUS_14_5_AWAY("223", "hcp=14.5", "AWAY_(-14.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_14_5),
-
-    // Handicap +15.5
     BASKETBALL_HCP_PLUS_15_5_HOME("223", "hcp=15.5", "HOME_(+15.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_15_5),
     BASKETBALL_HCP_MINUS_15_5_AWAY("223", "hcp=15.5", "AWAY_(-15.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_15_5),
-
-    // Handicap +16.5
     BASKETBALL_HCP_PLUS_16_5_HOME("223", "hcp=16.5", "HOME_(+16.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_16_5),
     BASKETBALL_HCP_MINUS_16_5_AWAY("223", "hcp=16.5", "AWAY_(-16.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_16_5),
-
-    // Handicap +17.5
     BASKETBALL_HCP_PLUS_17_5_HOME("223", "hcp=17.5", "HOME_(+17.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_17_5),
     BASKETBALL_HCP_MINUS_17_5_AWAY("223", "hcp=17.5", "AWAY_(-17.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_17_5),
-
-    // Handicap +18.5
     BASKETBALL_HCP_PLUS_18_5_HOME("223", "hcp=18.5", "HOME_(+18.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_18_5),
     BASKETBALL_HCP_MINUS_18_5_AWAY("223", "hcp=18.5", "AWAY_(-18.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_18_5),
-
-    // Handicap +19.5
     BASKETBALL_HCP_PLUS_19_5_HOME("223", "hcp=19.5", "HOME_(+19.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_19_5),
     BASKETBALL_HCP_MINUS_19_5_AWAY("223", "hcp=19.5", "AWAY_(-19.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_19_5),
-
-    // Handicap +20.5
     BASKETBALL_HCP_PLUS_20_5_HOME("223", "hcp=20.5", "HOME_(+20.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_20_5),
     BASKETBALL_HCP_MINUS_20_5_AWAY("223", "hcp=20.5", "AWAY_(-20.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_20_5),
-
-    // Handicap +21.5
     BASKETBALL_HCP_PLUS_21_5_HOME("223", "hcp=21.5", "HOME_(+21.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_21_5),
     BASKETBALL_HCP_MINUS_21_5_AWAY("223", "hcp=21.5", "AWAY_(-21.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_21_5),
-
-    // Handicap +22.5
     BASKETBALL_HCP_PLUS_22_5_HOME("223", "hcp=22.5", "HOME_(+22.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_22_5),
     BASKETBALL_HCP_MINUS_22_5_AWAY("223", "hcp=22.5", "AWAY_(-22.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_22_5),
-
-    // Handicap +23.5
     BASKETBALL_HCP_PLUS_23_5_HOME("223", "hcp=23.5", "HOME_(+23.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_23_5),
     BASKETBALL_HCP_MINUS_23_5_AWAY("223", "hcp=23.5", "AWAY_(-23.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_23_5),
-
-    // Handicap +24.5
     BASKETBALL_HCP_PLUS_24_5_HOME("223", "hcp=24.5", "HOME_(+24.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_24_5),
     BASKETBALL_HCP_MINUS_24_5_AWAY("223", "hcp=24.5", "AWAY_(-24.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_24_5),
-
-    // Handicap +25.5
     BASKETBALL_HCP_PLUS_25_5_HOME("223", "hcp=25.5", "HOME_(+25.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_25_5),
     BASKETBALL_HCP_MINUS_25_5_AWAY("223", "hcp=25.5", "AWAY_(-25.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_25_5),
-
-    // Handicap +26.5
     BASKETBALL_HCP_PLUS_26_5_HOME("223", "hcp=26.5", "HOME_(+26.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_26_5),
     BASKETBALL_HCP_MINUS_26_5_AWAY("223", "hcp=26.5", "AWAY_(-26.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_26_5),
-
-    // Handicap +27.5
     BASKETBALL_HCP_PLUS_27_5_HOME("223", "hcp=27.5", "HOME_(+27.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_27_5),
     BASKETBALL_HCP_MINUS_27_5_AWAY("223", "hcp=27.5", "AWAY_(-27.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_27_5),
-
-    // Handicap +28.5
     BASKETBALL_HCP_PLUS_28_5_HOME("223", "hcp=28.5", "HOME_(+28.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_28_5),
     BASKETBALL_HCP_MINUS_28_5_AWAY("223", "hcp=28.5", "AWAY_(-28.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_28_5),
-
-    // Handicap +29.5
     BASKETBALL_HCP_PLUS_29_5_HOME("223", "hcp=29.5", "HOME_(+29.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_29_5),
     BASKETBALL_HCP_MINUS_29_5_AWAY("223", "hcp=29.5", "AWAY_(-29.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_29_5),
-
-    // Handicap +30.5
     BASKETBALL_HCP_PLUS_30_5_HOME("223", "hcp=30.5", "HOME_(+30.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_30_5),
     BASKETBALL_HCP_MINUS_30_5_AWAY("223", "hcp=30.5", "AWAY_(-30.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_30_5),
-
-    // Handicap +31.5
     BASKETBALL_HCP_PLUS_31_5_HOME("223", "hcp=31.5", "HOME_(+31.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_31_5),
     BASKETBALL_HCP_MINUS_31_5_AWAY("223", "hcp=31.5", "AWAY_(-31.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_31_5),
-
-    // Handicap +32.5
     BASKETBALL_HCP_PLUS_32_5_HOME("223", "hcp=32.5", "HOME_(+32.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_32_5),
     BASKETBALL_HCP_MINUS_32_5_AWAY("223", "hcp=32.5", "AWAY_(-32.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_32_5),
-
-    // Handicap +33.5
     BASKETBALL_HCP_PLUS_33_5_HOME("223", "hcp=33.5", "HOME_(+33.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_33_5),
     BASKETBALL_HCP_MINUS_33_5_AWAY("223", "hcp=33.5", "AWAY_(-33.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_33_5),
-
-    // Handicap +34.5
     BASKETBALL_HCP_PLUS_34_5_HOME("223", "hcp=34.5", "HOME_(+34.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_34_5),
     BASKETBALL_HCP_MINUS_34_5_AWAY("223", "hcp=34.5", "AWAY_(-34.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_34_5),
-
-    // Handicap +35.5
     BASKETBALL_HCP_PLUS_35_5_HOME("223", "hcp=35.5", "HOME_(+35.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_HOME_PLUS_35_5),
     BASKETBALL_HCP_MINUS_35_5_AWAY("223", "hcp=35.5", "AWAY_(-35.5)", MarketCategory.BASKETBALL_HANDICAP, OutcomeType.ASIAN_HANDICAP_AWAY_MINUS_35_5);
+
+    // ========================================================================
+    // ENUM FIELDS & CONSTRUCTOR
+    // ========================================================================
 
     private final String marketId;
     private final String specifier;
     private final String normalizedName;
     private final MarketCategory category;
     private final OutcomeType outcomeType;
-
-    // The provider key is a combination of marketId and specifier to uniquely identify a market line.
     private final String providerKey;
 
     private static final Map<String, SportyMarketType> BY_PROVIDER_KEY;
@@ -564,15 +659,16 @@ public enum SportyMarketType implements MarketType {
         this.normalizedName = normalizedName;
         this.category = category;
         this.outcomeType = outcomeType;
-        // Create a unique key. Use marketId alone if specifier is null.
         this.providerKey = specifier == null ? marketId + ":" + normalizedName : marketId + ":" + specifier + ":" + normalizedName;
     }
 
-    // Static lookup methods
+    // ========================================================================
+    // STATIC LOOKUP METHODS
+    // ========================================================================
+
     public static SportyMarketType fromProviderKey(String providerKey) {
         if(providerKey == null) {
             throw new IllegalArgumentException("provider key cannot be null");
-
         }
         SportyMarketType market = BY_PROVIDER_KEY.get(providerKey);
         if (market == null) {
@@ -605,9 +701,7 @@ public enum SportyMarketType implements MarketType {
                 .orElse(false);
     }
 
-    // Helper method to generate the provider key from raw JSON data
     public static String generateProviderKey(String marketId, String specifier, String outcomeDesc) {
-//        return specifier == null || specifier.isEmpty() ? marketId : marketId + ":" + specifier;
         if (specifier != null && !specifier.isEmpty()) {
             return marketId + ":" + specifier + ":" + outcomeDesc;
         }
