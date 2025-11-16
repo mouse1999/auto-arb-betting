@@ -110,8 +110,24 @@ public class JsonParser {
         }
     }
 
-    public static MSportEvent deserializeMSportEvent(){
-        return null;
+    public static MSportEvent deserializeMSportEvent(String jsonString, ObjectMapper objectMapper){
+        MSportEvent event = null;
+
+        try {
+            JsonNode rootNode = objectMapper.readTree(jsonString);
+            JsonNode dataNode = rootNode.get("data");
+
+            if (dataNode == null || dataNode.isNull()) {
+                log.info("No 'data' node found in JSON");
+                return event;
+            }
+            event = objectMapper.treeToValue(dataNode, MSportEvent.class);
+
+        } catch (Exception e) {
+            log.error("Error deserializing JSON: {}", e.getMessage(), e);
+        }
+
+        return event;
 
     }
 

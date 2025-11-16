@@ -855,17 +855,17 @@ public class SportyBetOddsFetcher implements Runnable {
 //            log.warn("⚠️ Skipping Football fetch - previous request still in progress");
 //        }
 
-        if (basketballFetchInProgress.compareAndSet(false, true)) {
-            runSportListTaskWithFlag("Basketball", KEY_BB, KEY_BB, basketballFetchInProgress);
-        } else {
-            log.warn("⚠️ Skipping Basketball fetch - previous request still in progress");
-        }
-
-//        if (tableTennisFetchInProgress.compareAndSet(false, true)) {
-//            runSportListTaskWithFlag("TableTennis", KEY_TT, KEY_TT, tableTennisFetchInProgress);
+//        if (basketballFetchInProgress.compareAndSet(false, true)) {
+//            runSportListTaskWithFlag("Basketball", KEY_BB, KEY_BB, basketballFetchInProgress);
 //        } else {
-//            log.warn("⚠️ Skipping TableTennis fetch - previous request still in progress");
+//            log.warn("⚠️ Skipping Basketball fetch - previous request still in progress");
 //        }
+
+        if (tableTennisFetchInProgress.compareAndSet(false, true)) {
+            runSportListTaskWithFlag("TableTennis", KEY_TT, KEY_TT, tableTennisFetchInProgress);
+        } else {
+            log.warn("⚠️ Skipping TableTennis fetch - previous request still in progress");
+        }
 
         long duration = System.currentTimeMillis() - start;
         log.info("All sports fetch cycle triggered in {}ms [queue={}, active={}]",
@@ -1243,7 +1243,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 retry + 1, rateLimitCount, requestDuration);
 
         try {
-            Thread.sleep(1000 * (retry + 1));
+            Thread.sleep(1000L * (retry + 1));
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted during rate limit backoff", ie);
@@ -1295,7 +1295,7 @@ public class SportyBetOddsFetcher implements Runnable {
             log.info("Retrying request (attempt {}/{})", retry + 1, API_MAX_RETRIES);
 
             try {
-                Thread.sleep(200 * (retry + 1));
+                Thread.sleep(200L * (retry + 1));
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted during retry backoff", ie);

@@ -26,6 +26,7 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
     private final ScraperConfig scraperConfig;
     private final SportyBetOddsFetcher sportyBetOddsFetcher;
     private final Bet9jaOddsFetcher bet9jaOddsFetcher;
+    private final MSportOddsFetcher mSportOddsFetcher;
 
     // ==================== CONFIGURATION ====================
     private static final long HEALTH_CHECK_INTERVAL_SEC = 30;
@@ -149,20 +150,20 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         }
 
         // ✅ Add more scrapers here
-        // if (scraperConfig.isBetKingEnabled()) {
-        //     log.info("✅ BetKing scraper is ENABLED");
-        //     Future<?> future = orchestratorExecutor.submit(() -> {
-        //         try {
-        //             betKingOddsFetcher.run();
-        //         } catch (Exception e) {
-        //             log.error("BetKing scraper crashed: {}", e.getMessage(), e);
-        //             throw e;
-        //         }
-        //     });
-        //     activeTasks.add(new ScraperTask("BetKing", betKingOddsFetcher, true, future));
-        // } else {
-        //     log.warn("⚠️ BetKing scraper is DISABLED in configuration");
-        // }
+         if (scraperConfig.isBetKingEnabled()) {
+             log.info("✅ MSport scraper is ENABLED");
+             Future<?> future = orchestratorExecutor.submit(() -> {
+                 try {
+                     mSportOddsFetcher.run();
+                 } catch (Exception e) {
+                     log.error("Msport scraper crashed: {}", e.getMessage(), e);
+                     throw e;
+                 }
+             });
+             activeTasks.add(new ScraperTask("MSport", mSportOddsFetcher, true, future));
+         } else {
+             log.warn("⚠️ MSport scraper is DISABLED in configuration");
+         }
 
         log.info("═══════════════════════════════════════════════════════════");
         log.info("   {} SCRAPERS STARTED SUCCESSFULLY", activeTasks.size());

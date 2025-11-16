@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Getter
 public enum Bet9jaMarketType implements MarketType {
 
     // ==================== MATCH RESULT ====================
@@ -440,6 +439,119 @@ public enum Bet9jaMarketType implements MarketType {
     BASKETBALL_FT_OU_250_5_OVER("LIVEB_OUOT@250.5_O", "TOTAL_OF_WHOLE_MATCH(INCLUDING_OVERTIME)_OVER_250.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_250_5),
     BASKETBALL_FT_OU_250_5_UNDER("LIVEB_OUOT@250.5_U", "TOTAL_OF_WHOLE_MATCH(INCLUDING_OVERTIME)_UNDER_250.5", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_250_5);
 
+
+    //===================TABLE TENNIS========================
+    //=======================================================
+
+
+    //=====MATCH WINNER========
+//    TT_HOME("186","HOME", MarketCategory.MATCH_RESULT, OutcomeType.HOME),
+//    TT_AWAY("186", "HOME", MarketCategory.MATCH_RESULT, OutcomeType.AWAY),
+//
+//    //=======TOTAL POINT======
+//    TT_OVER_60_0("238",  "OVER_60.0", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.OVER_60_0),
+//    TT_UNDER_60_0("238",  "UNDER_60.0", MarketCategory.OVER_UNDER_TOTAL, OutcomeType.UNDER_60_0),
+//    //==========POINT HANDICAP================
+//    //-------> NEGATIVE HANDICAP
+//    TT_POINT_HCP_MINUS_4_5_HOME(),
+//    TT_POINT_HCP_PLUS_4_5_AWAY(),
+//
+//    //--------> POSITIVE HANDICAP--------
+//
+//    TT_POINT_HCP_PLUS_4_5_HOME(),
+//    TT_POINT_HCP_MINUS_4_5_AWAY(),
+//
+//
+//
+//    //=======GAME TOTAL POINTS================================
+//
+//    //========>>FIRST GAME POINT========================
+//
+//    TT_1stGPTotal_OVER_16_5( MarketCategory.TABLE_TENNIS_GAME_POINT, OutcomeType.OVER_16_5),
+//    TT_1stGPTotal_UNDER_16_5("247", "total=16.5|gamenr=1", "UNDER_16.5", MarketCategory.TABLE_TENNIS_GAME_POINT, OutcomeType.UNDER_16_5),
+//    //=======SECOND GAME POINT====
+//
+//    TT_2ndGPTotal_OVER_16_5(),
+//    TT_2ndGPTotal_UNDER_16_5(),
+//
+//
+//    //========THIRD GAME POINT=======
+//    TT_3rdGPTotal_OVER_16_5(),
+//    TT_3rdGPTotal_UNDER_16_5(),
+//
+//
+//
+//
+//    //=========FOURTH GAME POINT==========
+//
+//    TT_4thGPTotal_OVER_16_5(),
+//    TT_4thGPTotal_UNDER_16_5(),
+//
+//
+//
+//    //=========FIFTH GAME POINT==========================
+//    TT_5thGPTotal_OVER_16_5(),
+//    TT_5thGPTotal_UNDER_16_5(),
+//
+//
+//
+//    //===========GAME POINT HANDICAP================
+//
+//    //========FIRST GAME POINT HANDICAP========
+//    //------> NEGATIVE HCP
+//
+//    TT_1stGP_HCP_MINUS_4_5_HOME(),
+//    TT_1stGP_HCP_PLUS_4_5_AWAY(),
+//
+//    //-----> POSITIVE HCP---
+//    TT_1stGP_HCP_PLUS_4_5_HOME(),
+//    TT_1stGP_HCP_MINUS_4_5_AWAY(),
+//
+//
+//    //=======SECOND GAME POINT HANDICAP=========
+//
+//    //------> NEGATIVE HCP
+//
+//    TT_2ndGP_HCP_MINUS_4_5_HOME(),
+//    TT_2ndGP_HCP_PLUS_4_5_AWAY(),
+//
+//    //-----> POSITIVE HCP---
+//    TT_2ndGP_HCP_PLUS_4_5_HOME(),
+//    TT_2ndGP_HCP_MINUS_4_5_AWAY(),
+//
+////=========THIRD GAME POINT HANDICAP===========
+//    //------> NEGATIVE HCP
+//
+//    TT_3rdGP_HCP_MINUS_4_5_HOME(),
+//    TT_3rdGP_HCP_PLUS_4_5_AWAY(),
+//
+//    //-----> POSITIVE HCP---
+//    TT_3rdGP_HCP_PLUS_4_5_HOME(),
+//    TT_3rdGP_HCP_MINUS_4_5_AWAY(),
+//
+//    //========FOURTH GAME POINT HANDICAP=========
+//
+//    //------> NEGATIVE HCP
+//
+//    TT_4thGP_HCP_MINUS_4_5_HOME(),
+//    TT_4thGP_HCP_PLUS_4_5_AWAY(),
+//
+//    //-----> POSITIVE HCP---
+//    TT_4thGP_HCP_PLUS_4_5_HOME(),
+//    TT_4thGP_HCP_MINUS_4_5_AWAY(),
+//
+//    //=======FIFTH GAME POINT HANDICAP=======
+//
+//    //------> NEGATIVE HCP
+//
+//    TT_5thGP_HCP_MINUS_4_5_HOME(),
+//    TT_5thGP_HCP_PLUS_4_5_AWAY(),
+//
+//    //-----> POSITIVE HCP---
+//    TT_5thGP_HCP_PLUS_4_5_HOME(),
+//    TT_5thGP_HCP_MINUS_4_5_AWAY(),
+
+
     private final String providerKey;
     private final String normalizedName;
     private final MarketCategory category;
@@ -458,6 +570,23 @@ public enum Bet9jaMarketType implements MarketType {
         this.normalizedName = normalizedName;
         this.category = category;
         this.outcomeType = outcomeType;
+    }
+
+    public String getProviderKey() {
+        return providerKey;
+    }
+
+    public String getNormalizedName() {
+        return normalizedName;
+    }
+
+    @Override
+    public OutcomeType getOutcomeType() {
+        return outcomeType;
+    }
+
+    public MarketCategory getCategory() {
+        return category;
     }
 
     public static Bet9jaMarketType fromProviderKey(String providerKey) {

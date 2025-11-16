@@ -124,6 +124,12 @@ public enum OutcomeType {
     ASIAN_HANDICAP_HOME_MINUS_4_0("ASIAN_HANDICAP_HOME_-4.0", MarketCategory.ASIAN_HANDICAP_FULLTIME),
     ASIAN_HANDICAP_AWAY_PLUS_4_0("ASIAN_HANDICAP_AWAY_+4.0", MarketCategory.ASIAN_HANDICAP_FULLTIME),
 
+    ASIAN_HANDICAP_HOME_MINUS_5_0("ASIAN_HANDICAP_HOME_-5.0", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_PLUS_5_0("ASIAN_HANDICAP_AWAY_+5.0", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+
+    ASIAN_HANDICAP_HOME_MINUS_6_0("ASIAN_HANDICAP_HOME_-6.0", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_PLUS_6_0("ASIAN_HANDICAP_AWAY_+6.0", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+
 
     // ----------------------------------------------------------------------
     // --- NEGATIVE HANDICAP/HOME MINUS, AWAY PLUS (Half Increments) ---
@@ -203,6 +209,18 @@ public enum OutcomeType {
     ASIAN_HANDICAP_HOME_PLUS_4_0("ASIAN_HANDICAP_HOME_+4", MarketCategory.ASIAN_HANDICAP_FULLTIME),
     ASIAN_HANDICAP_AWAY_MINUS_4_0("ASIAN_HANDICAP_AWAY_-4", MarketCategory.ASIAN_HANDICAP_FULLTIME),
 
+    ASIAN_HANDICAP_HOME_PLUS_4_5("ASIAN_HANDICAP_HOME_+4.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_MINUS_4_5("ASIAN_HANDICAP_AWAY_-4.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_HOME_PLUS_5_0("ASIAN_HANDICAP_HOME_+5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_MINUS_5_0("ASIAN_HANDICAP_AWAY_-5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_HOME_PLUS_5_5("ASIAN_HANDICAP_HOME_+5.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_MINUS_5_5("ASIAN_HANDICAP_AWAY_-5.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_HOME_PLUS_6_0("ASIAN_HANDICAP_HOME_+6", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_MINUS_6_0("ASIAN_HANDICAP_AWAY_-6", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+
+    ASIAN_HANDICAP_HOME_PLUS_6_5("ASIAN_HANDICAP_HOME_+6.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+    ASIAN_HANDICAP_AWAY_MINUS_6_5("ASIAN_HANDICAP_AWAY_-6.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+
 
     // ----------------------------------------------------------------------
     // --- POSITIVE HANDICAP/HOME PLUS, AWAY MINUS (Half Increments) ---
@@ -225,8 +243,8 @@ public enum OutcomeType {
     ASIAN_HANDICAP_AWAY_MINUS_3_5("ASIAN_HANDICAP_AWAY_-3.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
 
     // Handicap +4.5
-    ASIAN_HANDICAP_HOME_PLUS_4_5("ASIAN_HANDICAP_HOME_+4.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
-    ASIAN_HANDICAP_AWAY_MINUS_4_5("ASIAN_HANDICAP_AWAY_-4.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+//    ASIAN_HANDICAP_HOME_PLUS_4_5("ASIAN_HANDICAP_HOME_+4.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+//    ASIAN_HANDICAP_AWAY_MINUS_4_5("ASIAN_HANDICAP_AWAY_-4.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
 
     // Handicap +/-35.5
     ASIAN_HANDICAP_HOME_MINUS_35_5("ASIAN_HANDICAP_HOME_-35.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
@@ -349,12 +367,12 @@ public enum OutcomeType {
 
 
     // Handicap +5.5
-    ASIAN_HANDICAP_HOME_PLUS_5_5("ASIAN_HANDICAP_HOME_+5.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
-    ASIAN_HANDICAP_AWAY_MINUS_5_5("ASIAN_HANDICAP_AWAY_-5.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+//    ASIAN_HANDICAP_HOME_PLUS_5_5("ASIAN_HANDICAP_HOME_+5.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+//    ASIAN_HANDICAP_AWAY_MINUS_5_5("ASIAN_HANDICAP_AWAY_-5.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
 
     // Handicap +6.5
-    ASIAN_HANDICAP_HOME_PLUS_6_5("ASIAN_HANDICAP_HOME_+6.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
-    ASIAN_HANDICAP_AWAY_MINUS_6_5("ASIAN_HANDICAP_AWAY_-6.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+//    ASIAN_HANDICAP_HOME_PLUS_6_5("ASIAN_HANDICAP_HOME_+6.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
+//    ASIAN_HANDICAP_AWAY_MINUS_6_5("ASIAN_HANDICAP_AWAY_-6.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
 
     // Handicap +7.5
     ASIAN_HANDICAP_HOME_PLUS_7_5("ASIAN_HANDICAP_HOME_+7.5", MarketCategory.ASIAN_HANDICAP_FULLTIME),
@@ -503,10 +521,157 @@ public enum OutcomeType {
 
     UNKNOWN("UNKNOWN", null),
 
+    OVER_12_5 ("OVER_12.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_12_5("UNDER_12.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 13.0 ----------
+    OVER_13_0 ("OVER_13.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_13_0("UNDER_13.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 13.5 ----------
+    OVER_13_5 ("OVER_13.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_13_5("UNDER_13.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 14.0 ----------
+    OVER_14_0 ("OVER_14.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_14_0("UNDER_14.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 14.5 ----------
+    OVER_14_5 ("OVER_14.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_14_5("UNDER_14.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 15.0 ----------
+    OVER_15_0 ("OVER_15.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_15_0("UNDER_15.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 15.5 ----------
+    OVER_15_5 ("OVER_15.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_15_5("UNDER_15.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 16.0 ----------
+    OVER_16_0 ("OVER_16.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_16_0("UNDER_16.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 16.5 ----------
+    OVER_16_5 ("OVER_16.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_16_5("UNDER_16.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 17.0 ----------
+    OVER_17_0 ("OVER_17.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_17_0("UNDER_17.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 17.5 ----------
+    OVER_17_5 ("OVER_17.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_17_5("UNDER_17.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 18.0 ----------
+    OVER_18_0 ("OVER_18.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_18_0("UNDER_18.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 18.5 ----------
+    OVER_18_5 ("OVER_18.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_18_5("UNDER_18.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 19.0 ----------
+    OVER_19_0 ("OVER_19.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_19_0("UNDER_19.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 19.5 ----------
+    OVER_19_5 ("OVER_19.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_19_5("UNDER_19.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 20.0 ----------
+    OVER_20_0 ("OVER_20.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_20_0("UNDER_20.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 20.5 ----------
+    OVER_20_5 ("OVER_20.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_20_5("UNDER_20.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 21.0 ----------
+    OVER_21_0 ("OVER_21.0",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_21_0("UNDER_21.0", MarketCategory.TABLE_TENNIS_GAME_POINT),
+
+    // ---------- 21.5 ----------
+    OVER_21_5 ("OVER_21.5",  MarketCategory.TABLE_TENNIS_GAME_POINT),
+    UNDER_21_5("UNDER_21.5", MarketCategory.TABLE_TENNIS_GAME_POINT),
 
 
-    //BASKETBALL
-    // Starting the range from 120.5
+
+    OVER_95_5("OVER_95.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_95_5("UNDER_95.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_94_5("OVER_94.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_94_5("UNDER_94.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_93_5("OVER_93.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_93_5("UNDER_93.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_92_5("OVER_92.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_92_5("UNDER_92.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_91_5("OVER_91.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_91_5("UNDER_91.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_90_5("OVER_90.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_90_5("UNDER_90.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_89_5("OVER_89.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_89_5("UNDER_89.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_88_5("OVER_88.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_88_5("UNDER_88.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_87_5("OVER_87.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_87_5("UNDER_87.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_86_5("OVER_86.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_86_5("UNDER_86.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_85_5("OVER_85.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_85_5("UNDER_85.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_84_5("OVER_84.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_84_5("UNDER_84.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_83_5("OVER_83.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_83_5("UNDER_83.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_82_5("OVER_82.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_82_5("UNDER_82.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_81_5("OVER_81.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_81_5("UNDER_81.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_80_5("OVER_80.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_80_5("UNDER_80.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_79_5("OVER_79.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_79_5("UNDER_79.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_78_5("OVER_78.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_78_5("UNDER_78.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_77_5("OVER_77.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_77_5("UNDER_77.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_76_5("OVER_76.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_76_5("UNDER_76.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_75_5("OVER_75.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_75_5("UNDER_75.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_74_5("OVER_74.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_74_5("UNDER_74.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_73_5("OVER_73.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_73_5("UNDER_73.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_72_5("OVER_72.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_72_5("UNDER_72.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_71_5("OVER_71.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_71_5("UNDER_71CLOSE.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_70_5("OVER_70.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_70_5("UNDER_70.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_69_5("OVER_69.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_69_5("UNDER_69.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_68_5("OVER_68.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_68_5("UNDER_68.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_67_5("OVER_67.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_67_5("UNDER_67.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_66_5("OVER_66.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_66_5("UNDER_66.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_65_5("OVER_65.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_65_5("UNDER_65.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_64_5("OVER_64.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_64_5("UNDER_64.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_63_5("OVER_63.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_63_5("UNDER_63.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_62_5("OVER_62.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_62_5("UNDER_62.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_61_5("OVER_61.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_61_5("UNDER_61.5", MarketCategory.OVER_UNDER_TOTAL),
+    OVER_60_5("OVER_60.5", MarketCategory.OVER_UNDER_TOTAL),
+    UNDER_60_5("UNDER_60.5", MarketCategory.OVER_UNDER_TOTAL),
+
+
 
     OVER_120_5("OVER_120.5", MarketCategory.OVER_UNDER_TOTAL),
     UNDER_120_5("UNDER_120.5", MarketCategory.OVER_UNDER_TOTAL),
@@ -1023,7 +1188,64 @@ public enum OutcomeType {
     BASKETBALL_Q4_OVER_41("4th quarter - over 41", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER),
     BASKETBALL_Q4_UNDER_41("4th quarter - under 41", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER),
     BASKETBALL_Q4_OVER_41_5("4th quarter - over 41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER),
-    BASKETBALL_Q4_UNDER_41_5("4th quarter - under 41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER);
+    BASKETBALL_Q4_UNDER_41_5("4th quarter - under 41.5", MarketCategory.BASKETBALL_OVER_UNDER_QUARTER),
+
+
+
+    GAME_POINT_HANDICAP_HOME_MINUS_4_5("1st Game Point Handicap: Home (-4.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_4_5("1st Game Point Handicap: Away (+4.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_4_0("1st Game Point Handicap: Home (-4.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_4_0("1st Game Point Handicap: Away (+4.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_3_5("1st Game Point Handicap: Home (-3.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_3_5("1st Game Point Handicap: Away (+3.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_3_0("1st Game Point Handicap: Home (-3.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_3_0("1st Game Point Handicap: Away (+3.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_2_5("1st Game Point Handicap: Home (-2.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_2_5("1st Game Point Handicap: Away (+2.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_2_0("1st Game Point Handicap: Home (-2.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_2_0("1st Game Point Handicap: Away (+2.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_1_5("1st Game Point Handicap: Home (-1.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_1_5("1st Game Point Handicap: Away (+1.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_1_0("1st Game Point Handicap: Home (-1.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_1_0("1st Game Point Handicap: Away (+1.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_MINUS_0_5("1st Game Point Handicap: Home (-0.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_PLUS_0_5("1st Game Point Handicap: Away (+0.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    // Positive side (Away favorite)
+    GAME_POINT_HANDICAP_HOME_PLUS_4_5("1st Game Point Handicap: Home (+4.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_4_5("1st Game Point Handicap: Away (-4.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_4_0("1st Game Point Handicap: Home (+4.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_4_0("1st Game Point Handicap: Away (-4.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_3_5("1st Game Point Handicap: Home (+3.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_3_5("1st Game Point Handicap: Away (-3.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_3_0("1st Game Point Handicap: Home (+3.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_3_0("1st Game Point Handicap: Away (-3.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_2_5("1st Game Point Handicap: Home (+2.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_2_5("1st Game Point Handicap: Away (-2.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_2_0("1st Game Point Handicap: Home (+2.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_2_0("1st Game Point Handicap: Away (-2.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_1_5("1st Game Point Handicap: Home (+1.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_1_5("1st Game Point Handicap: Away (-1.5)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_1_0("1st Game Point Handicap: Home (+1.0)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_1_0("1st Game Point Handicap: Away (-1.0)", MarketCategory.GAME_POINT_HANDICAP),
+
+    GAME_POINT_HANDICAP_HOME_PLUS_0_5("1st Game Point Handicap: Home (+0.5)", MarketCategory.GAME_POINT_HANDICAP),
+    GAME_POINT_HANDICAP_AWAY_MINUS_0_5("1st Game Point Handicap: Away (-0.5)", MarketCategory.GAME_POINT_HANDICAP);
 
 
 
@@ -1049,6 +1271,63 @@ public enum OutcomeType {
         UNDER_3_5.opposite = OVER_3_5;
         OVER_4_5.opposite = UNDER_4_5;
         UNDER_4_5.opposite = OVER_4_5;
+        OVER_12_5.opposite  = UNDER_12_5;  UNDER_12_5.opposite  = OVER_12_5;
+        OVER_13_0.opposite  = UNDER_13_0;  UNDER_13_0.opposite  = OVER_13_0;
+        OVER_13_5.opposite  = UNDER_13_5;  UNDER_13_5.opposite  = OVER_13_5;
+        OVER_14_0.opposite  = UNDER_14_0;  UNDER_14_0.opposite  = OVER_14_0;
+        OVER_14_5.opposite  = UNDER_14_5;  UNDER_14_5.opposite  = OVER_14_5;
+        OVER_15_0.opposite  = UNDER_15_0;  UNDER_15_0.opposite  = OVER_15_0;
+        OVER_15_5.opposite  = UNDER_15_5;  UNDER_15_5.opposite  = OVER_15_5;
+        OVER_16_0.opposite  = UNDER_16_0;  UNDER_16_0.opposite  = OVER_16_0;
+        OVER_16_5.opposite  = UNDER_16_5;  UNDER_16_5.opposite  = OVER_16_5;
+        OVER_17_0.opposite  = UNDER_17_0;  UNDER_17_0.opposite  = OVER_17_0;
+        OVER_17_5.opposite  = UNDER_17_5;  UNDER_17_5.opposite  = OVER_17_5;
+        OVER_18_0.opposite  = UNDER_18_0;  UNDER_18_0.opposite  = OVER_18_0;
+        OVER_18_5.opposite  = UNDER_18_5;  UNDER_18_5.opposite  = OVER_18_5;
+        OVER_19_0.opposite  = UNDER_19_0;  UNDER_19_0.opposite  = OVER_19_0;
+        OVER_19_5.opposite  = UNDER_19_5;  UNDER_19_5.opposite  = OVER_19_5;
+        OVER_20_0.opposite  = UNDER_20_0;  UNDER_20_0.opposite  = OVER_20_0;
+        OVER_20_5.opposite  = UNDER_20_5;  UNDER_20_5.opposite  = OVER_20_5;
+        OVER_21_0.opposite  = UNDER_21_0;  UNDER_21_0.opposite  = OVER_21_0;
+        OVER_21_5.opposite  = UNDER_21_5;  UNDER_21_5.opposite  = OVER_21_5;
+
+        OVER_95_5.opposite = UNDER_95_5; UNDER_95_5.opposite = OVER_95_5;
+        OVER_94_5.opposite = UNDER_94_5; UNDER_94_5.opposite = OVER_94_5;
+        OVER_93_5.opposite = UNDER_93_5; UNDER_93_5.opposite = OVER_93_5;
+        OVER_92_5.opposite = UNDER_92_5; UNDER_92_5.opposite = OVER_92_5;
+        OVER_91_5.opposite = UNDER_91_5; UNDER_91_5.opposite = OVER_91_5;
+        OVER_90_5.opposite = UNDER_90_5; UNDER_90_5.opposite = OVER_90_5;
+        OVER_89_5.opposite = UNDER_89_5; UNDER_89_5.opposite = OVER_89_5;
+        OVER_88_5.opposite = UNDER_88_5; UNDER_88_5.opposite = OVER_88_5;
+        OVER_87_5.opposite = UNDER_87_5; UNDER_87_5.opposite = OVER_87_5;
+        OVER_86_5.opposite = UNDER_86_5; UNDER_86_5.opposite = OVER_86_5;
+        OVER_85_5.opposite = UNDER_85_5; UNDER_85_5.opposite = OVER_85_5;
+        OVER_84_5.opposite = UNDER_84_5; UNDER_84_5.opposite = OVER_84_5;
+        OVER_83_5.opposite = UNDER_83_5; UNDER_83_5.opposite = OVER_83_5;
+        OVER_82_5.opposite = UNDER_82_5; UNDER_82_5.opposite = OVER_82_5;
+        OVER_81_5.opposite = UNDER_81_5; UNDER_81_5.opposite = OVER_81_5;
+        OVER_80_5.opposite = UNDER_80_5; UNDER_80_5.opposite = OVER_80_5;
+        OVER_79_5.opposite = UNDER_79_5; UNDER_79_5.opposite = OVER_79_5;
+        OVER_78_5.opposite = UNDER_78_5; UNDER_78_5.opposite = OVER_78_5;
+        OVER_77_5.opposite = UNDER_77_5; UNDER_77_5.opposite = OVER_77_5;
+        OVER_76_5.opposite = UNDER_76_5; UNDER_76_5.opposite = OVER_76_5;
+        OVER_75_5.opposite = UNDER_75_5; UNDER_75_5.opposite = OVER_75_5;
+        OVER_74_5.opposite = UNDER_74_5; UNDER_74_5.opposite = OVER_74_5;
+        OVER_73_5.opposite = UNDER_73_5; UNDER_73_5.opposite = OVER_73_5;
+        OVER_72_5.opposite = UNDER_72_5; UNDER_72_5.opposite = OVER_72_5;
+        OVER_71_5.opposite = UNDER_71_5; UNDER_71_5.opposite = OVER_71_5;
+        OVER_70_5.opposite = UNDER_70_5; UNDER_70_5.opposite = OVER_70_5;
+        OVER_69_5.opposite = UNDER_69_5; UNDER_69_5.opposite = OVER_69_5;
+        OVER_68_5.opposite = UNDER_68_5; UNDER_68_5.opposite = OVER_68_5;
+        OVER_67_5.opposite = UNDER_67_5; UNDER_67_5.opposite = OVER_67_5;
+        OVER_66_5.opposite = UNDER_66_5; UNDER_66_5.opposite = OVER_66_5;
+        OVER_65_5.opposite = UNDER_65_5; UNDER_65_5.opposite = OVER_65_5;
+        OVER_64_5.opposite = UNDER_64_5; UNDER_64_5.opposite = OVER_64_5;
+        OVER_63_5.opposite = UNDER_63_5; UNDER_63_5.opposite = OVER_63_5;
+        OVER_62_5.opposite = UNDER_62_5; UNDER_62_5.opposite = OVER_62_5;
+        OVER_61_5.opposite = UNDER_61_5; UNDER_61_5.opposite = OVER_61_5;
+        OVER_60_5.opposite = UNDER_60_5; UNDER_60_5.opposite = OVER_60_5;
+
 
         OVER_120_5.opposite = UNDER_120_5;
         UNDER_120_5.opposite = OVER_120_5;
@@ -1520,6 +1799,164 @@ public enum OutcomeType {
         ASIAN_HANDICAP_HOME_MINUS_35_5.opposite = ASIAN_HANDICAP_AWAY_PLUS_35_5;
         ASIAN_HANDICAP_AWAY_PLUS_35_5.opposite = ASIAN_HANDICAP_HOME_MINUS_35_5;
 
+
+        //=========positive
+
+        ASIAN_HANDICAP_HOME_PLUS_0_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_0_5;
+        ASIAN_HANDICAP_AWAY_MINUS_0_5.opposite = ASIAN_HANDICAP_HOME_PLUS_0_5;
+
+        // Handicap +/-1.0
+        ASIAN_HANDICAP_HOME_PLUS_1_0.opposite = ASIAN_HANDICAP_AWAY_MINUS_1_0;
+        ASIAN_HANDICAP_AWAY_MINUS_1_0.opposite = ASIAN_HANDICAP_HOME_PLUS_1_0;
+
+        // Handicap +/-1.25
+        ASIAN_HANDICAP_HOME_PLUS_1_25.opposite = ASIAN_HANDICAP_AWAY_MINUS_1_25;
+        ASIAN_HANDICAP_AWAY_MINUS_1_25.opposite = ASIAN_HANDICAP_HOME_PLUS_1_25;
+
+        // Handicap +/-1.5
+        ASIAN_HANDICAP_HOME_PLUS_1_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_1_5;
+        ASIAN_HANDICAP_AWAY_MINUS_1_5.opposite = ASIAN_HANDICAP_HOME_PLUS_1_5;
+
+        // Handicap +/-1.75
+        ASIAN_HANDICAP_HOME_PLUS_1_75.opposite = ASIAN_HANDICAP_AWAY_MINUS_1_75;
+        ASIAN_HANDICAP_AWAY_MINUS_1_75.opposite = ASIAN_HANDICAP_HOME_PLUS_1_75;
+
+        // Handicap +/-2.0
+        ASIAN_HANDICAP_HOME_PLUS_2_0.opposite = ASIAN_HANDICAP_AWAY_MINUS_2_0;
+        ASIAN_HANDICAP_AWAY_MINUS_2_0.opposite = ASIAN_HANDICAP_HOME_PLUS_2_0;
+
+        // Handicap +/-2.25
+        ASIAN_HANDICAP_HOME_PLUS_2_25.opposite = ASIAN_HANDICAP_AWAY_MINUS_2_25;
+        ASIAN_HANDICAP_AWAY_MINUS_2_25.opposite = ASIAN_HANDICAP_HOME_PLUS_2_25;
+
+        // Handicap +/-2.5
+        ASIAN_HANDICAP_HOME_PLUS_2_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_2_5;
+        ASIAN_HANDICAP_AWAY_MINUS_2_5.opposite = ASIAN_HANDICAP_HOME_PLUS_2_5;
+
+        // Handicap +/-2.75
+        ASIAN_HANDICAP_HOME_PLUS_2_75.opposite = ASIAN_HANDICAP_AWAY_MINUS_2_75;
+        ASIAN_HANDICAP_AWAY_MINUS_2_75.opposite = ASIAN_HANDICAP_HOME_PLUS_2_75;
+
+        // Handicap +/-3.0
+        ASIAN_HANDICAP_HOME_PLUS_3_0.opposite = ASIAN_HANDICAP_AWAY_MINUS_3_0;
+        ASIAN_HANDICAP_AWAY_MINUS_3_0.opposite = ASIAN_HANDICAP_HOME_PLUS_3_0;
+
+        // Handicap +/-3.25
+        ASIAN_HANDICAP_HOME_PLUS_3_25.opposite = ASIAN_HANDICAP_AWAY_MINUS_3_25;
+        ASIAN_HANDICAP_AWAY_MINUS_3_25.opposite = ASIAN_HANDICAP_HOME_PLUS_3_25;
+
+        // Handicap +/-3.5
+        ASIAN_HANDICAP_HOME_PLUS_3_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_3_5;
+        ASIAN_HANDICAP_AWAY_MINUS_3_5.opposite = ASIAN_HANDICAP_HOME_PLUS_3_5;
+
+        // Handicap +/-4.5
+        ASIAN_HANDICAP_HOME_PLUS_4_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_4_5;
+        ASIAN_HANDICAP_AWAY_MINUS_4_5.opposite = ASIAN_HANDICAP_HOME_PLUS_4_5;
+
+        // Handicap +/-5.5
+        ASIAN_HANDICAP_HOME_PLUS_5_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_5_5;
+        ASIAN_HANDICAP_AWAY_MINUS_5_5.opposite = ASIAN_HANDICAP_HOME_PLUS_5_5;
+
+        // Handicap +/-6.5
+        ASIAN_HANDICAP_HOME_PLUS_6_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_6_5;
+        ASIAN_HANDICAP_AWAY_MINUS_6_5.opposite = ASIAN_HANDICAP_HOME_PLUS_6_5;
+
+        // Handicap +/-7.5
+        ASIAN_HANDICAP_HOME_PLUS_7_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_7_5;
+        ASIAN_HANDICAP_AWAY_MINUS_7_5.opposite = ASIAN_HANDICAP_HOME_PLUS_7_5;
+
+        // Handicap +/-8.5
+        ASIAN_HANDICAP_HOME_PLUS_8_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_8_5;
+        ASIAN_HANDICAP_AWAY_MINUS_8_5.opposite = ASIAN_HANDICAP_HOME_PLUS_8_5;
+
+        // Handicap +/-9.5
+        ASIAN_HANDICAP_HOME_PLUS_9_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_9_5;
+        ASIAN_HANDICAP_AWAY_MINUS_9_5.opposite = ASIAN_HANDICAP_HOME_PLUS_9_5;
+
+        // Handicap +/-10.5
+        ASIAN_HANDICAP_HOME_PLUS_10_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_10_5;
+        ASIAN_HANDICAP_AWAY_MINUS_10_5.opposite = ASIAN_HANDICAP_HOME_PLUS_10_5;
+
+        // Handicap +/-11.5
+        ASIAN_HANDICAP_HOME_PLUS_11_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_11_5;
+        ASIAN_HANDICAP_AWAY_MINUS_11_5.opposite = ASIAN_HANDICAP_HOME_PLUS_11_5;
+
+        // Handicap +/-13.5
+        ASIAN_HANDICAP_HOME_PLUS_13_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_13_5;
+        ASIAN_HANDICAP_AWAY_MINUS_13_5.opposite = ASIAN_HANDICAP_HOME_PLUS_13_5;
+
+        // Handicap +/-14.5
+        ASIAN_HANDICAP_HOME_PLUS_14_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_14_5;
+        ASIAN_HANDICAP_AWAY_MINUS_14_5.opposite = ASIAN_HANDICAP_HOME_PLUS_14_5;
+
+        // Handicap +/-15.5
+        ASIAN_HANDICAP_HOME_PLUS_15_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_15_5;
+        ASIAN_HANDICAP_AWAY_MINUS_15_5.opposite = ASIAN_HANDICAP_HOME_PLUS_15_5;
+
+        // Handicap +/-16.5
+        ASIAN_HANDICAP_HOME_PLUS_16_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_16_5;
+        ASIAN_HANDICAP_AWAY_MINUS_16_5.opposite = ASIAN_HANDICAP_HOME_PLUS_16_5;
+
+        // Handicap +/-18.5
+        ASIAN_HANDICAP_HOME_PLUS_18_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_18_5;
+        ASIAN_HANDICAP_AWAY_MINUS_18_5.opposite = ASIAN_HANDICAP_HOME_PLUS_18_5;
+
+        // Handicap +/-19.5
+        ASIAN_HANDICAP_HOME_PLUS_19_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_19_5;
+        ASIAN_HANDICAP_AWAY_MINUS_19_5.opposite = ASIAN_HANDICAP_HOME_PLUS_19_5;
+
+        // Handicap +/-20.5
+        ASIAN_HANDICAP_HOME_PLUS_20_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_20_5;
+        ASIAN_HANDICAP_AWAY_MINUS_20_5.opposite = ASIAN_HANDICAP_HOME_PLUS_20_5;
+
+        // Handicap +/-21.5
+        ASIAN_HANDICAP_HOME_PLUS_21_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_21_5;
+        ASIAN_HANDICAP_AWAY_MINUS_21_5.opposite = ASIAN_HANDICAP_HOME_PLUS_21_5;
+
+        // Handicap +/-23.5
+        ASIAN_HANDICAP_HOME_PLUS_23_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_23_5;
+        ASIAN_HANDICAP_AWAY_MINUS_23_5.opposite = ASIAN_HANDICAP_HOME_PLUS_23_5;
+
+        // Handicap +/-24.5
+        ASIAN_HANDICAP_HOME_PLUS_24_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_24_5;
+        ASIAN_HANDICAP_AWAY_MINUS_24_5.opposite = ASIAN_HANDICAP_HOME_PLUS_24_5;
+
+        // Handicap +/-25.5
+        ASIAN_HANDICAP_HOME_PLUS_25_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_25_5;
+        ASIAN_HANDICAP_AWAY_MINUS_25_5.opposite = ASIAN_HANDICAP_HOME_PLUS_25_5;
+
+        // Handicap +/-26.5
+        ASIAN_HANDICAP_HOME_PLUS_26_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_26_5;
+        ASIAN_HANDICAP_AWAY_MINUS_26_5.opposite = ASIAN_HANDICAP_HOME_PLUS_26_5;
+
+        // Handicap +/-28.5
+        ASIAN_HANDICAP_HOME_PLUS_28_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_28_5;
+        ASIAN_HANDICAP_AWAY_MINUS_28_5.opposite = ASIAN_HANDICAP_HOME_PLUS_28_5;
+
+        // Handicap +/-29.5
+        ASIAN_HANDICAP_HOME_PLUS_29_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_29_5;
+        ASIAN_HANDICAP_AWAY_MINUS_29_5.opposite = ASIAN_HANDICAP_HOME_PLUS_29_5;
+
+        // Handicap +/-30.5
+        ASIAN_HANDICAP_HOME_PLUS_30_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_30_5;
+        ASIAN_HANDICAP_AWAY_MINUS_30_5.opposite = ASIAN_HANDICAP_HOME_PLUS_30_5;
+
+        // Handicap +/-31.5
+        ASIAN_HANDICAP_HOME_PLUS_31_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_31_5;
+        ASIAN_HANDICAP_AWAY_MINUS_31_5.opposite = ASIAN_HANDICAP_HOME_PLUS_31_5;
+
+        // Handicap +/-33.5
+        ASIAN_HANDICAP_HOME_PLUS_33_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_33_5;
+        ASIAN_HANDICAP_AWAY_MINUS_33_5.opposite = ASIAN_HANDICAP_HOME_PLUS_33_5;
+
+        // Handicap +/-34.5
+        ASIAN_HANDICAP_HOME_PLUS_34_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_34_5;
+        ASIAN_HANDICAP_AWAY_MINUS_34_5.opposite = ASIAN_HANDICAP_HOME_PLUS_34_5;
+
+        // Handicap +/-35.5
+        ASIAN_HANDICAP_HOME_PLUS_35_5.opposite = ASIAN_HANDICAP_AWAY_MINUS_35_5;
+        ASIAN_HANDICAP_AWAY_MINUS_35_5.opposite = ASIAN_HANDICAP_HOME_PLUS_35_5;
+
 // --- CORNERS OVER/UNDER ---
 
 // Corners 6.5
@@ -1762,6 +2199,63 @@ public enum OutcomeType {
         BASKETBALL_Q4_UNDER_41.opposite = BASKETBALL_Q4_OVER_41;
         BASKETBALL_Q4_OVER_41_5.opposite = BASKETBALL_Q4_UNDER_41_5;
         BASKETBALL_Q4_UNDER_41_5.opposite = BASKETBALL_Q4_OVER_41_5;
+
+
+
+        GAME_POINT_HANDICAP_HOME_MINUS_4_5.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_4_5;
+        GAME_POINT_HANDICAP_AWAY_PLUS_4_5.opposite = GAME_POINT_HANDICAP_HOME_MINUS_4_5;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_4_0.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_4_0;
+        GAME_POINT_HANDICAP_AWAY_PLUS_4_0.opposite = GAME_POINT_HANDICAP_HOME_MINUS_4_0;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_3_5.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_3_5;
+        GAME_POINT_HANDICAP_AWAY_PLUS_3_5.opposite = GAME_POINT_HANDICAP_HOME_MINUS_3_5;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_3_0.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_3_0;
+        GAME_POINT_HANDICAP_AWAY_PLUS_3_0.opposite = GAME_POINT_HANDICAP_HOME_MINUS_3_0;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_2_5.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_2_5;
+        GAME_POINT_HANDICAP_AWAY_PLUS_2_5.opposite = GAME_POINT_HANDICAP_HOME_MINUS_2_5;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_2_0.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_2_0;
+        GAME_POINT_HANDICAP_AWAY_PLUS_2_0.opposite = GAME_POINT_HANDICAP_HOME_MINUS_2_0;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_1_5.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_1_5;
+        GAME_POINT_HANDICAP_AWAY_PLUS_1_5.opposite = GAME_POINT_HANDICAP_HOME_MINUS_1_5;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_1_0.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_1_0;
+        GAME_POINT_HANDICAP_AWAY_PLUS_1_0.opposite = GAME_POINT_HANDICAP_HOME_MINUS_1_0;
+
+        GAME_POINT_HANDICAP_HOME_MINUS_0_5.opposite = GAME_POINT_HANDICAP_AWAY_PLUS_0_5;
+        GAME_POINT_HANDICAP_AWAY_PLUS_0_5.opposite = GAME_POINT_HANDICAP_HOME_MINUS_0_5;
+
+        // Positive side opposites
+        GAME_POINT_HANDICAP_HOME_PLUS_4_5.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_4_5;
+        GAME_POINT_HANDICAP_AWAY_MINUS_4_5.opposite = GAME_POINT_HANDICAP_HOME_PLUS_4_5;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_4_0.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_4_0;
+        GAME_POINT_HANDICAP_AWAY_MINUS_4_0.opposite = GAME_POINT_HANDICAP_HOME_PLUS_4_0;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_3_5.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_3_5;
+        GAME_POINT_HANDICAP_AWAY_MINUS_3_5.opposite = GAME_POINT_HANDICAP_HOME_PLUS_3_5;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_3_0.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_3_0;
+        GAME_POINT_HANDICAP_AWAY_MINUS_3_0.opposite = GAME_POINT_HANDICAP_HOME_PLUS_3_0;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_2_5.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_2_5;
+        GAME_POINT_HANDICAP_AWAY_MINUS_2_5.opposite = GAME_POINT_HANDICAP_HOME_PLUS_2_5;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_2_0.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_2_0;
+        GAME_POINT_HANDICAP_AWAY_MINUS_2_0.opposite = GAME_POINT_HANDICAP_HOME_PLUS_2_0;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_1_5.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_1_5;
+        GAME_POINT_HANDICAP_AWAY_MINUS_1_5.opposite = GAME_POINT_HANDICAP_HOME_PLUS_1_5;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_1_0.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_1_0;
+        GAME_POINT_HANDICAP_AWAY_MINUS_1_0.opposite = GAME_POINT_HANDICAP_HOME_PLUS_1_0;
+
+        GAME_POINT_HANDICAP_HOME_PLUS_0_5.opposite = GAME_POINT_HANDICAP_AWAY_MINUS_0_5;
+        GAME_POINT_HANDICAP_AWAY_MINUS_0_5.opposite = GAME_POINT_HANDICAP_HOME_PLUS_0_5;
 
 
 

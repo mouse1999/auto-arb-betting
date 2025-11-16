@@ -1,5 +1,8 @@
 package com.mouse.bet.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mouse.bet.detector.ArbDetector;
 
 import com.mouse.bet.enums.*;
@@ -29,6 +32,7 @@ public class MSportService implements OddService<MSportEvent> {
 
     private final ArbDetector arbDetector;
     private final TeamAliasService teamAliasService;
+    private final ObjectMapper objectMapper;
 
 
     @Override
@@ -71,7 +75,7 @@ public class MSportService implements OddService<MSportEvent> {
                 .awayTeam(awayTeam)
                 .league(league)
                 .sportEnum(determineSport(event))
-                .bookie(BookMaker.SPORTY_BET)
+                .bookie(BookMaker.M_SPORT)
                 .markets(markets)
                 .build();
     }
@@ -134,8 +138,8 @@ public class MSportService implements OddService<MSportEvent> {
                 .flatMap(market -> market.getOutcomes().stream().map(outcome -> {
                     String key = generateProviderKey(market, outcome);
                     return Map.entry(key, new MarketMeta(
-                            market.getName(),
-                            market.getTitle(),
+                            outcome.getDescription(), // name of the outcome to be chosen appears to be description
+                            market.getName(), // the name feild of each market appears to be the title on the frontend
                             market.getGroup(),
                             market.getSpecifiers(),
                             market.getId()+""
@@ -279,10 +283,10 @@ public class MSportService implements OddService<MSportEvent> {
                 .isActive(true)
                 .sportEnum(determineSport(event))
                 .outcomeStatus(outcomeStatus)
-                .matchStatus(extractMatchStatus(event))
-                .setScore(String.valueOf(event.getAllScores()))
-                .gameScore(extractScore(event))
-                .period(extractPeriod(event))
+                .matchStatus(event.getStatusDescription())
+                .setScore(event.getScoreOfWholeMatch())
+                .gameScore(getGameScoreList(event.getScoreOfSection()))
+                .period(event.getStatusDescription())
                 .playedSeconds(event.getPlayedTime())
                 .providerMarketName(meta != null ? meta.name()  : null)
                 .providerMarketTitle(meta != null ? meta.title() : null)
@@ -290,85 +294,37 @@ public class MSportService implements OddService<MSportEvent> {
                 .build();
     }
 
-    private String extractPeriod(MSportEvent event) {
-        return event.getAllScores() == null ? "": event.getAllScores().size()+"";
-    }
-
     /**
-     * Extracts the match period/status from the scores list based on size rules.
-     * - If the outer list contains one item, returns the period of that item (index 0 of inner list).
-     * - If the outer list contains two or more items, returns the period of the second item (index 1 of outer list).
-     * * @param event The MSportEvent containing the scores list.
-     * @return The period string (e.g., "h1" or "ft"), or null if the list is empty/null or index is out of bounds.
-     */
-    private String extractMatchStatus(MSportEvent event) {
-        List<List<String>> gameScoreList = event.getAllScores();
-
-        if (gameScoreList == null || gameScoreList.isEmpty()) {
-            return null;
-        }
-
-        List<String> periodEntry = getStrings(gameScoreList);
-
-        if (periodEntry != null && !periodEntry.isEmpty()) {
-            return periodEntry.get(0);
-        }
-
-        return null;
-    }
-
-    private static List<String> getStrings(List<List<String>> gameScoreList) {
-        int listSize = gameScoreList.size();
-
-        int periodIndexToExtract;
-        if (listSize == 1) {
-            periodIndexToExtract = 0;
-        } else {
-            periodIndexToExtract = 1;
-
-        }
-        return gameScoreList.get(periodIndexToExtract);
-    }
-
-    /**
-     * Extracts specific score strings (the second element of the inner list)
-     * from the provided list of score lists, where inner lists are formatted as [period, score].
-     * * - If the outer list is empty or null, returns null.
-     * - If the list contains one item, returns a list containing the score string of that one item.
-     * - If the list contains multiple items (>= 2), returns a list containing the score strings of the first item and the second item.
+     * Parses a JSON array string like "[\"11:5\",\"7:10\"]" into a List<String>
      *
-     * @param event The MSportEvent containing the scores list.
-     * @return A List<String> of extracted score strings (e.g., ["0:0", "1:0"]), or null if the input list is empty/null.
+     * @param inputString JSON-formatted string of game scores
+     * @return List of score strings (e.g., ["11:5", "7:10"]), empty list if invalid
      */
-    private List<String> extractScore(MSportEvent event) {
-
-        List<List<String>> gameScoreList = event.getAllScores();
-        List<String> resultScores = new ArrayList<>();
-
-        if (gameScoreList == null || gameScoreList.isEmpty()) {
-            return null;
+    private List<String> getGameScoreList(String inputString) {
+        if (inputString == null || inputString.isBlank()) {
+            log.warn("Input string is null or blank");
+            return new ArrayList<>();
         }
-        if (gameScoreList.size() == 1) {
 
-            List<String> scoreEntry = gameScoreList.get(0);
-            if (scoreEntry.size() > 1) {
-                resultScores.add(scoreEntry.get(1));
-            }
+        String trimmed = inputString.trim();
+
+        // Basic format check
+        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+            log.warn("Input does not start/end with []: {}", inputString);
+            return new ArrayList<>();
         }
-        else {
 
-            List<String> firstScoreEntry = gameScoreList.get(0);
-            if (firstScoreEntry.size() > 1) {
-                resultScores.add(firstScoreEntry.get(1));
-            }
-
-            List<String> secondScoreEntry = gameScoreList.get(1);
-            if (secondScoreEntry.size() > 1) {
-                resultScores.add(secondScoreEntry.get(1));
-            }
+        try {
+            return objectMapper.readValue(
+                    trimmed,
+                    new TypeReference<List<String>>() {}
+            );
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse JSON score list: {}", inputString, e);
+            return new ArrayList<>();
         }
-        return resultScores;
     }
+
 
     /**
      * Extract outcome description from provider key
@@ -420,7 +376,9 @@ public class MSportService implements OddService<MSportEvent> {
                 MarketCategory.OVER_UNDER_2NDHALF,
                 MarketCategory.ODD_EVEN,
                 MarketCategory.MATCH_RESULT,
-                MarketCategory.BASKETBALL_MATCH_WINNER
+                MarketCategory.BASKETBALL_MATCH_WINNER,
+
+                MarketCategory.GAME_POINT_HANDICAP
         ).contains(category);
 
         log.debug("Should group market '{}': {}", category, shouldGroup);

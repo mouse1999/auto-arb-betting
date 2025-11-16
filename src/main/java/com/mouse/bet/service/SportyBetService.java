@@ -266,7 +266,8 @@ public class SportyBetService implements OddService<SportyEvent> {
 
         return NormalizedOutcome.builder()
                 .outcomeId(providerKey)
-                .eventId(eventId)
+                .eventId(event.getEventId())
+                .normalEventId(eventId)
                 .marketType(marketType)
                 .league(leagueName)
                 .odds(oddsValue)
@@ -274,6 +275,7 @@ public class SportyBetService implements OddService<SportyEvent> {
                 .homeTeam(event.getHomeTeamName())
                 .awayTeam(event.getAwayTeamName())
                 .outcomeDescription(outcomeDesc)
+//                .eventName(ev)
                 .isActive(true)
                 .eventStartTime(event.getEstimateStartTime())
                 .sportEnum(determineSport(event))
@@ -351,7 +353,9 @@ public class SportyBetService implements OddService<SportyEvent> {
                 MarketCategory.OVER_UNDER_1STHALF,
                 MarketCategory.OVER_UNDER_2NDHALF,
                 MarketCategory.ODD_EVEN,
-                MarketCategory.MATCH_RESULT
+                MarketCategory.MATCH_RESULT,
+                MarketCategory.GAME_POINT_HANDICAP
+//                MarketCategory.BASKETBALL_HANDICAP
         ).contains(category);
 
         log.debug("Should group market '{}': {}", category, shouldGroup);

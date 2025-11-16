@@ -340,7 +340,9 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
                 MarketCategory.OVER_UNDER_2NDHALF,
                 MarketCategory.ODD_EVEN,
                 MarketCategory.MATCH_RESULT,
-                MarketCategory.BASKETBALL_MATCH_WINNER
+                MarketCategory.BASKETBALL_MATCH_WINNER,
+                MarketCategory.GAME_POINT_HANDICAP
+//                MarketCategory.BASKETBALL_HANDICAP
         ).contains(category);
     }
 

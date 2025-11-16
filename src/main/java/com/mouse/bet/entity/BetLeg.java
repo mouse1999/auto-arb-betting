@@ -30,6 +30,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder(toBuilder = true)
+@ToString(exclude = "arb")
 public class BetLeg {
 
     @Id
@@ -244,4 +245,5 @@ public class BetLeg {
         copy.updatePotentialPayout();
         return copy;
     }
+
 }

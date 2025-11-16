@@ -12,73 +12,117 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * This class helps to add arbs to caches and also provides methods to update it if it already existed
- * persist arb info in database
- * it depends on arbcalculator
- *
+ * Service for managing arbitrage opportunities
+ * - Persists and updates arbs in database
+ * - Tracks odds changes and snapshots
+ * - Provides ranked arbitrage recommendations
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ArbService {
+
     private final ArbRepository arbRepository;
 
+    // Emoji constants for logging
+    private static final String EMOJI_SAVE = "💾";
+    private static final String EMOJI_NEW = "🆕";
+    private static final String EMOJI_UPDATE = "🔄";
+    private static final String EMOJI_SUCCESS = "✅";
+    private static final String EMOJI_WARNING = "⚠️";
+    private static final String EMOJI_ERROR = "❌";
+    private static final String EMOJI_CHART = "📊";
+    private static final String EMOJI_MONEY = "💰";
+    private static final String EMOJI_CLOCK = "⏰";
+    private static final String EMOJI_FIRE = "🔥";
+    private static final String EMOJI_TARGET = "🎯";
+    private static final String EMOJI_SEARCH = "🔍";
+    private static final String EMOJI_TROPHY = "🏆";
+    private static final String EMOJI_CHANGE = "📈";
+
     /**
-     * Save or update an Arb (identified by normalEventId).
-     * - If new: attach legs properly, compute payouts, mark seen, seed odds history + snapshot, compute metrics, save.
-     * - If existing: merge scalar fields, upsert legs, detect odds changes, snapshot each update, compute metrics, save.
+     * Save or update an Arb
+     * - New arb: Initialize, compute metrics, create snapshot
+     * - Existing arb: Merge fields, detect odds changes, update metrics
      */
     @Transactional
     public void saveArb(Arb incoming) {
-//        Objects.requireNonNull(incoming, "arb must not be null");
-//        Objects.requireNonNull(incoming.getNormalEventId(), "arb.normalEventId must not be null");
+        log.info("{} {} Starting arb save process | ArbId: {}",
+                EMOJI_SAVE, EMOJI_TARGET, incoming.getArbId());
 
         Instant now = Instant.now();
 
-        // Normalize incoming legs to respect A/B roles and bidirectional consistency
-        normalizeIncomingLegs(incoming);
-
-        // Ensure potential payouts are up-to-date on the payload
-        incoming.getLegA().ifPresent(BetLeg::updatePotentialPayout);
-        incoming.getLegB().ifPresent(BetLeg::updatePotentialPayout);
-
-        Arb result = arbRepository.findById(incoming.getArbId())
-                .map(existing -> updateExistingArb(existing, incoming, now))
-                .orElseGet(() -> newArb(incoming, now));
-
-        Arb persisted = arbRepository.save(result);
-
-        if (log.isDebugEnabled()) {
-            log.debug("Upserted Arb {} | status={} active={} legs={} changes={}",
-                    persisted.getArbId(),
-                    persisted.getStatus(),
-                    persisted.isActive(),
-                    persisted.getLegs().size(),
-                    persisted.getOddsChangeCount());
+        // Initialize timestamps if null
+        if (incoming.getCreatedAt() == null) {
+            incoming.setCreatedAt(now);
+            log.info("{} Set createdAt: {}", EMOJI_CLOCK, now);
         }
 
-    }
+        if (incoming.getLastUpdatedAt() == null) {
+            incoming.setLastUpdatedAt(now);
+            log.info("{} Set lastUpdatedAt: {}", EMOJI_CLOCK, now);
+        }
 
+        // Update potential payouts
+        incoming.getLegA().ifPresent(leg -> {
+            leg.updatePotentialPayout();
+            log.debug("{} Updated payout for LegA: {}", EMOJI_MONEY, leg.getPotentialPayout());
+        });
+
+        incoming.getLegB().ifPresent(leg -> {
+            leg.updatePotentialPayout();
+            log.debug("{} Updated payout for LegB: {}", EMOJI_MONEY, leg.getPotentialPayout());
+        });
+
+        // Find existing or create new
+        Arb result = arbRepository.findById(incoming.getArbId())
+                .map(existing -> {
+                    log.info("{} {} Updating existing arb | ArbId: {}",
+                            EMOJI_UPDATE, EMOJI_FIRE, existing.getArbId());
+                    return updateExistingArb(existing, incoming, now);
+                })
+                .orElseGet(() -> {
+                    log.info("{} {} Creating new arb | ArbId: {} | Profit: {}%",
+                            EMOJI_NEW, EMOJI_FIRE, incoming.getArbId(), incoming.getProfitPercentage());
+                    return newArb(incoming, now);
+                });
+
+        // Persist to database
+        Arb persisted = arbRepository.save(result);
+
+        log.info("{} {} Arb persisted successfully | ArbId: {} | Status: {} | Active: {} | Legs: {} | OddsChanges: {} | Profit: {}%",
+                EMOJI_SUCCESS, EMOJI_SAVE,
+                persisted.getArbId(),
+                persisted.getStatus(),
+                persisted.isActive(),
+                persisted.getLegs().size(),
+                persisted.getOddsChangeCount(),
+                persisted.getProfitPercentage());
+    }
 
     /**
      * Update an existing arb with new data
      */
     private Arb updateExistingArb(Arb existing, Arb incoming, Instant now) {
+        log.debug("{} Merging scalar fields | ArbId: {}", EMOJI_UPDATE, existing.getArbId());
+
         // Merge top-level fields
         mergeScalarFields(existing, incoming);
 
         // Mark as seen
         existing.markSeen(now);
+        log.info("{} Marked as seen at: {}", EMOJI_CLOCK, now);
 
         // Track previous odds for change detection
         BigDecimal oldA = existing.getLegA().map(BetLeg::getOdds).orElse(null);
         BigDecimal oldB = existing.getLegB().map(BetLeg::getOdds).orElse(null);
+
+        log.info("{} Previous odds | LegA: {} | LegB: {}", EMOJI_CHART, oldA, oldB);
 
         // Upsert legs
         upsertLeg(existing, incoming.getLegA().orElse(null), true);
@@ -88,15 +132,24 @@ public class ArbService {
         BigDecimal newA = existing.getLegA().map(BetLeg::getOdds).orElse(null);
         BigDecimal newB = existing.getLegB().map(BetLeg::getOdds).orElse(null);
 
+        log.info("{} New odds | LegA: {} | LegB: {}", EMOJI_CHART, newA, newB);
+
         // Handle odds changes
         handleOddsChanges(existing, oldA, oldB, newA, newB);
 
         // Update peak profit
         if (incoming.getProfitPercentage() != null) {
+            BigDecimal oldPeak = existing.getPeakProfitPercentage();
             existing.updatePeakProfit(incoming.getProfitPercentage());
+
+            if (oldPeak == null || incoming.getProfitPercentage().compareTo(oldPeak) > 0) {
+                log.info("{} {} New peak profit achieved | Old: {}% | New: {}% | ArbId: {}",
+                        EMOJI_TROPHY, EMOJI_FIRE, oldPeak, incoming.getProfitPercentage(), existing.getArbId());
+            }
         }
 
-        // Recompute stability metrics from recent odds history
+        // Recompute stability metrics
+        log.info("{} Recomputing derived metrics | ArbId: {}", EMOJI_CHART, existing.getArbId());
         ArbFilter.recomputeDerivedMetrics(existing);
 
         return existing;
@@ -107,28 +160,40 @@ public class ArbService {
      */
     private Arb newArb(Arb fresh, Instant now) {
         fresh.markSeen(now);
+        log.info("{} Marked new arb as seen at: {}", EMOJI_CLOCK, now);
 
         // Initial odds history & snapshot
         BigDecimal a = fresh.getLegA().map(BetLeg::getOdds).orElse(null);
         BigDecimal b = fresh.getLegB().map(BetLeg::getOdds).orElse(null);
 
+        log.info("{} Initial odds | LegA: {} | LegB: {} | ArbId: {}",
+                EMOJI_CHART, a, b, fresh.getArbId());
+
         if (a != null || b != null) {
             try {
                 fresh.updateOdds(a, b, "CREATED");
+                log.info("{} {} Initial odds history created | ArbId: {}",
+                        EMOJI_SUCCESS, EMOJI_NEW, fresh.getArbId());
             } catch (Exception e) {
-                log.warn("Initial odds history write failed for {}: {}", fresh.getArbId(), e.getMessage());
+                log.error("{} {} Initial odds history failed | ArbId: {} | Error: {}",
+                        EMOJI_ERROR, EMOJI_WARNING, fresh.getArbId(), e.getMessage());
                 captureSnapshotSafely(fresh, "CREATED_NO_ODDS_HISTORY");
             }
         } else {
+            log.warn("{} No odds available for new arb | ArbId: {}",
+                    EMOJI_WARNING, fresh.getArbId());
             captureSnapshotSafely(fresh, "CREATED_NO_ODDS");
         }
 
         // Set initial peak profit
         if (fresh.getProfitPercentage() != null) {
             fresh.updatePeakProfit(fresh.getProfitPercentage());
+            log.info("{} {} Initial peak profit set: {}% | ArbId: {}",
+                    EMOJI_TROPHY, EMOJI_MONEY, fresh.getProfitPercentage(), fresh.getArbId());
         }
 
-        // Compute stability metrics on creation
+        // Compute stability metrics
+        log.info("{} Computing initial stability metrics | ArbId: {}", EMOJI_CHART, fresh.getArbId());
         ArbFilter.recomputeDerivedMetrics(fresh);
 
         return fresh;
@@ -143,34 +208,28 @@ public class ArbService {
         boolean bChanged = hasOddsChanged(oldB, newB);
 
         if (aChanged || bChanged) {
+            log.info("{} {} Odds change detected | ArbId: {} | LegA: {} -> {} | LegB: {} -> {}",
+                    EMOJI_CHANGE, EMOJI_FIRE,
+                    existing.getArbId(),
+                    oldA, newA,
+                    oldB, newB);
+
             try {
                 existing.updateOdds(
                         newA != null ? newA : oldA,
                         newB != null ? newB : oldB,
                         "SERVICE_UPSERT"
                 );
+                log.info("{} Odds history updated successfully | ArbId: {} | Changes: {}",
+                        EMOJI_SUCCESS, existing.getArbId(), existing.getOddsChangeCount());
             } catch (Exception e) {
-                log.warn("Odds history update failed for {}: {}", existing.getArbId(), e.getMessage());
+                log.error("{} {} Odds history update failed | ArbId: {} | Error: {}",
+                        EMOJI_ERROR, EMOJI_WARNING, existing.getArbId(), e.getMessage());
                 captureSnapshotSafely(existing, "UPSERT_FALLBACK_SNAPSHOT");
             }
         } else {
+            log.info("{} No odds change detected | ArbId: {}", EMOJI_CHART, existing.getArbId());
             captureSnapshotSafely(existing, "NO_ODDS_CHANGE");
-        }
-    }
-
-    /**
-     * Normalize incoming legs to ensure single A/B leg invariant
-     */
-    private void normalizeIncomingLegs(Arb arb) {
-        List<BetLeg> copy = new ArrayList<>(arb.getLegs());
-        arb.getLegs().clear();
-
-        for (BetLeg leg : copy) {
-            if (leg.isPrimaryLeg()) {
-                arb.setLegA(leg);
-            } else {
-                arb.setLegB(leg);
-            }
         }
     }
 
@@ -187,6 +246,8 @@ public class ArbService {
      * Merge scalar fields from source to target arb
      */
     private void mergeScalarFields(Arb target, Arb source) {
+        log.trace("{} Merging scalar fields | ArbId: {}", EMOJI_UPDATE, target.getArbId());
+
         // Identity/Event meta
         target.setSportEnum(source.getSportEnum());
         target.setLeague(source.getLeague());
@@ -204,7 +265,7 @@ public class ArbService {
         target.setExpiresAt(source.getExpiresAt());
         target.setPredictedHoldUpMs(source.getPredictedHoldUpMs());
 
-        // Flags & metrics (will be recomputed by ArbFilter)
+        // Flags & metrics
         target.setStatus(source.getStatus() != null ? source.getStatus() : target.getStatus());
         target.setActive(source.isActive());
         target.setShouldBet(source.isShouldBet());
@@ -219,29 +280,47 @@ public class ArbService {
      * Upsert a bet leg (either primary/A or secondary/B)
      */
     private void upsertLeg(Arb existing, BetLeg incomingLeg, boolean isPrimary) {
-        if (incomingLeg == null) return;
+        if (incomingLeg == null) {
+            log.trace("{} No incoming leg to upsert | isPrimary: {}", EMOJI_WARNING, isPrimary);
+            return;
+        }
 
+        String legLabel = isPrimary ? "LegA" : "LegB";
         incomingLeg.setPrimaryLeg(isPrimary);
 
         Optional<BetLeg> maybeExisting = isPrimary ? existing.getLegA() : existing.getLegB();
+
         if (maybeExisting.isEmpty()) {
-            // attach a detached clone, avoids cross-Arb ownership
+            log.info("{} {} Creating new {} | Bookmaker: {} | Odds: {}",
+                    EMOJI_NEW, EMOJI_SUCCESS, legLabel,
+                    incomingLeg.getBookmaker(), incomingLeg.getOdds());
+
+            // Attach a detached clone, avoids cross-Arb ownership
             BetLeg clone = incomingLeg.toBuilder()
-                    .id(null).version(null)
+                    .id(null)
+                    .version(null)
                     .arb(null)
                     .build();
             clone.setPrimaryLeg(isPrimary);
 
             existing.attachLeg(clone);
             clone.updatePotentialPayout();
+
+            log.info("{} {} attached with payout: {}",
+                    legLabel, EMOJI_MONEY, clone.getPotentialPayout());
             return;
         }
 
-        // merge into existing role
+        // Merge into existing leg
         BetLeg existingLeg = maybeExisting.get();
-        mergeLegFields(existingLeg, incomingLeg);
-    }
+        log.info("{} Merging into existing {} | Old odds: {} | New odds: {}",
+                EMOJI_UPDATE, legLabel, existingLeg.getOdds(), incomingLeg.getOdds());
 
+        mergeLegFields(existingLeg, incomingLeg);
+
+        log.info("{} {} updated successfully | Payout: {}",
+                legLabel, EMOJI_SUCCESS, existingLeg.getPotentialPayout());
+    }
 
     /**
      * Merge fields from incoming leg to existing leg
@@ -291,77 +370,145 @@ public class ArbService {
     private void captureSnapshotSafely(Arb arb, String reason) {
         try {
             arb.captureSnapshot(reason);
+            log.debug("{} Snapshot captured | Reason: {} | ArbId: {}",
+                    EMOJI_SUCCESS, reason, arb.getArbId());
         } catch (Exception e) {
-            log.warn("Failed to capture snapshot for {} with reason '{}': {}",
-                    arb.getArbId(), reason, e.getMessage());
+            log.warn("{} {} Snapshot capture failed | ArbId: {} | Reason: {} | Error: {}",
+                    EMOJI_WARNING, EMOJI_ERROR, arb.getArbId(), reason, e.getMessage());
         }
     }
 
+    /**
+     * Fetch top arbitrage opportunities by ranking metrics
+     */
     public List<Arb> fetchTopArbsByMetrics(BigDecimal minProfit, int limit) {
-        var now = Instant.now();
+        log.info("{} {} Fetching top arbs | MinProfit: {}% | Limit: {}",
+                EMOJI_SEARCH, EMOJI_TROPHY, minProfit, limit);
+
+        Instant now = Instant.now();
+
         // Pull a wider pool, then rank locally
-        var pool = arbRepository.findActiveCandidates(
-                now, minProfit,
+        List<Arb> pool = arbRepository.findActiveCandidates(
+                now,
+                minProfit,
                 PageRequest.of(0, Math.max(limit * 5, 100), Sort.by(Sort.Order.desc("profitPercentage")))
         );
-        // Rank by soft score using your computed metrics
-        return pool.stream()
+
+        log.info("{} Found {} candidates from database", EMOJI_CHART, pool.size());
+
+        // Rank by soft score using computed metrics
+        List<Arb> topArbs = pool.stream()
                 .filter(Arb::isShouldBet)
                 .sorted(Comparator.comparingDouble(this::score).reversed())
                 .limit(limit)
                 .toList();
+
+        log.info("{} {} Top {} arbs selected after scoring",
+                EMOJI_SUCCESS, EMOJI_FIRE, topArbs.size());
+
+        if (!topArbs.isEmpty()) {
+            Arb best = topArbs.get(0);
+            log.info("{} {} BEST ARB | ArbId: {} | Profit: {}% | Score: {} | Confidence: {}",
+                    EMOJI_TROPHY, EMOJI_FIRE,
+                    best.getArbId(),
+                    best.getProfitPercentage(),
+                    String.format("%.2f", score(best)),
+                    best.getConfidenceScore());
+        }
+
+        return topArbs;
     }
 
-    /** Higher score = better. No hard cutoffs here. */
+    /**
+     * Calculate composite score for arb ranking
+     * Higher score = better opportunity
+     */
     private double score(Arb a) {
         double profit = nz(a.getProfitPercentage());
-        double conf   = nz(a.getConfidenceScore());            // higher is better
-        double vel    = nz(a.getVelocityPctPerSec());          // lower is better
-        double vol    = nz(a.getVolatilitySigma());            // lower is better
-        double meanDev = meanDeviation(a);                     // lower is better (distance from SMA)
-        double recency = recencyBoost(a);                      // small bonus for fresh data
+        double conf = nz(a.getConfidenceScore());            // higher is better
+        double vel = nz(a.getVelocityPctPerSec());          // lower is better
+        double vol = nz(a.getVolatilitySigma());            // lower is better
+        double meanDev = meanDeviation(a);                   // lower is better
+        double recency = recencyBoost(a);                    // small bonus for fresh data
 
-        // Weights: profit leads; confidence helps; velocity/volatility/meanDev penalize; slight recency boost
-        return 1.00 * profit
+        double compositeScore = 1.00 * profit
                 + 0.60 * conf
                 - 0.25 * vel
                 - 0.20 * vol
                 - 0.15 * meanDev
                 + 0.05 * recency;
+
+        log.info("{} Score calculated | ArbId: {} | Total: {:.2f} | Profit: {:.2f} | Conf: {:.2f} | Vel: {:.2f} | Vol: {:.2f}",
+                EMOJI_CHART, a.getArbId(), compositeScore, profit, conf, vel, vol);
+
+        return compositeScore;
     }
 
+    /**
+     * Calculate mean deviation from SMA for odds
+     */
     private double meanDeviation(Arb a) {
-        double devA = 0.0, devB = 0.0; int n=0;
-        var legA = a.getLegA().map(BetLeg::getOdds).orElse(null);
-        if (legA != null && a.getMeanOddsLegA()!=null && a.getMeanOddsLegA()>0) {
-            devA = Math.abs(legA.doubleValue()/a.getMeanOddsLegA() - 1.0)*100.0; n++;
+        double devA = 0.0, devB = 0.0;
+        int n = 0;
+
+        BigDecimal legAOdds = a.getLegA().map(BetLeg::getOdds).orElse(null);
+        if (legAOdds != null && a.getMeanOddsLegA() != null && a.getMeanOddsLegA() > 0) {
+            devA = Math.abs(legAOdds.doubleValue() / a.getMeanOddsLegA() - 1.0) * 100.0;
+            n++;
         }
-        var legB = a.getLegB().map(BetLeg::getOdds).orElse(null);
-        if (legB != null && a.getMeanOddsLegB()!=null && a.getMeanOddsLegB()>0) {
-            devB = Math.abs(legB.doubleValue()/a.getMeanOddsLegB() - 1.0)*100.0; n++;
+
+        BigDecimal legBOdds = a.getLegB().map(BetLeg::getOdds).orElse(null);
+        if (legBOdds != null && a.getMeanOddsLegB() != null && a.getMeanOddsLegB() > 0) {
+            devB = Math.abs(legBOdds.doubleValue() / a.getMeanOddsLegB() - 1.0) * 100.0;
+            n++;
         }
-        return n==0?0.0:(devA+devB)/n; // % from SMA
+
+        return n == 0 ? 0.0 : (devA + devB) / n;
     }
 
+    /**
+     * Calculate recency boost based on last update time
+     */
     private double recencyBoost(Arb a) {
-        // tiny boost if updated in last 10s making most recent have an edge
-        var lu = a.getLastUpdatedAt();
+        Instant lu = a.getLastUpdatedAt();
         if (lu == null) return 0.0;
+
         long ageSec = Math.max(0, Instant.now().getEpochSecond() - lu.getEpochSecond());
-        if (ageSec <= 3)  return 1.0;
+
+        if (ageSec <= 3) return 1.0;
         if (ageSec <= 10) return 0.5;
         return 0.0;
     }
 
-    private double nz(Double d) { return d==null?0.0:d; }
+    /**
+     * Null-safe double conversion
+     */
+    private double nz(Double d) {
+        return d == null ? 0.0 : d;
+    }
+
+    /**
+     * Null-safe BigDecimal to double conversion
+     */
     private double nz(BigDecimal b) {
-        return b==null?0.0:b.doubleValue();
+        return b == null ? 0.0 : b.doubleValue();
     }
 
+    /**
+     * Retrieve arb by its unique identifier
+     */
     public Arb getArbByNormalEventId(String normalEventId) {
-        return arbRepository.findByArbId(normalEventId).orElse(null);
+        log.info("{} {} Fetching arb by ID: {}", EMOJI_SEARCH, EMOJI_TARGET, normalEventId);
+
+        Arb arb = arbRepository.findByArbId(normalEventId).orElse(null);
+
+        if (arb != null) {
+            log.debug("{} Arb found | ArbId: {} | Profit: {}%",
+                    EMOJI_SUCCESS, arb.getArbId(), arb.getProfitPercentage());
+        } else {
+            log.debug("{} Arb not found | ArbId: {}", EMOJI_WARNING, normalEventId);
+        }
+
+        return arb;
     }
-
-
-
 }

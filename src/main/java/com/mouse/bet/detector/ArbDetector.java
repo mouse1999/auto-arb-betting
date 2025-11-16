@@ -104,7 +104,7 @@ public class ArbDetector {
                     }
 
                     List<NormalizedEvent> eventList = new ArrayList<>(events);
-                    log.debug("Analyzing {} events for arbitrage (eventId={})", eventList.size(), eventId);
+                    log.info("Analyzing {} events for arbitrage (eventId={})", eventList.size(), eventId);
 
                     List<Arb> opportunities = arbFactory.findOpportunities(eventList);
 

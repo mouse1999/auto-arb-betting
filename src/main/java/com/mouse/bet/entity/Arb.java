@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
         }
 )
 @EntityListeners(AuditingEntityListener.class)
+@ToString(exclude = {"legs", "history"})
 public class Arb {
 
     @Version
@@ -171,6 +172,10 @@ public class Arb {
         attachLeg(legB);
     }
 
+    public void clearLegs() {
+        this.legs.clear();
+    }
+
     public void attachLeg(BetLeg leg) {
         if (leg.getArb() != null && leg.getArb() != this) {
             throw new IllegalStateException("Leg is already attached to another Arb");
@@ -278,7 +283,7 @@ public class Arb {
     }
 
     /** Recent odds changes (last N) */
-    public List<com.mouse.bet.model.OddsChange> getRecentOddsChanges(int limit) {
+    public List<OddsChange> getRecentOddsChanges(int limit) {
         if (oddsHistory == null || oddsHistory.isEmpty()) return Collections.emptyList();
         return oddsHistory.values().stream()
                 .sorted(Comparator.comparing(com.mouse.bet.model.OddsChange::getTimestamp).reversed())
@@ -287,7 +292,7 @@ public class Arb {
     }
 
     /** Odds changes within time range */
-    public List<com.mouse.bet.model.OddsChange> getOddsChangesBetween(Instant start, Instant end) {
+    public List<OddsChange> getOddsChangesBetween(Instant start, Instant end) {
         if (oddsHistory == null || oddsHistory.isEmpty()) return Collections.emptyList();
         long startMillis = start.toEpochMilli();
         long endMillis = end.toEpochMilli();
@@ -355,4 +360,5 @@ public class Arb {
             if (minOddsLegB == null || oddsB.compareTo(minOddsLegB) < 0) minOddsLegB = oddsB;
         }
     }
+
 }
