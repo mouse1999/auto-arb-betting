@@ -2,10 +2,7 @@ package com.mouse.bet.service;
 
 import com.mouse.bet.entity.Arb;
 import com.mouse.bet.entity.BetLeg;
-import com.mouse.bet.enums.BookMaker;
-import com.mouse.bet.enums.BetLegStatus;
-import com.mouse.bet.enums.SportEnum;
-import com.mouse.bet.enums.Status;
+import com.mouse.bet.enums.*;
 import com.mouse.bet.repository.ArbRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,8 +49,8 @@ class ArbServiceTest {
         service.saveArb(spyIncoming);
 
         verify(spyIncoming, atLeastOnce()).markSeen(any());
-        verify(spyIncoming).updateOdds(bd("2.00"), bd("3.50"), "CREATED");
-        verify(spyIncoming, never()).captureSnapshot("CREATED_NO_ODDS");
+        verify(spyIncoming).updateOdds(bd("2.00"), bd("3.50"), ChangeReason.CREATED);
+        verify(spyIncoming, never()).captureSnapshot(ChangeReason.CREATED_NO_ODDS);
         verify(arbRepository).save(spyIncoming);
 
         assertThat(spyIncoming.getLegA().get().getPotentialPayout()).isEqualByComparingTo(bd("20.00"));
@@ -73,8 +70,8 @@ class ArbServiceTest {
         Arb spyIncoming = spy(incoming);
         service.saveArb(spyIncoming);
 
-        verify(spyIncoming).captureSnapshot("CREATED_NO_ODDS");
-        verify(spyIncoming, never()).updateOdds(any(), any(), anyString());
+        verify(spyIncoming).captureSnapshot(ChangeReason.CREATED_NO_ODDS);
+        verify(spyIncoming, never()).updateOdds(any(), any(), ChangeReason.CREATED_NO_ODDS);
         verify(arbRepository).save(spyIncoming);
     }
 
@@ -95,8 +92,8 @@ class ArbServiceTest {
         service.saveArb(incoming);
 
         verify(spyExisting, atLeastOnce()).markSeen(any());
-        verify(spyExisting).updateOdds(bd("2.10"), bd("3.00"), "SERVICE_UPSERT");
-        verify(spyExisting, never()).captureSnapshot("UPSERT_FALLBACK_SNAPSHOT");
+        verify(spyExisting).updateOdds(bd("2.10"), bd("3.00"), ChangeReason.SERVICE_UPSERT);
+        verify(spyExisting, never()).captureSnapshot(ChangeReason.UPSERT_FALLBACK_SNAPSHOT);
         verify(arbRepository).save(spyExisting);
     }
 
@@ -115,8 +112,8 @@ class ArbServiceTest {
 
         service.saveArb(incoming);
 
-        verify(spyExisting).captureSnapshot("NO_ODDS_CHANGE");
-        verify(spyExisting, never()).updateOdds(any(), any(), anyString());
+        verify(spyExisting).captureSnapshot(ChangeReason.NO_ODDS_CHANGE);
+        verify(spyExisting, never()).updateOdds(any(), any(), ChangeReason.NO_ODDS_CHANGE);
         verify(arbRepository).save(spyExisting);
     }
 
@@ -135,8 +132,8 @@ class ArbServiceTest {
 
         service.saveArb(incoming);
 
-        verify(spyExisting).captureSnapshot("NO_ODDS_CHANGE");
-        verify(spyExisting, never()).updateOdds(any(), any(), anyString());
+        verify(spyExisting).captureSnapshot(ChangeReason.NO_ODDS_CHANGE);
+        verify(spyExisting, never()).updateOdds(any(), any(), ChangeReason.NO_ODDS_CHANGE);
         verify(arbRepository).save(spyExisting);
         assertThat(spyExisting.getLegB()).isPresent(); // B preserved
     }
@@ -155,11 +152,11 @@ class ArbServiceTest {
         when(arbRepository.save(any(Arb.class))).thenAnswer(inv -> inv.getArgument(0));
 
         doThrow(new RuntimeException("history backend down"))
-                .when(spyExisting).updateOdds(bd("2.10"), bd("3.00"), "SERVICE_UPSERT");
+                .when(spyExisting).updateOdds(bd("2.10"), bd("3.00"), ChangeReason.SERVICE_UPSERT);
 
         service.saveArb(incoming);
 
-        verify(spyExisting).captureSnapshot("UPSERT_FALLBACK_SNAPSHOT");
+        verify(spyExisting).captureSnapshot(ChangeReason.UPSERT_FALLBACK_SNAPSHOT);
         verify(arbRepository).save(spyExisting);
     }
 
@@ -191,12 +188,12 @@ class ArbServiceTest {
             verify(spyExisting).updateOdds(
                     newA != null ? newA : oldA,
                     newB != null ? newB : oldB,
-                    "SERVICE_UPSERT"
+                    ChangeReason.SERVICE_UPSERT
             );
-            verify(spyExisting, never()).captureSnapshot("NO_ODDS_CHANGE");
+            verify(spyExisting, never()).captureSnapshot(ChangeReason.NO_ODDS_CHANGE);
         } else {
-            verify(spyExisting, never()).updateOdds(any(), any(), anyString());
-            verify(spyExisting).captureSnapshot("NO_ODDS_CHANGE");
+            verify(spyExisting, never()).updateOdds(any(), any(), ChangeReason.NO_ODDS_CHANGE);
+            verify(spyExisting).captureSnapshot(ChangeReason.NO_ODDS_CHANGE);
         }
     }
 

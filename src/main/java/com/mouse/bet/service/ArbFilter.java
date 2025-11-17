@@ -18,7 +18,6 @@ import java.util.stream.Collectors;
  *
  */
 @Slf4j
-@Component
 public class ArbFilter {
 
     // Metric tuning parameters

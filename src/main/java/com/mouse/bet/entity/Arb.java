@@ -193,7 +193,7 @@ public class Arb {
     /* -------------------- Business logic (adapted) -------------------- */
 
     /** Capture current state before updating odds */
-    public void captureSnapshot(String changeReason) {
+    public void captureSnapshot(ChangeReason changeReason) {
         Optional<BetLeg> legA = getLegA();
         Optional<BetLeg> legB = getLegB();
         if (legA.isEmpty() || legB.isEmpty()) {
@@ -212,14 +212,14 @@ public class Arb {
                 .volatilitySigma(volatilitySigma)
                 .velocityPctPerSec(velocityPctPerSec)
                 .status(status)
-                .changeReason(ChangeReason.MARKET_UPDATE)
+                .changeReason(changeReason)
                 .build();
 
         history.add(snapshot);
     }
 
     /** Update odds for both legs and track the change */
-    public void updateOdds(BigDecimal newOddsA, BigDecimal newOddsB, String changeReason) {
+    public void updateOdds(BigDecimal newOddsA, BigDecimal newOddsB, ChangeReason changeReason) {
         captureSnapshot(changeReason);
 
         BigDecimal oldOddsA = getLegA().map(BetLeg::getOdds).orElse(null);
@@ -246,13 +246,13 @@ public class Arb {
     }
 
     /** Update one leg at a time (A) */
-    public void updateLegAOdds(BigDecimal newOdds, String changeReason) {
+    public void updateLegAOdds(BigDecimal newOdds, ChangeReason changeReason) {
         BigDecimal other = getLegB().map(BetLeg::getOdds).orElse(BigDecimal.ZERO);
         updateOdds(newOdds, other, changeReason);
     }
 
     /** Update one leg at a time (B) */
-    public void updateLegBOdds(BigDecimal newOdds, String changeReason) {
+    public void updateLegBOdds(BigDecimal newOdds, ChangeReason changeReason) {
         BigDecimal other = getLegA().map(BetLeg::getOdds).orElse(BigDecimal.ZERO);
         updateOdds(other, newOdds, changeReason);
     }
@@ -300,14 +300,14 @@ public class Arb {
         return oddsHistory.entrySet().stream()
                 .filter(e -> e.getKey() >= startMillis && e.getKey() <= endMillis)
                 .map(Map.Entry::getValue)
-                .sorted(Comparator.comparing(com.mouse.bet.model.OddsChange::getTimestamp).reversed())
+                .sorted(Comparator.comparing(OddsChange::getTimestamp).reversed())
                 .toList();
     }
 
     /** Average odds velocity over recent window */
     public Double calculateAverageVelocity(int windowMinutes) {
         Instant cutoff = Instant.now().minusSeconds(windowMinutes * 60L);
-        List<com.mouse.bet.model.OddsChange> recent = getOddsChangesBetween(cutoff, Instant.now());
+        List<OddsChange> recent = getOddsChangesBetween(cutoff, Instant.now());
         if (recent.isEmpty()) return 0.0;
 
         double totalDelta = recent.stream()

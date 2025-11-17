@@ -2,6 +2,7 @@ package com.mouse.bet.service;
 
 import com.mouse.bet.entity.Arb;
 import com.mouse.bet.entity.BetLeg;
+import com.mouse.bet.enums.ChangeReason;
 import com.mouse.bet.repository.ArbRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -171,18 +172,18 @@ public class ArbService {
 
         if (a != null || b != null) {
             try {
-                fresh.updateOdds(a, b, "CREATED");
+                fresh.updateOdds(a, b, ChangeReason.CREATED);
                 log.info("{} {} Initial odds history created | ArbId: {}",
                         EMOJI_SUCCESS, EMOJI_NEW, fresh.getArbId());
             } catch (Exception e) {
                 log.error("{} {} Initial odds history failed | ArbId: {} | Error: {}",
                         EMOJI_ERROR, EMOJI_WARNING, fresh.getArbId(), e.getMessage());
-                captureSnapshotSafely(fresh, "CREATED_NO_ODDS_HISTORY");
+                captureSnapshotSafely(fresh, ChangeReason.CREATED_NO_ODDS_HISTORY);
             }
         } else {
             log.warn("{} No odds available for new arb | ArbId: {}",
                     EMOJI_WARNING, fresh.getArbId());
-            captureSnapshotSafely(fresh, "CREATED_NO_ODDS");
+            captureSnapshotSafely(fresh, ChangeReason.CREATED_NO_ODDS);
         }
 
         // Set initial peak profit
@@ -218,18 +219,18 @@ public class ArbService {
                 existing.updateOdds(
                         newA != null ? newA : oldA,
                         newB != null ? newB : oldB,
-                        "SERVICE_UPSERT"
+                        ChangeReason.SERVICE_UPSERT
                 );
                 log.info("{} Odds history updated successfully | ArbId: {} | Changes: {}",
                         EMOJI_SUCCESS, existing.getArbId(), existing.getOddsChangeCount());
             } catch (Exception e) {
                 log.error("{} {} Odds history update failed | ArbId: {} | Error: {}",
                         EMOJI_ERROR, EMOJI_WARNING, existing.getArbId(), e.getMessage());
-                captureSnapshotSafely(existing, "UPSERT_FALLBACK_SNAPSHOT");
+                captureSnapshotSafely(existing, ChangeReason.UPSERT_FALLBACK_SNAPSHOT);
             }
         } else {
             log.info("{} No odds change detected | ArbId: {}", EMOJI_CHART, existing.getArbId());
-            captureSnapshotSafely(existing, "NO_ODDS_CHANGE");
+            captureSnapshotSafely(existing, ChangeReason.NO_ODDS_CHANGE);
         }
     }
 
@@ -367,7 +368,7 @@ public class ArbService {
     /**
      * Safely capture snapshot, swallowing exceptions
      */
-    private void captureSnapshotSafely(Arb arb, String reason) {
+    private void captureSnapshotSafely(Arb arb, ChangeReason reason) {
         try {
             arb.captureSnapshot(reason);
             log.debug("{} Snapshot captured | Reason: {} | ArbId: {}",

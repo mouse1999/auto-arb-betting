@@ -1,5 +1,6 @@
 package com.mouse.bet.model;
 
+import com.mouse.bet.enums.ChangeReason;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -21,5 +22,5 @@ public class OddsChange {
     private BigDecimal newOddsB;
     private BigDecimal deltaA;  // newOddsA - oldOddsA
     private BigDecimal deltaB;  // newOddsB - oldOddsB
-    private String changeReason;
+    private ChangeReason changeReason;
 }
