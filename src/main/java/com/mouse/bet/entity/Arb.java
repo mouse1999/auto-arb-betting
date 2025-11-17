@@ -15,8 +15,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
+/**
+ * Arb entity - Pure data model with minimal business logic
+ * Business logic moved to ArbService and ArbMetricsCalculator
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -35,9 +38,14 @@ import java.util.stream.Collectors;
 @ToString(exclude = {"legs", "history"})
 public class Arb {
 
+    @Id
+    @Column(length = 128)
+    private String arbId;
+
     @Version
     private Integer version;
 
+    // Event metadata
     @Enumerated(EnumType.STRING)
     @Column(length = 64)
     private SportEnum sportEnum;
@@ -45,12 +53,6 @@ public class Arb {
     @Column(length = 128)
     private String league;
 
-    /** Business key that already existed in your model */
-    @Id
-    @Column(length = 128)
-    private String arbId;
-
-    /** Period/phase (kept on Arb; legs also store period for their own context) */
     @Column(length = 64)
     private String period;
 
@@ -59,23 +61,21 @@ public class Arb {
 
     private Instant eventStartTime;
 
-    /** Current set/match score (e.g., "0:2") */
+    // Live match data
     @Column(length = 24)
     private String setScore;
 
-    /** Period scores stored as TEXT via converter */
     @Convert(converter = StringListConverter.class)
     @Column(columnDefinition = "TEXT")
     private List<String> gameScore;
 
-    /** Match status (e.g., "H2") */
     @Column(length = 24)
     private String matchStatus;
 
-    /** Time elapsed in current period */
     @Column(length = 24)
     private String playedSeconds;
 
+    // Timestamps
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -90,6 +90,7 @@ public class Arb {
     private Instant expiresAt;
     private Integer predictedHoldUpMs;
 
+    // Status flags
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(length = 24, nullable = false)
@@ -100,19 +101,20 @@ public class Arb {
     private boolean active = true;
 
     private boolean shouldBet;
+
+    // Computed metrics (calculated by ArbMetricsCalculator)
     private Double confidenceScore;
     private Double volatilitySigma;
     private Double velocityPctPerSec;
     private Double meanOddsLegA;
     private Double meanOddsLegB;
 
+    // Financial data
     private BigDecimal stakeA;
     private BigDecimal stakeB;
-
-    /** Profit percentage of the arb */
     private BigDecimal profitPercentage;
 
-    /** Legs (A=primary, B=secondary) */
+    // Relationships
     @Builder.Default
     @OneToMany(
             mappedBy = "arb",
@@ -123,34 +125,119 @@ public class Arb {
     @OrderBy("isPrimaryLeg DESC, id ASC")
     private List<BetLeg> legs = new ArrayList<>();
 
-    /** Historical snapshots */
     @OneToMany(mappedBy = "arb", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("capturedAt DESC")
     @Builder.Default
     private List<ArbSnapshot> history = new ArrayList<>();
 
-    /** Odds changes timeline (JSON) */
+    // Odds tracking
     @Column(columnDefinition = "TEXT")
     @Convert(converter = OddsHistoryConverter.class)
     @Builder.Default
     private Map<Long, OddsChange> oddsHistory = new TreeMap<>();
 
-    /** Count of how many times odds have changed */
     @Builder.Default
     @Column(nullable = false)
     private Integer oddsChangeCount = 0;
 
-    /** Min/Max tracking */
+    // Odds range tracking
     private BigDecimal maxOddsLegA;
     private BigDecimal minOddsLegA;
     private BigDecimal maxOddsLegB;
     private BigDecimal minOddsLegB;
 
-    /** Peak profit tracking */
+    // Peak profit tracking
     private BigDecimal peakProfitPercentage;
     private Instant peakProfitAt;
 
-    /* -------------------- Helpers for legs -------------------- */
+    /**
+     * Maximum gap allowed between updates before treating as new arb
+     * Default: 5 seconds
+     */
+    @Transient
+    private static final long MAX_CONTINUITY_GAP_SECONDS = 5;
+
+    /**
+     * Timestamp of the last continuous update
+     * Used to detect gaps in arb existence
+     */
+    private Instant lastContinuousUpdateAt;
+
+    /**
+     * Counter for how many times this arb has been "reborn" after gaps
+     * Incremented each time continuity is broken
+     */
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer continuityBreakCount = 0;
+
+    /**
+     * Timestamp when current continuous session started
+     * Reset each time continuity is broken
+     */
+    private Instant currentSessionStartedAt;
+
+    /**
+     * Total seconds of continuous existence in current session
+     * Calculated from currentSessionStartedAt
+     */
+    @Transient
+    public Long getCurrentSessionDurationSeconds() {
+        if (currentSessionStartedAt == null) return 0L;
+        return Instant.now().getEpochSecond() - currentSessionStartedAt.getEpochSecond();
+    }
+
+    /**
+     * Check if there's been a continuity break
+     * Returns true if last update was too long ago
+     */
+    @Transient
+    public boolean hasContinuityBreak(Instant now) {
+        if (lastContinuousUpdateAt == null) return false;
+
+        long gapSeconds = now.getEpochSecond() - lastContinuousUpdateAt.getEpochSecond();
+        return gapSeconds > MAX_CONTINUITY_GAP_SECONDS;
+    }
+
+    /**
+     * Mark continuity break and reset session tracking
+     */
+    public void breakContinuity(Instant now) {
+        continuityBreakCount++;
+        currentSessionStartedAt = now;
+        lastContinuousUpdateAt = now;
+
+        // Clear metrics that rely on continuity
+        oddsHistory = new TreeMap<>();
+        oddsChangeCount = 0;
+        confidenceScore = null;
+        volatilitySigma = null;
+        velocityPctPerSec = null;
+        meanOddsLegA = null;
+        meanOddsLegB = null;
+    }
+
+    /**
+     * Update continuity timestamp for ongoing session
+     */
+    public void updateContinuity(Instant now) {
+        lastContinuousUpdateAt = now;
+        if (currentSessionStartedAt == null) {
+            currentSessionStartedAt = now;
+        }
+    }
+
+    /**
+     * Check if arb is in a reliable state for metrics
+     * Returns true only if session has been running long enough
+     */
+    @Transient
+    public boolean hasReliableMetrics(int minSessionSeconds) {
+        Long duration = getCurrentSessionDurationSeconds();
+        return duration != null && duration >= minSessionSeconds;
+    }
+
+    // ==================== LEG ACCESSORS ====================
 
     @Transient
     public Optional<BetLeg> getLegA() {
@@ -162,26 +249,33 @@ public class Arb {
         return legs.stream().filter(l -> !l.isPrimaryLeg()).findFirst();
     }
 
-    public void setLegA(BetLeg legA) {
-        legA.setPrimaryLeg(true);
-        attachLeg(legA);
+    // ==================== SIMPLE HELPERS ====================
+
+    /**
+     * Mark this arb as seen at a specific time
+     */
+    public void markSeen(Instant when) {
+        if (firstSeenAt == null) firstSeenAt = when;
+        lastSeenAt = when;
     }
 
-    public void setLegB(BetLeg legB) {
-        legB.setPrimaryLeg(false);
-        attachLeg(legB);
+    /**
+     * Check if arb has expired
+     */
+    public boolean isExpired(Instant now) {
+        return expiresAt != null && now.isAfter(expiresAt);
     }
 
-    public void clearLegs() {
-        this.legs.clear();
-    }
-
+    /**
+     * Add a bet leg to this arb
+     */
     public void attachLeg(BetLeg leg) {
         if (leg.getArb() != null && leg.getArb() != this) {
             throw new IllegalStateException("Leg is already attached to another Arb");
         }
         leg.setArb(this);
-        // replace existing A/B by role
+
+        // Replace existing leg with same role
         if (leg.isPrimaryLeg()) {
             getLegA().ifPresent(existing -> legs.remove(existing));
         } else {
@@ -190,74 +284,39 @@ public class Arb {
         legs.add(leg);
     }
 
-    /* -------------------- Business logic (adapted) -------------------- */
-
-    /** Capture current state before updating odds */
-    public void captureSnapshot(ChangeReason changeReason) {
-        Optional<BetLeg> legA = getLegA();
-        Optional<BetLeg> legB = getLegB();
-        if (legA.isEmpty() || legB.isEmpty()) {
-            return;
-        }
-
-        ArbSnapshot snapshot = ArbSnapshot.builder()
-                .arb(this)
-                .capturedAt(Instant.now())
-                .oddsLegA(legA.get().getOdds())
-                .oddsLegB(legB.get().getOdds())
-                .stakeA(stakeA)
-                .stakeB(stakeB)
-                .expectedProfit(profitPercentage)
-                .confidenceScore(confidenceScore)
-                .volatilitySigma(volatilitySigma)
-                .velocityPctPerSec(velocityPctPerSec)
-                .status(status)
-                .changeReason(changeReason)
-                .build();
-
+    /**
+     * Add snapshot to history
+     */
+    public void addSnapshot(ArbSnapshot snapshot) {
+        snapshot.setArb(this);
         history.add(snapshot);
     }
 
-    /** Update odds for both legs and track the change */
-    public void updateOdds(BigDecimal newOddsA, BigDecimal newOddsB, ChangeReason changeReason) {
-        captureSnapshot(changeReason);
-
-        BigDecimal oldOddsA = getLegA().map(BetLeg::getOdds).orElse(null);
-        BigDecimal oldOddsB = getLegB().map(BetLeg::getOdds).orElse(null);
-
-        OddsChange change = OddsChange.builder()
-                .timestamp(Instant.now())
-                .oldOddsA(oldOddsA)
-                .newOddsA(newOddsA)
-                .oldOddsB(oldOddsB)
-                .newOddsB(newOddsB)
-                .deltaA(calculateDelta(oldOddsA, newOddsA))
-                .deltaB(calculateDelta(oldOddsB, newOddsB))
-                .changeReason(changeReason)
-                .build();
-
-        oddsHistory.put(System.currentTimeMillis(), change);
+    /**
+     * Add odds change to history
+     */
+    public void recordOddsChange(Long timestamp, OddsChange change) {
+        oddsHistory.put(timestamp, change);
         oddsChangeCount++;
-
-        getLegA().ifPresent(leg -> { leg.setOdds(newOddsA); leg.updatePotentialPayout(); });
-        getLegB().ifPresent(leg -> { leg.setOdds(newOddsB); leg.updatePotentialPayout(); });
-
-        updateMinMaxOdds(newOddsA, newOddsB);
     }
 
-    /** Update one leg at a time (A) */
-    public void updateLegAOdds(BigDecimal newOdds, ChangeReason changeReason) {
-        BigDecimal other = getLegB().map(BetLeg::getOdds).orElse(BigDecimal.ZERO);
-        updateOdds(newOdds, other, changeReason);
+    /**
+     * Update min/max odds tracking
+     */
+    public void updateOddsRange(BigDecimal oddsA, BigDecimal oddsB) {
+        if (oddsA != null) {
+            if (maxOddsLegA == null || oddsA.compareTo(maxOddsLegA) > 0) maxOddsLegA = oddsA;
+            if (minOddsLegA == null || oddsA.compareTo(minOddsLegA) < 0) minOddsLegA = oddsA;
+        }
+        if (oddsB != null) {
+            if (maxOddsLegB == null || oddsB.compareTo(maxOddsLegB) > 0) maxOddsLegB = oddsB;
+            if (minOddsLegB == null || oddsB.compareTo(minOddsLegB) < 0) minOddsLegB = oddsB;
+        }
     }
 
-    /** Update one leg at a time (B) */
-    public void updateLegBOdds(BigDecimal newOdds, ChangeReason changeReason) {
-        BigDecimal other = getLegA().map(BetLeg::getOdds).orElse(BigDecimal.ZERO);
-        updateOdds(other, newOdds, changeReason);
-    }
-
-    /** Track peak profit if current profit is higher */
+    /**
+     * Update peak profit if current is higher
+     */
     public void updatePeakProfit(BigDecimal currentProfitPercentage) {
         if (currentProfitPercentage == null) return;
 
@@ -268,30 +327,40 @@ public class Arb {
         }
     }
 
-    /** Most recent snapshot */
+    // ==================== QUERY HELPERS ====================
+
+    /**
+     * Get most recent snapshot
+     */
     public Optional<ArbSnapshot> getLatestSnapshot() {
         if (history == null || history.isEmpty()) return Optional.empty();
-        return Optional.of(history.get(0)); // ordered DESC
+        return Optional.of(history.get(0));
     }
 
-    /** Snapshots within time range */
+    /**
+     * Get snapshots within time range
+     */
     public List<ArbSnapshot> getSnapshotsBetween(Instant start, Instant end) {
         if (history == null || history.isEmpty()) return Collections.emptyList();
         return history.stream()
                 .filter(s -> !s.getCapturedAt().isBefore(start) && !s.getCapturedAt().isAfter(end))
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    /** Recent odds changes (last N) */
+    /**
+     * Get recent odds changes (last N)
+     */
     public List<OddsChange> getRecentOddsChanges(int limit) {
         if (oddsHistory == null || oddsHistory.isEmpty()) return Collections.emptyList();
         return oddsHistory.values().stream()
-                .sorted(Comparator.comparing(com.mouse.bet.model.OddsChange::getTimestamp).reversed())
+                .sorted(Comparator.comparing(OddsChange::getTimestamp).reversed())
                 .limit(limit)
                 .toList();
     }
 
-    /** Odds changes within time range */
+    /**
+     * Get odds changes within time range
+     */
     public List<OddsChange> getOddsChangesBetween(Instant start, Instant end) {
         if (oddsHistory == null || oddsHistory.isEmpty()) return Collections.emptyList();
         long startMillis = start.toEpochMilli();
@@ -303,62 +372,4 @@ public class Arb {
                 .sorted(Comparator.comparing(OddsChange::getTimestamp).reversed())
                 .toList();
     }
-
-    /** Average odds velocity over recent window */
-    public Double calculateAverageVelocity(int windowMinutes) {
-        Instant cutoff = Instant.now().minusSeconds(windowMinutes * 60L);
-        List<OddsChange> recent = getOddsChangesBetween(cutoff, Instant.now());
-        if (recent.isEmpty()) return 0.0;
-
-        double totalDelta = recent.stream()
-                .mapToDouble(ch -> {
-                    double dA = ch.getDeltaA() != null ? ch.getDeltaA().abs().doubleValue() : 0.0;
-                    double dB = ch.getDeltaB() != null ? ch.getDeltaB().abs().doubleValue() : 0.0;
-                    return (dA + dB) / 2.0;
-                })
-                .sum();
-
-        long span = recent.get(0).getTimestamp().getEpochSecond()
-                - recent.get(recent.size() - 1).getTimestamp().getEpochSecond();
-        return span > 0 ? totalDelta / span : 0.0;
-    }
-
-    /** Simple “uptrend” check */
-    public boolean isOddsTrendingUp() {
-        List<OddsChange> recent = getRecentOddsChanges(3);
-        if (recent.size() < 2) return false;
-
-        return recent.stream()
-                .filter(ch -> ch.getDeltaA() != null && ch.getDeltaB() != null)
-                .allMatch(ch -> ch.getDeltaA().compareTo(BigDecimal.ZERO) >= 0
-                        || ch.getDeltaB().compareTo(BigDecimal.ZERO) >= 0);
-    }
-
-    public void markSeen(Instant when) {
-        if (firstSeenAt == null) firstSeenAt = when;
-        lastSeenAt = when;
-    }
-
-    public boolean isExpired(Instant now) {
-        return expiresAt != null && now.isAfter(expiresAt);
-    }
-
-    /* -------------------- Private helpers -------------------- */
-
-    private BigDecimal calculateDelta(BigDecimal oldValue, BigDecimal newValue) {
-        if (oldValue == null || newValue == null) return BigDecimal.ZERO;
-        return newValue.subtract(oldValue);
-    }
-
-    private void updateMinMaxOdds(BigDecimal oddsA, BigDecimal oddsB) {
-        if (oddsA != null) {
-            if (maxOddsLegA == null || oddsA.compareTo(maxOddsLegA) > 0) maxOddsLegA = oddsA;
-            if (minOddsLegA == null || oddsA.compareTo(minOddsLegA) < 0) minOddsLegA = oddsA;
-        }
-        if (oddsB != null) {
-            if (maxOddsLegB == null || oddsB.compareTo(maxOddsLegB) > 0) maxOddsLegB = oddsB;
-            if (minOddsLegB == null || oddsB.compareTo(minOddsLegB) < 0) minOddsLegB = oddsB;
-        }
-    }
-
 }

@@ -329,7 +329,7 @@ public class SportyBetOddsFetcher implements Runnable {
             log.error("❌❌❌ CRITICAL: Average response time {}ms - LIVE ARB INEFFECTIVE! ❌❌❌",
                     avgResponseTime);
         } else if (avgResponseTime > 3000) {
-            log.warn("⚠️ WARNING: Average response time {}ms - approaching live arb threshold",
+            log.info("⚠️ WARNING: Average response time {}ms - approaching live arb threshold",
                     avgResponseTime);
         }
     }
@@ -624,13 +624,13 @@ public class SportyBetOddsFetcher implements Runnable {
             return true;
         }
 
-        if (timeSinceLastRotation > 300_000 && requests > 100) {
+        if (timeSinceLastRotation > 300_000 && requests > 800) {
             log.info("Proactive profile rotation: {}s elapsed, {} requests made",
                     timeSinceLastRotation / 1000, requests);
             return true;
         }
 
-        if (requests > 500) {
+        if (requests > 800) {
             log.info("Proactive profile rotation: {} requests threshold reached", requests);
             return true;
         }

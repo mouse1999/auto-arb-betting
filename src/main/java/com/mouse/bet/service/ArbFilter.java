@@ -6,6 +6,7 @@ import com.mouse.bet.model.OddsChange;
 import com.mouse.bet.model.VelocityVolatility;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -18,90 +19,95 @@ import java.util.stream.Collectors;
  *
  */
 @Slf4j
+@Service
 public class ArbFilter {
 
-    // Metric tuning parameters
-    private static final int METRICS_WINDOW_MINUTES = 10;  // lookback for stability metrics
-    private static final int MIN_SAMPLES_FOR_VOL = 3;      // minimum deltas to compute stdev
-    private static final double VOLATILITY_WEIGHT = 0.08;  // weight on sigma in confidence score
-    private static final double CHANGE_RATE_WEIGHT = 0.35; // weight on change rate per minute
+    private static final int METRICS_WINDOW_MINUTES = 10;
+    private static final int MIN_SAMPLES_FOR_VOL = 3;
+    private static final double VOLATILITY_WEIGHT = 0.08;
+    private static final double CHANGE_RATE_WEIGHT = 0.35;
+
+    // Emoji constants
+    private static final String EMOJI_CHART = "📊";
+    private static final String EMOJI_CALC = "🧮";
 
     /**
-     * Recompute all derived metrics for an arb based on recent odds history.
-     * Updates: meanOddsLegA/B, velocityPctPerSec, volatilitySigma, confidenceScore, oddsChangeCount
+     * Recompute all derived metrics for an arb
      */
-    public static void recomputeDerivedMetrics(Arb arb) {
-        final Instant now = Instant.now();
-        final Instant cutoff = now.minusSeconds(METRICS_WINDOW_MINUTES * 60L);
+    public void recomputeMetrics(Arb arb) {
+        log.debug("{} {} Recomputing metrics | ArbId: {}", EMOJI_CHART, EMOJI_CALC, arb.getArbId());
 
-        // Recent odds changes from entity helper (sorted DESC)
-        final List<OddsChange> recent = arb.getOddsChangesBetween(cutoff, now);
+        Instant now = Instant.now();
+        Instant cutoff = now.minusSeconds(METRICS_WINDOW_MINUTES * 60L);
 
-        // Keep oddsChangeCount consistent with stored map
+        List<OddsChange> recent = arb.getOddsChangesBetween(cutoff, now);
+
+        // Update odds change count
         arb.setOddsChangeCount(arb.getOddsHistory() != null ? arb.getOddsHistory().size() : 0);
 
-        // Current odds for fallbacks
-        final BigDecimal curA = arb.getLegA().map(BetLeg::getOdds).orElse(null);
-        final BigDecimal curB = arb.getLegB().map(BetLeg::getOdds).orElse(null);
+        // Current odds as fallback
+        BigDecimal curA = arb.getLegA().map(BetLeg::getOdds).orElse(null);
+        BigDecimal curB = arb.getLegB().map(BetLeg::getOdds).orElse(null);
 
-        // Means over window (SMA of new odds)
-        arb.setMeanOddsLegA(meanOfNewOddsA(recent).orElse(curA != null ? curA.doubleValue() : null));
-        arb.setMeanOddsLegB(meanOfNewOddsB(recent).orElse(curB != null ? curB.doubleValue() : null));
+        // Calculate mean odds
+        arb.setMeanOddsLegA(calculateMeanOddsA(recent, curA));
+        arb.setMeanOddsLegB(calculateMeanOddsB(recent, curB));
 
-        // Velocity (|%| per sec) and Volatility (stdev of % moves)
-        VelocityVolatility vv = computeVelocityAndVolatility(recent);
+        // Calculate velocity and volatility
+        VelocityVolatility vv = calculateVelocityAndVolatility(recent);
         arb.setVelocityPctPerSec(vv.velocityPctPerSec());
         arb.setVolatilitySigma(vv.volatilitySigma());
 
-        // Confidence score (0..1): higher = more stable
-        double confidence = computeConfidenceScore(vv.volatilitySigma(), recent, cutoff, now);
+        // Calculate confidence score
+        double confidence = calculateConfidenceScore(vv.volatilitySigma(), recent, cutoff, now);
         arb.setConfidenceScore(confidence);
 
-        if (log.isDebugEnabled()) {
-            log.debug("Recomputed metrics for {} | confidence={} volatility={} velocity={}",
-                    arb.getArbId(), confidence, vv.volatilitySigma(), vv.velocityPctPerSec());
-        }
+        log.debug("{} Metrics updated | Confidence: {:.2f} | Volatility: {:.2f} | Velocity: {:.2f}",
+                EMOJI_CHART, confidence, vv.volatilitySigma(), vv.velocityPctPerSec());
     }
 
     /**
-     * Compute mean of newOddsA from recent changes
+     * Calculate mean odds for Leg A
      */
-    private static Optional<Double> meanOfNewOddsA(List<OddsChange> changes) {
+    private Double calculateMeanOddsA(List<OddsChange> changes, BigDecimal fallback) {
         List<BigDecimal> vals = changes.stream()
                 .map(OddsChange::getNewOddsA)
                 .filter(Objects::nonNull)
                 .toList();
 
-        if (vals.isEmpty()) return Optional.empty();
+        if (vals.isEmpty()) {
+            return fallback != null ? fallback.doubleValue() : null;
+        }
 
         BigDecimal sum = vals.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        return Optional.of(sum.divide(BigDecimal.valueOf(vals.size()), 8, RoundingMode.HALF_UP).doubleValue());
+        return sum.divide(BigDecimal.valueOf(vals.size()), 8, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**
-     * Compute mean of newOddsB from recent changes
+     * Calculate mean odds for Leg B
      */
-    private static Optional<Double> meanOfNewOddsB(List<OddsChange> changes) {
+    private Double calculateMeanOddsB(List<OddsChange> changes, BigDecimal fallback) {
         List<BigDecimal> vals = changes.stream()
                 .map(OddsChange::getNewOddsB)
                 .filter(Objects::nonNull)
                 .toList();
 
-        if (vals.isEmpty()) return Optional.empty();
+        if (vals.isEmpty()) {
+            return fallback != null ? fallback.doubleValue() : null;
+        }
 
         BigDecimal sum = vals.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        return Optional.of(sum.divide(BigDecimal.valueOf(vals.size()), 8, RoundingMode.HALF_UP).doubleValue());
+        return sum.divide(BigDecimal.valueOf(vals.size()), 8, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**
-     * Compute velocity (% change per second) and volatility (standard deviation of % changes)
+     * Calculate velocity and volatility metrics
      */
-    private static VelocityVolatility computeVelocityAndVolatility(List<OddsChange> changes) {
+    private VelocityVolatility calculateVelocityAndVolatility(List<OddsChange> changes) {
         if (changes == null || changes.size() < 2) {
             return new VelocityVolatility(0.0, 0.0);
         }
 
-        // Oldest -> newest for time span
         List<OddsChange> seq = new ArrayList<>(changes);
         seq.sort(Comparator.comparing(OddsChange::getTimestamp));
 
@@ -109,17 +115,15 @@ public class ArbFilter {
         Instant firstTs = seq.get(0).getTimestamp();
         Instant lastTs = seq.get(seq.size() - 1).getTimestamp();
 
-        for (var ch : seq) {
+        for (OddsChange ch : seq) {
             Double pctA = calculatePercentageDelta(ch.getOldOddsA(), ch.getNewOddsA());
             Double pctB = calculatePercentageDelta(ch.getOldOddsB(), ch.getNewOddsB());
 
             if (pctA == null && pctB == null) continue;
 
             if (pctA != null && pctB != null) {
-                // Average of both leg changes
                 pctDeltas.add((Math.abs(pctA) + Math.abs(pctB)) / 2.0);
             } else {
-                // Only one leg changed
                 pctDeltas.add(Math.abs(pctA != null ? pctA : pctB));
             }
         }
@@ -131,10 +135,8 @@ public class ArbFilter {
         long seconds = Math.max(1L, lastTs.getEpochSecond() - firstTs.getEpochSecond());
         double totalAbsPct = pctDeltas.stream().mapToDouble(Double::doubleValue).sum();
 
-        // Velocity: % per second (absolute)
         double velocity = totalAbsPct / seconds;
 
-        // Volatility: Standard deviation of per-change % moves
         double volatility = 0.0;
         if (pctDeltas.size() >= MIN_SAMPLES_FOR_VOL) {
             double mean = totalAbsPct / pctDeltas.size();
@@ -148,10 +150,9 @@ public class ArbFilter {
     }
 
     /**
-     * Calculate percentage delta: (new-old)/old * 100
-     * Returns null if either value is null or old value is zero
+     * Calculate percentage delta between two odds values
      */
-    private static Double calculatePercentageDelta(BigDecimal oldVal, BigDecimal newVal) {
+    private Double calculatePercentageDelta(BigDecimal oldVal, BigDecimal newVal) {
         if (oldVal == null || newVal == null) return null;
         if (oldVal.compareTo(BigDecimal.ZERO) == 0) return null;
 
@@ -162,27 +163,59 @@ public class ArbFilter {
     }
 
     /**
-     * Compute confidence score ∈ [0,1]. Higher means more stable.
-     * Penalizes both volatility and change rate in the window using exponential decay.
+     * Calculate confidence score (0..1)
+     * Higher = more stable
      */
-    private static double computeConfidenceScore(Double volatilitySigma,
-                                          List<OddsChange> recent,
-                                          Instant from,
-                                          Instant to) {
+    private double calculateConfidenceScore(Double volatilitySigma,
+                                            List<OddsChange> recent,
+                                            Instant from,
+                                            Instant to) {
         if (volatilitySigma == null) volatilitySigma = 0.0;
 
         long seconds = Math.max(1L, to.getEpochSecond() - from.getEpochSecond());
         double changesPerMin = (recent != null ? recent.size() : 0) / (seconds / 60.0);
 
-        // Exponential decay scoring
-        double volatilityScore = Math.exp(-VOLATILITY_WEIGHT * volatilitySigma);  // 0..1
-        double changeRateScore = Math.exp(-CHANGE_RATE_WEIGHT * changesPerMin);   // 0..1
+        double volatilityScore = Math.exp(-VOLATILITY_WEIGHT * volatilitySigma);
+        double changeRateScore = Math.exp(-CHANGE_RATE_WEIGHT * changesPerMin);
 
         double score = volatilityScore * changeRateScore;
 
-        // Clamp to [0, 1]
         return Math.max(0.0, Math.min(1.0, score));
     }
 
+    /**
+     * Calculate mean deviation from SMA
+     */
+    public double calculateMeanDeviation(Arb arb) {
+        double devA = 0.0, devB = 0.0;
+        int n = 0;
 
+        BigDecimal legAOdds = arb.getLegA().map(BetLeg::getOdds).orElse(null);
+        if (legAOdds != null && arb.getMeanOddsLegA() != null && arb.getMeanOddsLegA() > 0) {
+            devA = Math.abs(legAOdds.doubleValue() / arb.getMeanOddsLegA() - 1.0) * 100.0;
+            n++;
+        }
+
+        BigDecimal legBOdds = arb.getLegB().map(BetLeg::getOdds).orElse(null);
+        if (legBOdds != null && arb.getMeanOddsLegB() != null && arb.getMeanOddsLegB() > 0) {
+            devB = Math.abs(legBOdds.doubleValue() / arb.getMeanOddsLegB() - 1.0) * 100.0;
+            n++;
+        }
+
+        return n == 0 ? 0.0 : (devA + devB) / n;
+    }
+
+    /**
+     * Calculate recency boost
+     */
+    public double calculateRecencyBoost(Arb arb) {
+        Instant lu = arb.getLastUpdatedAt();
+        if (lu == null) return 0.0;
+
+        long ageSec = Math.max(0, Instant.now().getEpochSecond() - lu.getEpochSecond());
+
+        if (ageSec <= 3) return 1.0;
+        if (ageSec <= 10) return 0.5;
+        return 0.0;
+    }
 }

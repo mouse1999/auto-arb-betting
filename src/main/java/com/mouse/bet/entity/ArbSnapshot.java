@@ -20,7 +20,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder(toBuilder = true)
-class ArbSnapshot {
+public class ArbSnapshot {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
