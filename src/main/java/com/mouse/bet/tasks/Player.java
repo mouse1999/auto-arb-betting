@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * graceful shutdown, and per-scraper enable/disable configuration.
  */
 @Slf4j
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 @Component
 public class Player implements ApplicationListener<ApplicationReadyEvent> {
 
@@ -27,6 +27,18 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
     private final SportyBetOddsFetcher sportyBetOddsFetcher;
     private final Bet9jaOddsFetcher bet9jaOddsFetcher;
     private final MSportOddsFetcher mSportOddsFetcher;
+
+    public Player(ScraperConfig scraperConfig,
+                  SportyBetOddsFetcher sportyBetOddsFetcher,
+                  Bet9jaOddsFetcher bet9jaOddsFetcher,
+                  MSportOddsFetcher mSportOddsFetcher) {
+        this.scraperConfig = scraperConfig;
+        this.sportyBetOddsFetcher = sportyBetOddsFetcher;
+        this.bet9jaOddsFetcher = bet9jaOddsFetcher;
+        this.mSportOddsFetcher = mSportOddsFetcher;
+    }
+
+
 
     // ==================== CONFIGURATION ====================
     private static final long HEALTH_CHECK_INTERVAL_SEC = 30;

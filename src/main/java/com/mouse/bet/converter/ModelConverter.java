@@ -38,6 +38,7 @@ public class ModelConverter {
                 .rawStake(rawStake)
                 .stake(stake)
                 .potentialPayout(stake.multiply(outcome.getOdds()))
+                .navigationLink(outcome.getNavigationLink())
 
                 .build();
     }

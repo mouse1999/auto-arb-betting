@@ -5,11 +5,15 @@ import com.mouse.bet.entity.BetLeg;
 import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.enums.Status;
 import com.mouse.bet.model.arb.LegResult;
+import com.mouse.bet.service.ArbPollingService;
 import com.mouse.bet.service.ArbService;
 
 import com.mouse.bet.tasks.LegTask;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -23,6 +27,8 @@ import java.util.stream.Collectors;
  * Dispatches legs to per-bookmaker worker queues and waits (via Phaser) until all assigned legs finish.
  */
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class ArbOrchestrator {
     /** Single active Arb slot. */
     @Getter
@@ -36,13 +42,17 @@ public class ArbOrchestrator {
     private volatile Set<BookMaker> registeredWorkers = Set.of();
 
     private final ArbService arbService;
+    private final ArbPollingService arbPollingService;
 
     /** Max time for all legs (including retries) to complete. */
-    private final Duration legTimeout;
+//    private Duration legTimeout;
+
+    @Value("${sporty.poll.interval.ms:2000}")
+    private long pollIntervalMs;
 
     /** Retry policy for each Leg. */
-    private final int maxRetries;
-    private final Duration retryBackoff;
+    private int maxRetries;
+    private Duration retryBackoff;
 
     /** Orchestrator loop. */
     private final ExecutorService orchestratorExec = Executors.newSingleThreadExecutor(r -> {
@@ -53,19 +63,6 @@ public class ArbOrchestrator {
 
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    private final BigDecimal MIN_PROFIT_PERCENTAGE = BigDecimal.TEN;
-    private final int LIMIT = 3;
-    private final Random random = new Random();
-
-    public ArbOrchestrator(ArbService arbService,
-                           Duration legTimeout,
-                           int maxRetries,
-                           Duration retryBackoff) {
-        this.arbService = Objects.requireNonNull(arbService);
-        this.legTimeout = Objects.requireNonNull(legTimeout);
-        this.maxRetries = maxRetries;
-        this.retryBackoff = Objects.requireNonNull(retryBackoff);
-    }
 
     /** Register a worker queue for a bookmaker. Call this at startup after creating workers. */
     public void registerWorker(BookMaker bookmaker, BlockingQueue<LegTask> queue) {
@@ -107,11 +104,19 @@ public class ArbOrchestrator {
                 // Try to take an Arb from the single-slot queue; if empty, proactively fetch one
                 Arb arb = arbQueue.poll(150, TimeUnit.MILLISECONDS);
                 if (arb == null) {
-                    Optional<Arb> next = getNextActiveArb(arbService.fetchTopArbsByMetrics(MIN_PROFIT_PERCENTAGE, LIMIT)); // implement your criteria
-                    next.ifPresent(arbQueue::offer);
+                    // Only fetch when queue is empty → prevents flooding
+                    arbPollingService.fetchNextArbCandidate()
+                            .ifPresent(candidate -> {
+                                if (tryLoadArb(candidate)) {
+                                    log.info("Loaded new arb into orchestrator | ArbId: {}", candidate.getArbId());
+                                }
+                            });
                     arb = arbQueue.poll(200, TimeUnit.MILLISECONDS);
-                    if (arb == null) continue;
+                    if (arb == null)
+                        Thread.sleep(pollIntervalMs);
+                    continue;
                 }
+
 
                 processOneArb(arb);
 
@@ -125,15 +130,7 @@ public class ArbOrchestrator {
         log.info("ArbOrchestrator stopped.");
     }
 
-    private Optional<Arb> getNextActiveArb(List<Arb> arbs) {
 
-        if (arbs == null || arbs.isEmpty()) {
-            return Optional.empty();
-        }
-        int randomIndex = random.nextInt(arbs.size());
-
-        return Optional.of(arbs.get(randomIndex));
-    }
 
     private void processOneArb(Arb arb) throws InterruptedException {
         // Mark as IN_PROGRESS to avoid being picked again
@@ -165,6 +162,7 @@ public class ArbOrchestrator {
         List<BookMaker> targets = new ArrayList<>(legsByBook.keySet());
 
         Phaser barrier = new Phaser(targets.size());
+
         ConcurrentMap<BookMaker, LegResult> results = new ConcurrentHashMap<>();
 
         // Dispatch tasks to matching workers only .

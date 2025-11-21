@@ -43,5 +43,6 @@ public class NormalizedOutcome {
     private String matchStatus;
     private String playedSeconds;
     private String marketId;
+    private String navigationLink;
 
 }

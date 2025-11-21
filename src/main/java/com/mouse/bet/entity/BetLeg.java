@@ -125,6 +125,8 @@ public class BetLeg {
     @Column(precision = 12, scale = 2)
     private BigDecimal balanceAfterBet;
 
+    private String navigationLink;
+
     /* -------------------- Business logic -------------------- */
 
     public BigDecimal calculatePotentialPayout() {

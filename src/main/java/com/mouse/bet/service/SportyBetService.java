@@ -289,6 +289,7 @@ public class SportyBetService implements OddService<SportyEvent> {
                 .providerMarketName(meta != null ? meta.name()  : null)
                 .providerMarketTitle(meta != null ? meta.title() : null)
                 .marketId(String.valueOf(meta != null ? meta.marketId() : null))
+                .navigationLink(makeNavigationLink(event))
 
                 .build();
     }
@@ -360,6 +361,64 @@ public class SportyBetService implements OddService<SportyEvent> {
 
         log.debug("Should group market '{}': {}", category, shouldGroup);
         return shouldGroup;
+    }
+
+    /**
+     * Creates a clean, normalized navigation link for SportyBet URLs
+     * Example:
+     *   Home: "Grohsgott, Jiri"    → "grohsgott,_jiri"
+     *   Away: "Mazanek, Stanislav" → "mazanek,_stanislav"
+     *   Final link: "/table-tennis/czech-republic/tt-star-series/grohsgott,_jiri_vs_mazanek,_stanislav"
+     */
+    private String makeNavigationLink(SportyEvent event) {
+        if (event == null || event.getSport() == null) {
+            return "";
+        }
+
+        String categoryName = normalize(event.getSport().getCategory().getName());        // e.g. "Czech Republic"
+        String tournamentName = normalize(event.getSport().getCategory().getTournament().getName());                    // e.g. "TT Star Series"
+        String home = normalize(event.getHomeTeamName());                                 // e.g. "Grohsgott, Jiri"
+        String away = normalize(event.getAwayTeamName());                                 // e.g. "Mazanek, Stanislav"
+
+        return String.format("/%s/live/%s/%s/%s_vs_%s",
+                normalizeSportName(event.getSport().getName()),  // "table-tennis"
+                categoryName,                                                              // "czech-republic"
+                tournamentName,                                                            // "tt-star-series"
+                home,                                                                      // "grohsgott_jiri"
+                away                                                                       // "mazanek_stanislav"
+        ).toLowerCase();
+    }
+
+    /**
+     * Core normalization: replaces spaces → underscore
+     */
+    private String normalize(String input) {
+        if (input == null || input.isBlank()) {
+            return "unknown";
+        }
+
+        return input.trim()
+                .replaceAll("\\s+", "_")                 // Spaces → single underscore
+                .replaceAll("[^\\p{L}0-9_]", "")         // Remove any non-letter/digit/underscore (accents, dots, etc.)
+                .toLowerCase();
+    }
+
+    /**
+     * Special handling for sport name (Football → football, Table Tennis → table-tennis)
+     */
+    private String normalizeSportName(String sport) {
+        if (sport == null) return "unknown";
+
+        return switch (sport.toLowerCase()) {
+            case "football", "soccer" -> "football";
+            case "table tennis", "tt" -> "tableTennis";
+            case "basketball" -> "basketball";
+            case "tennis" -> "tennis";
+            case "ice hockey" -> "ice-hockey";
+            case "volleyball" -> "volleyball";
+            case "beach volleyball" -> "beach-volleyball";
+            default -> normalize(sport);
+        };
     }
 
     @Override

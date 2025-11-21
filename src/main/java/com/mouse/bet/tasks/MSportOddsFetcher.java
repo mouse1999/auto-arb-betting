@@ -17,6 +17,7 @@ import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.model.sporty.SportyEvent;
 import com.mouse.bet.service.BetLegRetryService;
 import com.mouse.bet.service.MSportService;
+import com.mouse.bet.service.ScraperCycleSyncService;
 import com.mouse.bet.service.SportyBetService;
 import com.mouse.bet.utils.DecompressionUtil;
 import com.mouse.bet.utils.JsonParser;
@@ -25,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import okhttp3.Request;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -52,6 +54,9 @@ public class MSportOddsFetcher implements Runnable {
     private final BetLegRetryService betLegRetryService;
     private final ArbDetector arbDetector;
     private final ObjectMapper objectMapper;
+
+    private final ScraperCycleSyncService cycleSync;  // ← ADD THIS
+    private final String scraperId = "MSport-" + (Math.random() < 0.5 ? "A" : "B");
 
     // ==================== CONFIGURATION CONSTANTS ====================
     private static final String SPORT_PAGE = "https://www.msport.com";
@@ -85,6 +90,15 @@ public class MSportOddsFetcher implements Runnable {
     private static final String KEY_FB = "sr:sport:1";
     private static final String KEY_BB = "sr:sport:2";
     private static final String KEY_TT = "sr:sport:20";
+
+    @Value("${sportybet.fetch.enabled.football:false}")
+    private boolean fetchFootballEnabled;
+
+    @Value("${sportybet.fetch.enabled.basketball:false}")
+    private boolean fetchBasketballEnabled;
+
+    @Value("${sportybet.fetch.enabled.table-tennis:true}")
+    private boolean fetchTableTennisEnabled;
     private static final BookMaker SCRAPER_BOOKMAKER = BookMaker.SPORTY_BET;
 
     // Response time tracking for adaptive cadence
@@ -196,6 +210,7 @@ public class MSportOddsFetcher implements Runnable {
                 MIN_SCHEDULER_PERIOD_SEC, EVENT_DEDUP_WINDOW_MS, STALE_DATA_THRESHOLD_MS,
                 EVENT_DETAIL_THREADS, PROCESSING_THREADS);
 
+
         playwrightRef.set(Playwright.create());
 
         try {
@@ -212,6 +227,7 @@ public class MSportOddsFetcher implements Runnable {
             log.error("Fatal error in main loop", fatal);
         } finally {
             cleanup();
+
         }
     }
 
@@ -743,6 +759,7 @@ public class MSportOddsFetcher implements Runnable {
             attempt++;
             try {
                 log.info("=== Initial setup attempt {}/{} ===", attempt, INITIAL_SETUP_MAX_ATTEMPTS);
+
                 performInitialSetup();
                 setupCompleted.set(true);
                 log.info("=== Initial setup completed successfully on attempt {} ===", attempt);
@@ -751,6 +768,7 @@ public class MSportOddsFetcher implements Runnable {
                 lastException = e;
                 log.error("Initial setup attempt {}/{} failed: {}",
                         attempt, INITIAL_SETUP_MAX_ATTEMPTS, e.getMessage());
+
 
                 if (attempt < INITIAL_SETUP_MAX_ATTEMPTS) {
                     backoffBeforeRetry(attempt);
@@ -835,6 +853,7 @@ public class MSportOddsFetcher implements Runnable {
             log.info("Schedulers already started");
             return;
         }
+
         log.info("Starting ADAPTIVE schedulers with initial cadence {}s (live arbing mode)", MIN_SCHEDULER_PERIOD_SEC);
 
         activeFetchSchedule = scheduler.scheduleAtFixedRate(
@@ -848,35 +867,61 @@ public class MSportOddsFetcher implements Runnable {
             log.info("Skipping fetch - setup not completed");
             return;
         }
-
         if (profileRotationInProgress.get()) {
             log.info("Skipping fetch - profile rotation in progress");
             return;
         }
 
+        boolean partnerReady = cycleSync.waitForPartner(scraperId, Duration.ofSeconds(90));
+
+        if (!partnerReady) {
+            // One scraper timed out → just skip this round, don't force anything
+            log.info("{} skipping fetch — partner not ready", scraperId);
+            return;
+        }
+
         long start = System.currentTimeMillis();
 
-//        if (footballFetchInProgress.compareAndSet(false, true)) {
-//            runSportListTaskWithFlag("Football", KEY_FB, KEY_FB, footballFetchInProgress);
-//        } else {
-//            log.warn("⚠️ Skipping Football fetch - previous request still in progress");
-//        }
-
-//        if (basketballFetchInProgress.compareAndSet(false, true)) {
-//            runSportListTaskWithFlag("Basketball", KEY_BB, KEY_BB, basketballFetchInProgress);
-//        } else {
-//            log.warn("⚠️ Skipping Basketball fetch - previous request still in progress");
-//        }
-
-        if (tableTennisFetchInProgress.compareAndSet(false, true)) {
-            runSportListTaskWithFlag("TableTennis", KEY_TT, KEY_TT, tableTennisFetchInProgress);
+        // FOOTBALL
+        if (fetchFootballEnabled) {
+            if (footballFetchInProgress.compareAndSet(false, true)) {
+                runSportListTaskWithFlag("Football", KEY_FB, KEY_FB, footballFetchInProgress);
+            } else {
+                log.warn("Skipping Football fetch - previous request still in progress");
+            }
         } else {
-            log.warn("⚠️ Skipping TableTennis fetch - previous request still in progress");
+            log.debug("Football fetch DISABLED via config");
+        }
+
+        // BASKETBALL
+        if (fetchBasketballEnabled) {
+            if (basketballFetchInProgress.compareAndSet(false, true)) {
+                runSportListTaskWithFlag("Basketball", KEY_BB, KEY_BB, basketballFetchInProgress);
+            } else {
+                log.warn("Skipping Basketball fetch - previous request still in progress");
+            }
+        } else {
+            log.debug("Basketball fetch DISABLED via config");
+        }
+
+        // TABLE TENNIS
+        if (fetchTableTennisEnabled) {
+            if (tableTennisFetchInProgress.compareAndSet(false, true)) {
+                runSportListTaskWithFlag("TableTennis", KEY_TT, KEY_TT, tableTennisFetchInProgress);
+            } else {
+                log.warn("Skipping TableTennis fetch - previous request still in progress");
+            }
+        } else {
+            log.debug("Table Tennis fetch DISABLED via config");
         }
 
         long duration = System.currentTimeMillis() - start;
-        log.info("All sports fetch cycle triggered in {}ms [queue={}, active={}]",
-                duration, eventQueue.size(), activeDetailFetches.get());
+        log.info("All sports fetch cycle triggered in {}ms [queue={}, active={}] | FB={} | BB={} | TT={}",
+                duration, eventQueue.size(), activeDetailFetches.get(),
+                fetchFootballEnabled ? "ON" : "OFF",
+                fetchBasketballEnabled ? "ON" : "OFF",
+                fetchTableTennisEnabled ? "ON" : "OFF"
+        );
     }
 
     private void runSportListTaskWithFlag(String sportName, String sportId,
