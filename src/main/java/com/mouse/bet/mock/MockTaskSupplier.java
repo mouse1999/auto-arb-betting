@@ -23,8 +23,8 @@ public class MockTaskSupplier {
                 .stake(BigDecimal.TEN)
                 .profitPercent(BigDecimal.valueOf(12))
                 .league("TT_cup")
-                .homeTeam("Lama, Jaime")
-                .awayTeam("Happek, Sven")
+                .homeTeam("Cetner, Milan")
+                .awayTeam("Strnad, Jaroslav (1964)")
                 .isPrimaryLeg(true)
                 .sportEnum(SportEnum.TABLE_TENNIS)
                 .odds(BigDecimal.valueOf(2.0))
@@ -41,8 +41,7 @@ public class MockTaskSupplier {
                 .leg(leg)
                 .build();
 
-
-//Lama, Jaime vs Happek, Sven
+        // Cetner, Milan vs Strnad, Jaroslav (1964)
 // SportyTV Match Tracker
 
     }
