@@ -1,3 +1,5 @@
+
+
 package com.mouse.bet.converter;
 
 import com.mouse.bet.entity.BetLeg;
@@ -39,6 +41,9 @@ public class ModelConverter {
                 .stake(stake)
                 .potentialPayout(stake.multiply(outcome.getOdds()))
                 .navigationLink(outcome.getNavigationLink())
+                .providerMarketTitle(outcome.getProviderMarketTitle())
+                .providerMarketName(outcome.getProviderMarketName())
+
 
                 .build();
     }

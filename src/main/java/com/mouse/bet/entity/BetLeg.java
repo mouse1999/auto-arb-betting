@@ -119,6 +119,9 @@ public class BetLeg {
     private Integer cashOutAvailable;
     private BigDecimal profitPercent;
 
+    private String providerMarketName;
+    private String providerMarketTitle;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal balanceBeforeBet;
 

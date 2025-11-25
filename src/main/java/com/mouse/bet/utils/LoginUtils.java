@@ -65,35 +65,35 @@ public class LoginUtils {
     // UPDATED: Actual SportyBet logged-in indicators from HTML
     private static final List<String> LOGGED_IN_INDICATORS = Arrays.asList(
             // Primary indicators - balance and user menu
-            "#j_balance",
-            ".m-balance",
-            "span.m-balance",
-            ".m-bablance-wrapper",
-
-            // User info and account menu
-            "#j_userInfo",
-            ".m-userInfo",
-            ".m-user-center",
-
-            // Action buttons (Deposit, Withdraw, etc.)
-            "a.m-deposit",
-            ".m-deposit",
-            "text=Deposit",
-
-            "#j_betHistory",
-            ".m-history",
-            "text=Bet History",
-
-            // Logout button (definitive proof of being logged in)
-            ".m-list-bar[data-cms-key='log_out']",
-            "li:has-text('Logout')",
-            "text=Logout",
-
-            // Balance refresh/toggle icons
-            "#j_refreshBalance",
-            "#j_toggleBalance",
-            ".m-icon-refresh",
-            ".m-icon-toggle",
+//            "#j_balance",
+//            ".m-balance",
+//            "span.m-balance",
+//            ".m-bablance-wrapper",
+//
+//            // User info and account menu
+//            "#j_userInfo",
+//            ".m-userInfo",
+//            ".m-user-center",
+//
+//            // Action buttons (Deposit, Withdraw, etc.)
+//            "a.m-deposit",
+//            ".m-deposit",
+//            "text=Deposit",
+//
+//            "#j_betHistory",
+//            ".m-history",
+//            "text=Bet History",
+//
+//            // Logout button (definitive proof of being logged in)
+//            ".m-list-bar[data-cms-key='log_out']",
+//            "li:has-text('Logout')",
+//            "text=Logout",
+//
+//            // Balance refresh/toggle icons
+//            "#j_refreshBalance",
+//            "#j_toggleBalance",
+//            ".m-icon-refresh",
+//            ".m-icon-toggle",
 
             // User menu items
             "span[data-cms-key='my_account']",
@@ -103,11 +103,11 @@ public class LoginUtils {
             // Generic indicators (fallback)
             "text=My Account",
             "text=Withdraw",
-            "text=Transactions",
-            "text=Notification Center",
-            ".user-balance",
-            ".header__user",
-            ".account-balance"
+            "text=Transactions"
+//            "text=Notification Center",
+//            ".user-balance",
+//            ".header__user",
+//            ".account-balance"
     );
 
     // UPDATED: Login form indicators (when NOT logged in)
@@ -558,4 +558,51 @@ public class LoginUtils {
 
         return false;
     }
+
+
+    /**
+     * Types text into an input field like a real human — fast but natural.
+     * Includes tiny random delays, realistic key speed, and human-like variation.
+     */
+    public static void typeFastHumanLike(Locator locator, String text) {
+        // Optional: small random delay before starting (mimics human reaction)
+        randomDelay(80, 250);
+
+        // Focus the field first (critical for some betting sites)
+        locator.evaluate("el => el.focus()");
+
+        // Convert text to char array for per-character typing
+        char[] chars = text.toCharArray();
+
+        for (int i = 0; i < chars.length; i++) {
+            char c = chars[i];
+            String charStr = String.valueOf(c);
+
+            // 1. Type the character
+            locator.press(charStr);
+
+            // 2. Human-like typing speed: 80–220 ms per character (avg ~140ms = ~7 chars/sec)
+            int baseDelay = 80 + (i % 3 == 0 ? 60 : 0); // slight rhythm variation
+            randomDelay(baseDelay, baseDelay + 140);
+
+            // 3. 3% chance of a tiny "thinking" pause (200–600ms) — makes it ultra-realistic
+            if (Math.random() < 0.03) {
+                randomDelay(200, 600);
+            }
+
+            // 4. 1% chance of a small backspace + retype (classic human typo fix)
+            if (Math.random() < 0.01 && i > 0) {
+                locator.press("Backspace");
+                randomDelay(100, 300);
+                locator.press(charStr); // retype the same char
+                randomDelay(120, 280);
+            }
+        }
+
+        // Final small pause after typing (human habit)
+        randomDelay(100, 350);
+    }
+
+
+
 }
