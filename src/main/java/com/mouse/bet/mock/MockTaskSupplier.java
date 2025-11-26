@@ -23,8 +23,8 @@ public class MockTaskSupplier {
                 .stake(BigDecimal.TEN)
                 .profitPercent(BigDecimal.valueOf(12))
                 .league("TT_cup")
-                .homeTeam("Cetner, Milan")
-                .awayTeam("Strnad, Jaroslav (1964)")
+                .homeTeam("Misiak, Mateusz")
+                .awayTeam("Trela, Mateusz")
                 .isPrimaryLeg(true)
                 .sportEnum(SportEnum.TABLE_TENNIS)
                 .odds(BigDecimal.valueOf(2.0))
@@ -41,7 +41,7 @@ public class MockTaskSupplier {
                 .leg(leg)
                 .build();
 
-        // Cetner, Milan vs Strnad, Jaroslav (1964)
+        // Misiak, Mateusz vs Trela, Mateusz
 // SportyTV Match Tracker
 
     }

@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -72,6 +73,8 @@ public class SportyWindow implements BettingWindow {
     private static final String EMOJI_TRASH = "";
     private static final String EMOJI_TARGET = "";
     private static final String EMOJI_ROCKET = "";
+
+    private static final double ODDS_TOLERANCE_PERCENT = 50.0;
 
 
 
@@ -305,13 +308,13 @@ public class SportyWindow implements BettingWindow {
             mimicHumanBehavior(page);
             goToLivePage(page);
 
-            if(checkLoginStatus(page)) {
-                performLoginIfRequired(page);
+
+            performLoginIfRequired(page);
 
                 // 🔔 Check for any pop-ups after login
-                checkAndClosePopups(page);
+            checkAndClosePopups(page);
 
-            }
+
 
 
             moveToEnabledLiveSport(page);
@@ -1487,69 +1490,100 @@ public class SportyWindow implements BettingWindow {
         return false;
     }
 
-    /**
-     * Verify odds are still valid
-     */
+
     // Step 1: Clear bet slip before adding new bet
     private boolean clearBetSlip(Page page) {
         try {
-            // Direct & bulletproof selector for the betslip container
-            Locator betSlip = page.locator("div.m-list").first();
+            Locator betslipContainer = page.locator("#j_betslip .m-betslips");
 
-            // If the entire m-list doesn't exist → slip is empty or hidden
-            if (betSlip.count() == 0 || !betSlip.isVisible()) {
-                log.info("{} Bet slip not visible or empty – nothing to clear", EMOJI_INFO);
+            if (betslipContainer.count() == 0 || !betslipContainer.isVisible()) {
+                log.info("{} Betslip not visible", EMOJI_INFO);
                 return true;
             }
 
-            // Target ONLY the real delete icons inside the betslip
-            Locator deleteButtons = betSlip.locator("i.m-icon-delete");
-
-            int betCount = deleteButtons.count();
-
-            if (betCount == 0) {
-                log.info("{} Bet slip already empty", EMOJI_SUCCESS);
+            // Check bet count badge
+            String betCountText = getBetCount(page);
+            if ("0".equals(betCountText) || betCountText.isEmpty()) {
+                log.info("{} Betslip already empty", EMOJI_SUCCESS);
                 return true;
             }
 
-            log.info("{} Found {} bet(s) in slip – removing all...", EMOJI_TRASH, betCount);
+            // Try "Remove All" button first (if visible)
+            Locator removeAllBtn = page.locator("#j_betslip .m-text-min[data-cms-key='remove_all']");
+            if (removeAllBtn.count() > 0 && removeAllBtn.isVisible()) {
+                log.info("{} Using 'Remove All' button", EMOJI_TRASH);
+                removeAllBtn.click();
+                page.waitForTimeout(1000);
 
-            // Remove from last to first (prevents DOM re-indexing issues)
-            for (int i = betCount - 1; i >= 0; i--) {
-                try {
-                    Locator deleteBtn = deleteButtons.nth(i);
-
-                    // Ensure it's visible and clickable
-                    deleteBtn.scrollIntoViewIfNeeded();
-                    page.waitForTimeout(150);
-
-                    deleteBtn.click(new Locator.ClickOptions()
-                            .setForce(true)      // bypasses any overlay issues
-                            .setTimeout(10000));
-
-                    // Wait for removal animation
-                    page.waitForTimeout(500);
-
-                } catch (Exception e) {
-                    log.warn("{} Failed to remove bet at index {}: {}", EMOJI_WARNING, i, e.getMessage());
+                if (isBetstipEmpty(page)) {
+                    log.info("{} Betslip cleared via 'Remove All'", EMOJI_SUCCESS);
+                    return true;
                 }
             }
 
-            // Final confirmation: no delete icons left = success
-            page.waitForTimeout(1000);
-            boolean fullyCleared = page.locator("i.m-icon-delete").count() == 0;
-
-            if (fullyCleared) {
-                log.info("{} Bet slip successfully cleared! ({} bet(s) removed)", EMOJI_SUCCESS, betCount);
-            } else {
-                log.warn("{} Some bets may still remain after clearing attempt", EMOJI_WARNING);
-            }
-
-            return fullyCleared;
+            // Fallback: Remove bets individually
+            return clearBetsIndividually(page);
 
         } catch (Exception e) {
-            log.error("{} Unexpected error while clearing bet slip: {}", EMOJI_ERROR, e.getMessage());
+            log.error("{} Error clearing betslip: {}", EMOJI_ERROR, e.getMessage());
             return false;
+        }
+    }
+
+    private boolean clearBetsIndividually(Page page) {
+        Locator betList = page.locator("#j_betslip .m-list");
+
+        if (betList.count() == 0 || !betList.isVisible()) {
+            return true;
+        }
+
+        Locator deleteButtons = betList.locator(".m-item .m-icon-delete");
+        int betCount = deleteButtons.count();
+
+        if (betCount == 0) {
+            return true;
+        }
+
+        log.info("{} Removing {} bet(s) individually...", EMOJI_TRASH, betCount);
+
+        for (int i = betCount - 1; i >= 0; i--) {
+            try {
+                Locator deleteBtn = deleteButtons.nth(i);
+                deleteBtn.scrollIntoViewIfNeeded();
+                page.waitForTimeout(150);
+
+                deleteBtn.click(new Locator.ClickOptions()
+                        .setForce(true)
+                        .setTimeout(10000));
+
+                page.waitForTimeout(500);
+
+            } catch (Exception e) {
+                log.warn("{} Failed to remove bet {}: {}", EMOJI_WARNING, i, e.getMessage());
+            }
+        }
+
+        page.waitForTimeout(1000);
+        boolean cleared = isBetstipEmpty(page);
+
+        if (cleared) {
+            log.info("{} All bets removed", EMOJI_SUCCESS);
+        } else {
+            log.warn("{} Some bets may remain", EMOJI_WARNING);
+        }
+
+        return cleared;
+    }
+
+    private boolean isBetstipEmpty(Page page) {
+        return page.locator("#j_betslip .m-list .m-item").count() == 0;
+    }
+
+    private String getBetCount(Page page) {
+        try {
+            return page.locator("#j_betslip .m-bet-count").first().textContent().trim();
+        } catch (Exception e) {
+            return "0";
         }
     }
 
@@ -1581,68 +1615,66 @@ public class SportyWindow implements BettingWindow {
 
     // Step 2: Select and verify the betting option
     private boolean selectAndVerifyBet(Page page, BetLeg leg) {
-        String marketTitle = leg.getProviderMarketTitle();   // e.g. "Winner", "3rd game - winner"
-        String outcomeName = leg.getProviderMarketName();    // e.g. "Away", "Home"
+        String marketTitle = leg.getProviderMarketTitle();   // e.g. "Winner"
+        String outcomeName = leg.getProviderMarketName();    // e.g. "Away"
 
         try {
             log.info("Selecting: {} → {}", marketTitle, outcomeName);
 
-            // ── STEP 1: Find market header ─────────────────────────────────────
-            Locator marketHeader = page.locator(
-                    String.format("xpath=//span[contains(@class,'m-table-header-title') and normalize-space(.)=%s]",
-                            escapeXPath(marketTitle))
-            ).first();
+            // ── STEP 1: Find the specific market wrapper containing both header AND odds ─────
+            String marketWrapperXPath = String.format(
+                    "//div[contains(@class,'m-table__wrapper')]" +
+                            "[.//span[contains(@class,'m-table-header-title') and normalize-space()=%s]]",
+                    escapeXPath(marketTitle)
+            );
 
-            if (marketHeader.count() == 0) {
-                log.error("Market NOT FOUND: {}", marketTitle);
+            Locator marketWrapper = page.locator(marketWrapperXPath).first();
+
+            if (marketWrapper.count() == 0) {
+                log.error("❌ Market NOT FOUND: {}", marketTitle);
                 return false;
             }
-            log.info("Market FOUND: {}", marketTitle);
+            log.info("✅ Market FOUND: {}", marketTitle);
 
-            // ── STEP 2: Get the visible odds table (with fallback) ─────────────
-            Locator oddsTable = marketHeader.locator(
-                    "xpath=./ancestor::div[contains(@class,'m-table__wrapper')][1]" +
-                            "/following-sibling::div[contains(@class,'m-table') and not(contains(@style,'display: none'))]" +
-                            "[.//div[contains(@class,'m-outcome')]]"
+            // ── STEP 2: Find the odds table WITHIN this specific market wrapper ─────
+            Locator oddsTable = marketWrapper.locator(
+                    "xpath=.//div[contains(@class,'m-table') and contains(@class,'m-outcome')]"
             ).first();
 
             if (oddsTable.count() == 0) {
-                oddsTable = marketHeader.locator(
-                        "xpath=./ancestor::div[contains(@class,'m-table__wrapper')][1]//div[contains(@class,'m-table') and not(contains(@style,'display: none'))][.//div[contains(@class,'m-outcome')]]"
-                ).first();
-            }
-
-            if (oddsTable.count() == 0) {
-                log.error("Visible odds table NOT found for market: {}", marketTitle);
+                log.error("❌ Odds table NOT found within market: {}", marketTitle);
                 return false;
             }
 
-            // ── STEP 3: Find the exact clickable cell ───────────────────────────
-            Locator betCell = oddsTable.locator(
-                    String.format("xpath=.//div[contains(@class,'m-table-cell--responsive') " +
-                                    "and not(contains(@class,'m-table-cell--disable')) " +
-                                    "and .//span[contains(@class,'m-table-cell-item') and normalize-space(.)=%s]]",
-                            escapeXPath(outcomeName))
-            ).first();
+            // ── STEP 3: Find the outcome cell WITHIN this specific odds table ─────
+            String outcomeCellXPath = String.format(
+                    ".//div[contains(@class,'m-table-cell--responsive') " +
+                            "and not(contains(@class,'m-table-cell--disable')) " +
+                            "and .//span[contains(@class,'m-table-cell-item') and normalize-space()=%s]]",
+                    escapeXPath(outcomeName)
+            );
+
+            Locator betCell = oddsTable.locator(outcomeCellXPath).first();
 
             if (betCell.count() == 0) {
                 List<String> available = oddsTable.locator("span.m-table-cell-item").allTextContents();
-                log.warn("Outcome '{}' NOT FOUND in '{}'. Available outcomes: {}", outcomeName, marketTitle, available);
+                log.warn("❌ Outcome '{}' NOT FOUND in '{}'. Available: {}",
+                        outcomeName, marketTitle, available);
                 return false;
             }
 
-            String displayedText = betCell.textContent().trim();
-            log.info("FOUND → '{}' (odds: {})", outcomeName, displayedText.replace(outcomeName, "").trim());
+            // Extract displayed odds
+            String oddsText = betCell.locator(".m-table-cell-item").nth(1).textContent().trim();
+            log.info("✅ FOUND: {} → {} @ {}", marketTitle, outcomeName, oddsText);
 
-            // ── STEP 4: Optional odds verification ─────────────────────────────
+            // ── STEP 4: Optional odds verification ─────
             if (!verifyOdds(page, leg, betCell)) {
-                log.warn("Odds changed (expected {}), clicking anyway", leg.getOdds());
-                // Remove return false below if you want to accept any odds
+                log.warn("⚠️ Odds changed (expected {}), clicking anyway", leg.getOdds());
             }
 
-            // ── STEP 5: GUARANTEED SCROLL + CLICK (WORKS 100% ON SPORTYBET) ─────
+            // ── STEP 5: SCROLL + CLICK ─────
             betCell.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'smooth' })");
-            page.waitForTimeout(300); // Critical: let the virtual scroller react
+            page.waitForTimeout(300);
 
             try {
                 betCell.click(new Locator.ClickOptions()
@@ -1653,13 +1685,12 @@ public class SportyWindow implements BettingWindow {
                 betCell.evaluate("el => el.click()");
             }
 
-            log.info("CLICKED: {} → {}", outcomeName, displayedText.replace(outcomeName, "").trim());
+            log.info("✅ CLICKED: {} → {} @ {}", marketTitle, outcomeName, oddsText);
             page.waitForTimeout(800);
             return true;
 
         } catch (Exception e) {
-            log.error("FATAL ERROR in selectAndVerifyBet ({} → {}): {}",
-                    marketTitle, outcomeName, e.getMessage());
+            log.error("❌ FATAL ERROR ({} → {}): {}", marketTitle, outcomeName, e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -1668,8 +1699,9 @@ public class SportyWindow implements BettingWindow {
     private boolean verifyOdds(Page page, BetLeg leg, Locator betOption) {
         try {
             String fullText = betOption.textContent().trim();
+            log.info("Gotten text content from betOption locator");
 
-            // Extract the first decimal odds (e.g. "1.55", "2.30")
+            // Extract first valid odds (handles "↑1.85", "1.90↓", "1.75", etc.)
             Matcher matcher = Pattern.compile("\\d+\\.\\d+").matcher(fullText);
             if (!matcher.find()) {
                 log.error("{} {} No odds found in button text: {}", EMOJI_ERROR, EMOJI_BET, fullText);
@@ -1679,16 +1711,20 @@ public class SportyWindow implements BettingWindow {
             double displayed = Double.parseDouble(matcher.group());
             double expected = leg.getOdds().doubleValue();
 
-            // Your original 2% tolerance
-            double tolerance = expected * 0.7; //TODO
+            // CORRECT TOLERANCE: percentage-based
+            double tolerance = expected * (ODDS_TOLERANCE_PERCENT / 100.0);
             boolean valid = Math.abs(displayed - expected) <= tolerance;
 
             if (valid) {
-                log.info("{} {} Odds verified | Expected: {} | Displayed: {}", EMOJI_SUCCESS, EMOJI_BET, expected, displayed);
+                log.info("{} {} Odds OK | Expected: {} | Displayed: {} | Within ±{:.1f}%",
+                        EMOJI_SUCCESS, EMOJI_BET, expected, displayed, ODDS_TOLERANCE_PERCENT);
+                return true;
             } else {
-                log.info("{} {} Odds mismatch | Expected: {} | Displayed: {}", EMOJI_WARNING, EMOJI_BET, expected, displayed);
+                double diffPercent = (Math.abs(displayed - expected) / expected) * 100.0;
+                log.warn("{} {} Odds OUT OF TOLERANCE | Expected: {} | Got: {} | Diff: {:.2f}% (limit: ±{:.1f}%) → SKIPPING",
+                        EMOJI_WARNING, EMOJI_BET, expected, displayed, diffPercent, ODDS_TOLERANCE_PERCENT);
+                return false;
             }
-            return valid;
 
         } catch (Exception e) {
             log.error("{} {} Error verifying odds: {}", EMOJI_ERROR, EMOJI_BET, e.getMessage());
@@ -1723,10 +1759,10 @@ public class SportyWindow implements BettingWindow {
         }
 
         // 4. Final verification in bet slip
-//        if (!verifyBetSlip(page, leg)) {
-//            log.error("{} {} Bet slip verification failed", EMOJI_ERROR, EMOJI_BET);
-//            return false;
-//        }
+        if (!verifyBetSlip(page, leg)) {
+            log.error("{} {} Bet slip verification failed", EMOJI_ERROR, EMOJI_BET);
+            return false;
+        }
 
         log.info("{} {} Bet deployment successful", EMOJI_SUCCESS, EMOJI_ROCKET);
         return true;
@@ -1735,55 +1771,96 @@ public class SportyWindow implements BettingWindow {
     // Optional: Verify bet appeared in slip
     private boolean verifyBetSlip(Page page, BetLeg leg) {
         String outcome = leg.getProviderMarketName();   // e.g. "Away"
-        String market  = leg.getProviderMarketTitle();  // e.g. "Winner"
+        String market = leg.getProviderMarketTitle();   // e.g. "Winner"
 
         try {
-            // RELAXED SELECTOR: uses contains() instead of normalize-space() — 100% reliable
-            String relaxedXPath = String.format(
-                    "xpath=//div[contains(@class,'m-list')]//div[contains(@class,'m-item') and " +
-                            "contains(., %s) and " +  // outcome anywhere in the item
-                            "contains(., %s)]",       // market anywhere in the item
-                    escapeXPath(outcome),
-                    escapeXPath(market)
-            );
-
-            Locator betInSlip = page.locator(relaxedXPath).first();
-
-            // Wait for visibility (now finds it instantly)
-            betInSlip.waitFor(new Locator.WaitForOptions()
+            // Wait for betslip container to be visible
+            Locator betslip = page.locator("#j_betslip .m-betslips");
+            betslip.waitFor(new Locator.WaitForOptions()
                     .setState(WaitForSelectorState.VISIBLE)
                     .setTimeout(8000));
 
-            // Log displayed odds
-            String displayedOdds = "N/A";
-            try {
-                displayedOdds = betInSlip.locator(".m-item-odds span, .m-item-odds .m-text-main").first().textContent().trim();
-            } catch (Exception ignored) {}
+            // Wait specifically for the bet item to appear (more reliable)
+            Locator betItem = betslip.locator(".m-list .m-item").first();
+            betItem.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(3000));
 
-            log.info("BET VERIFIED IN SLIP: {} @ {} | Market: {} | Odds shown: {}",
-                    EMOJI_SUCCESS, outcome, leg.getOdds(), market, displayedOdds);
+            // Extract and verify details
+            String displayedOutcome = betItem.locator(".m-item-play span").first().textContent().trim();
+            String displayedMarket = betItem.locator(".m-item-market").textContent().trim();
+            String displayedOdds = betItem.locator(".m-item-odds .m-text-main").textContent().trim();
+            String displayedTeam = betItem.locator(".m-item-team").textContent().trim();
+            boolean isLive = betItem.locator(".m-icon-live").count() > 0;
+
+            // Verify outcome matches
+            if (!displayedOutcome.equalsIgnoreCase(outcome)) {
+                log.warn("⚠️ Outcome mismatch: expected '{}' but found '{}'", outcome, displayedOutcome);
+                return false;
+            }
+
+            // Verify market matches (optional based on your requirements)
+            if (!displayedMarket.equalsIgnoreCase(market)) {
+                log.warn("⚠️ Market mismatch: expected '{}' but found '{}'", market, displayedMarket);
+                return false;
+            }
+
+            log.info("✅ BET VERIFIED IN SLIP: {} | Market: {} | Odds: {} | Match: {} | Live: {}",
+                    displayedOutcome, displayedMarket, displayedOdds, displayedTeam, isLive);
 
             return true;
 
         } catch (PlaywrightException pe) {
             if (pe.getMessage().contains("Timeout")) {
-                // ULTIMATE DEBUG: show ALL text in the entire betslip container
-                try {
-                    String fullSlipText = page.locator(".m-list, .m-betslip-wrapper").first().textContent();
-                    List<String> items = page.locator(".m-item").allTextContents();
-                    log.warn("TIMEOUT: Expected '{}' in '{}' | Full slip text: {} | Items: {}",
-                            outcome, market, fullSlipText.substring(0, Math.min(200, fullSlipText.length())), items);
-                } catch (Exception debugEx) {
-                    log.warn("Debug failed: {}", debugEx.getMessage());
-                }
-                return false;
+                log.warn("⏱️ Timeout waiting for bet in slip: {}", pe.getMessage());
+                debugBetslipContents(page, outcome, market);
             } else {
-                log.error("Playwright error in verifyBetSlip: {}", pe.getMessage());
-                return false;
+                log.error("❌ Playwright error: {}", pe.getMessage());
             }
-        } catch (Exception e) {
-            log.error("Unexpected error in verifyBetSlip: {}", e.getMessage());
             return false;
+        } catch (Exception e) {
+            log.error("❌ Unexpected error: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+
+    private void debugBetslipContents(Page page, String expectedOutcome, String expectedMarket) {
+        try {
+            // Check if betslip is even visible
+            boolean betslipVisible = page.locator("#j_betslip").isVisible();
+            log.warn("❌ TIMEOUT - Betslip visible: {}", betslipVisible);
+
+            if (!betslipVisible) {
+                log.warn("Betslip container not found or not visible!");
+                return;
+            }
+
+            // Get bet count
+            String betCount = page.locator(".m-bet-count").first().textContent().trim();
+            log.warn("Bet count showing: {}", betCount);
+
+            // List all items in betslip
+            Locator allItems = page.locator("#j_betslip .m-list .m-item");
+            int itemCount = allItems.count();
+            log.warn("Number of items in betslip: {}", itemCount);
+
+            // Show details of each item
+            for (int i = 0; i < itemCount; i++) {
+                Locator item = allItems.nth(i);
+                String outcome = item.locator(".m-item-play span").nth(0).textContent().trim();
+                String market = item.locator(".m-item-market").textContent().trim();
+                String odds = item.locator(".m-item-odds .m-text-main").textContent().trim();
+                String team = item.locator(".m-item-team").textContent().trim();
+
+                log.warn("  Item {}: outcome='{}', market='{}', odds='{}', team='{}'",
+                        i, outcome, market, odds, team);
+            }
+
+            log.warn("Expected: outcome='{}', market='{}'", expectedOutcome, expectedMarket);
+
+        } catch (Exception e) {
+            log.warn("Debug failed: {}", e.getMessage());
         }
     }
 
@@ -1806,6 +1883,9 @@ public class SportyWindow implements BettingWindow {
 
             jsScrollAndFocus(stakeInput, page);
             stakeInput.fill("");
+
+            log.info("Preparing to type amount");
+
             LoginUtils.typeFastHumanLike(stakeInput, String.valueOf(stake));
             stakeInput.press("Enter");
             page.waitForTimeout(800);
@@ -1817,11 +1897,11 @@ public class SportyWindow implements BettingWindow {
                 return false;
             }
 
-            if (!verifyOdds(page, leg, betInSlip)) {
-                log.warn("Odds in betslip OUT OF TOLERANCE → SKIPPING BET");
-                safeRemoveFromSlip(page);
-                return false;
-            }
+//            if (!verifyOdds(page, leg, betInSlip)) {
+//                log.warn("Odds in betslip OUT OF TOLERANCE → SKIPPING BET");
+//                safeRemoveFromSlip(page);
+//                return false;
+//            }
 
             // ── 3. ACCEPT CHANGES IF ODDS CHANGED SLIGHTLY ─────────────────────────
             Locator acceptBtn = page.locator("button.af-button--primary span:has-text('Accept Changes')").first();
@@ -1879,7 +1959,8 @@ public class SportyWindow implements BettingWindow {
         } catch (Exception e) {
             log.error("FATAL ERROR in placeBet(): {}", e.getMessage());
             e.printStackTrace();
-            safeRemoveFromSlip(page);
+//            safeRemoveFromSlip(page);
+
             return false;
         }
     }
@@ -1924,6 +2005,114 @@ public class SportyWindow implements BettingWindow {
             log.info("{} {} Bet confirmed", EMOJI_SUCCESS, EMOJI_BET);
         } catch (Exception e) {
             log.warn("{} {} Confirmation not detected: {}", EMOJI_WARNING, EMOJI_BET, e.getMessage());
+        }
+    }
+
+
+    /**
+     * Extracts odds from betslip, verifies they're acceptable (equal, higher, or within 2% lower),
+     * and places the bet if odds are favorable.
+     *
+     * @param page Playwright page object
+     * @param leg BetLeg containing expected odds and bet details
+     * @return true if bet was successfully placed, false otherwise
+     */
+    private boolean replayOddandBet(Page page, BetLeg leg) {
+        BigDecimal expectedOdds = leg.getOdds();
+        String outcome = leg.getProviderMarketName();   // e.g. "Away"
+        String market = leg.getProviderMarketTitle();   // e.g. "Winner"
+
+        try {
+            log.info("🔍 Extracting odds from betslip for verification...");
+
+            // Wait for betslip container to be visible
+            Locator betslip = page.locator("#j_betslip .m-betslips");
+            betslip.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(8000));
+
+            // Wait specifically for the bet item to appear
+            Locator betItem = betslip.locator(".m-list .m-item").first();
+            betItem.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(3000));
+
+            // ── 1. EXTRACT ODDS FROM BETSLIP ──────────────────────────────────────
+            String displayedOddsText = betItem.locator(".m-item-odds .m-text-main").textContent().trim();
+
+            // Parse the odds string to BigDecimal
+            BigDecimal currentOdds;
+            try {
+                currentOdds = new BigDecimal(displayedOddsText);
+            } catch (NumberFormatException e) {
+                log.error("❌ Failed to parse odds from betslip: '{}'", displayedOddsText);
+                return false;
+            }
+
+            log.info("📊 Expected Odds: {} | Current Betslip Odds: {}", expectedOdds, currentOdds);
+
+            // ── 2. CALCULATE 2% TOLERANCE THRESHOLD ───────────────────────────────
+            // Acceptable if: currentOdds >= expectedOdds * 0.98 (2% lower tolerance)
+            BigDecimal lowerThreshold = expectedOdds.multiply(new BigDecimal("0.98"));
+
+            log.info("📉 Lower Threshold (2% tolerance): {}", lowerThreshold.setScale(2, RoundingMode.HALF_UP));
+
+            // ── 3. COMPARE ODDS ────────────────────────────────────────────────────
+            int comparison = currentOdds.compareTo(lowerThreshold);
+
+            if (comparison >= 0) {
+                // Current odds are equal, higher, or within 2% lower
+                String status;
+                if (currentOdds.compareTo(expectedOdds) > 0) {
+                    status = "HIGHER ✅";
+                } else if (currentOdds.compareTo(expectedOdds) == 0) {
+                    status = "EXACT MATCH ✅";
+                } else {
+                    BigDecimal percentageDrop = expectedOdds.subtract(currentOdds)
+                            .divide(expectedOdds, 4, RoundingMode.HALF_UP)
+                            .multiply(new BigDecimal("100"));
+                    status = String.format("WITHIN TOLERANCE ✅ (%.2f%% lower)", percentageDrop);
+                }
+
+                log.info("✅ ODDS ACCEPTABLE: {} → Proceeding to place bet", status);
+
+                // ── 4. EXTRACT ADDITIONAL INFO FOR LOGGING ────────────────────────
+                String displayedOutcome = betItem.locator(".m-item-play span").first().textContent().trim();
+                String displayedMarket = betItem.locator(".m-item-market").textContent().trim();
+                String displayedTeam = betItem.locator(".m-item-team").textContent().trim();
+                boolean isLive = betItem.locator(".m-icon-live").count() > 0;
+
+                log.info("🎯 Bet Details: {} | Market: {} | Odds: {} | Match: {} | Live: {}",
+                        displayedOutcome, displayedMarket, currentOdds, displayedTeam, isLive);
+
+                // ── 5. PLACE THE BET ───────────────────────────────────────────────
+                // Create a temporary Arb object if needed (or modify signature to not need it)
+                return placeBet(page, null, leg);
+
+            } else {
+                // Current odds are more than 2% lower than expected
+                BigDecimal percentageDrop = expectedOdds.subtract(currentOdds)
+                        .divide(expectedOdds, 4, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100"));
+
+                log.warn("⚠️ ODDS TOO LOW: Current {} vs Expected {} (%.2f%% drop) → SKIPPING BET",
+                        currentOdds, expectedOdds, percentageDrop);
+
+                // Remove from betslip
+                safeRemoveFromSlip(page);
+                return false;
+            }
+
+        } catch (PlaywrightException pe) {
+            if (pe.getMessage().contains("Timeout")) {
+                log.warn("⏱️ Timeout waiting for bet in slip: {}", pe.getMessage());
+            } else {
+                log.error("❌ Playwright error during odds verification: {}", pe.getMessage());
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("❌ Unexpected error in replayOddandBet: {}", e.getMessage(), e);
+            return false;
         }
     }
 
