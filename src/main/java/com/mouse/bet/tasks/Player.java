@@ -28,6 +28,7 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
     private final Bet9jaOddsFetcher bet9jaOddsFetcher;
     private final MSportOddsFetcher mSportOddsFetcher;
 
+
     public Player(ScraperConfig scraperConfig,
                   SportyBetOddsFetcher sportyBetOddsFetcher,
                   Bet9jaOddsFetcher bet9jaOddsFetcher,

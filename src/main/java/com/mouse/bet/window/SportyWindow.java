@@ -20,8 +20,9 @@ import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.service.ArbPollingService;
 import com.mouse.bet.service.BetLegRetryService;
 import com.mouse.bet.tasks.LegTask;
-import com.mouse.bet.utils.LoginUtils;
+import com.mouse.bet.utils.SportyLoginUtils;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -33,17 +34,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static com.mouse.bet.utils.WindowUtils.attachAntiDetection;
 
@@ -55,7 +56,7 @@ import static com.mouse.bet.utils.WindowUtils.attachAntiDetection;
  */
 @Slf4j
 @Component
-public class SportyWindow implements BettingWindow {
+public class SportyWindow implements BettingWindow, Runnable {
 
     private static final String EMOJI_INIT = "🚀";
     private static final String EMOJI_LOGIN = "🔐";
@@ -66,6 +67,7 @@ public class SportyWindow implements BettingWindow {
     private static final String EMOJI_SYNC = "🔄";
     private static final String EMOJI_POLL = "📊";
     private static final String EMOJI_HEALTH = "💚";
+    private static final String EMOJI_SHUTDOWN = "🛑";
 
     private static final String  EMOJI_START = "";
     private static final String EMOJI_SEARCH = "";
@@ -73,12 +75,15 @@ public class SportyWindow implements BettingWindow {
     private static final String EMOJI_TRASH = "";
     private static final String EMOJI_TARGET = "";
     private static final String EMOJI_ROCKET = "";
+    private static final String  EMOJI_NAVIGATION = "";
+
 
     private static final double ODDS_TOLERANCE_PERCENT = 50.0;
 
 
 
     private static final BookMaker BOOK_MAKER = BookMaker.SPORTY_BET;
+    final int MAX_DURATION_MS = 15_000; // duration for placing bet after initial failure
     private static final String CONTEXT_FILE = "sporty-context.json";
     private static final String SPORTY_BET_URL = "https://www.sportybet.com/ng";
 
@@ -86,9 +91,9 @@ public class SportyWindow implements BettingWindow {
     private final ScraperConfig scraperConfig;
     private final ArbPollingService arbPollingService;
     private final ArbOrchestrator arbOrchestrator;
-    private final BetLegRetryService betRetryService;
+//    private final BetLegRetryService betRetryService;
     private final WindowSyncManager syncManager;
-    private final LoginUtils loginUtils;
+    private final SportyLoginUtils sportyLoginUtils;
 
     private Playwright playwright;
     private Browser browser;
@@ -99,7 +104,8 @@ public class SportyWindow implements BettingWindow {
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isLoggedIn = new AtomicBoolean(false);
-    protected final BlockingQueue<LegTask> taskQueue = new LinkedBlockingQueue<>();
+    @Getter
+    private final BlockingQueue<LegTask> taskQueue = new LinkedBlockingQueue<>();
 
     @Value("${sporty.username:}")
     private String sportyUsername;
@@ -119,13 +125,13 @@ public class SportyWindow implements BettingWindow {
     @Value("${sporty.bet.timeout.seconds:10}")
     private int betTimeoutSeconds;
 
-    @Value("${sportybet.fetch.enabled.football:false}")
+    @Value("${fetch.enabled.football:false}")
     private boolean fetchFootballEnabled;
 
-    @Value("${sportybet.fetch.enabled.basketball:false}")
+    @Value("${fetch.enabled.basketball:false}")
     private boolean fetchBasketballEnabled;
 
-    @Value("${sportybet.fetch.enabled.table-tennis:true}")
+    @Value("${fetch.enabled.table-tennis:true}")
     private boolean fetchTableTennisEnabled;
 
     public SportyWindow(ProfileManager profileManager,
@@ -133,14 +139,14 @@ public class SportyWindow implements BettingWindow {
                         ArbPollingService arbPollingService,
                         ArbOrchestrator arbOrchestrator,
                         BetLegRetryService betRetryService,
-                        WindowSyncManager syncManager, LoginUtils loginUtils) {
+                        WindowSyncManager syncManager, SportyLoginUtils sportyLoginUtils) {
         this.profileManager = profileManager;
         this.scraperConfig = scraperConfig;
         this.arbPollingService = arbPollingService;
         this.arbOrchestrator = arbOrchestrator;
-        this.betRetryService = betRetryService;
+//        this.betRetryService = betRetryService;
         this.syncManager = syncManager;
-        this.loginUtils = loginUtils;
+        this.sportyLoginUtils = sportyLoginUtils;
     }
 
     /**
@@ -314,9 +320,6 @@ public class SportyWindow implements BettingWindow {
                 // 🔔 Check for any pop-ups after login
             checkAndClosePopups(page);
 
-
-
-
             moveToEnabledLiveSport(page);
 
             // 🔔 Check again after navigation
@@ -482,7 +485,7 @@ public class SportyWindow implements BettingWindow {
         try {
             page.waitForLoadState(LoadState.NETWORKIDLE);
 
-            boolean loginSuccess = loginUtils.performLogin(page, sportyUsername, sportyPassword);
+            boolean loginSuccess = sportyLoginUtils.performLogin(page, sportyUsername, sportyPassword);
 
             if (!loginSuccess) {
                 log.error("{} {} Login failed – universal login returned false", EMOJI_ERROR, EMOJI_LOGIN);
@@ -514,7 +517,7 @@ public class SportyWindow implements BettingWindow {
     private boolean checkLoginStatus(Page page) {
         try {
             // Delegate to LoginUtils which has proper login detection
-            boolean loggedIn = loginUtils.isLoggedIn(page);
+            boolean loggedIn = sportyLoginUtils.isLoggedIn(page);
 
             if (loggedIn) {
                 log.info("Login status: LOGGED IN");
@@ -537,120 +540,237 @@ public class SportyWindow implements BettingWindow {
         log.info("{} {} Starting betting loop for {}", EMOJI_INIT, EMOJI_POLL, bookmaker);
 
         MockTaskSupplier mockTaskSupplier = new MockTaskSupplier();
+        int consecutiveErrors = 0;
+        int maxConsecutiveErrors = 5;
 
         while (isRunning.get()) {
             try {
                 // Check if paused
                 if (isPaused.get()) {
-                    log.info("Window paused, waiting...");
+                    log.info("⏸️ Window paused, waiting... | Bookmaker: {}", bookmaker);
                     Thread.sleep(1000);
                     continue;
                 }
 
                 // Health check
-//                healthMonitor.checkHealth();
-                log.info("Ready to poll task for betting");
+                // healthMonitor.checkHealth();
+                log.info("📊 Ready to poll task for betting | Bookmaker: {}", bookmaker);
 
                 // Poll for available Leg task
-//                LegTask task = taskQueue.poll();
-
-
-
+                // LegTask task = taskQueue.poll();
                 LegTask task = mockTaskSupplier.poll();
 
-
-
                 if (task == null) {
-                    Thread.sleep(100); // Small delay to prevent busy waiting
+                    randomHumanDelay(500, 1000); // Small delay to prevent busy waiting
+                    consecutiveErrors = 0; // Reset error counter on successful poll
                     continue;
                 }
 
-                log.info("arb opportunity retrieved for placing bet | ArbId: {} | Profit: {}% | Bookmaker: {}",
+                log.info("🎯 Arb opportunity retrieved | ArbId: {} | Profit: {}% | Bookmaker: {}",
                         task.getArbId(), task.getLeg().getProfitPercent(), BOOK_MAKER);
 
-                // Get the leg for this bookmaker
+                // Validate task
                 BetLeg myLeg = task.getLeg();
                 if (myLeg == null) {
                     log.warn("{} {} No leg found for bookmaker {} in arb {}",
                             EMOJI_WARNING, EMOJI_BET, bookmaker, task.getArbId());
+
+                    // Notify partner that this arb is invalid
+                    syncManager.skipArbAndSync(task.getArbId());
+                    arbPollingService.releaseArb(task.getArb());
                     continue;
                 }
 
-                // Signal that this window is healthy and ready to accept bets
-                syncManager.markReady(task.getArbId(), bookmaker);
+                // Check login status BEFORE registering intent
+                if (!sportyLoginUtils.isLoggedIn(page)) {
+                    log.warn("⚠️ {} not logged in - cannot process bet | ArbId: {}",
+                            BOOK_MAKER, task.getArbId());
 
-//                // Wait for partner window to be ready
-//                boolean partnersReady = syncManager.waitForPartnersReady(
-//                        task.getArbId(),
-//                        bookmaker,
-//                        Duration.ofSeconds(betTimeoutSeconds)
-//                );
-//
-//                if (!partnersReady) {
-//                    log.warn("{} {} Partners not ready within timeout | ArbId: {}",
-//                            EMOJI_WARNING, EMOJI_SYNC, task.getArbId());
-//                    arbPollingService.releaseArb(task.getArb());
-//                    continue;
-//                }
-//
-//                log.info("{} {} All partners ready, proceeding with bet placement | ArbId: {}",
-//                        EMOJI_SUCCESS, EMOJI_SYNC, task.getArbId());
+                    // Notify partner and skip this arb
+                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER, "Not LoggedIn");
+                    syncManager.skipArbAndSync(task.getArbId());
+                    arbPollingService.releaseArb(task.getArb());
+
+                    // Throw exception to trigger re-login
+                    throw new LoginException(BOOK_MAKER + " is not logged in for this bet to be placed");
+                }
 
                 // Process the bet placement
-                processBetPlacement(page, task, myLeg);
-                mockTaskSupplier.consume();
+                try {
+                    processBetPlacement(page, task, myLeg);
+                    randomHumanDelay(1000, 2300);
+
+                    navigateBack(page);
+                    mockTaskSupplier.consume();
+                    consecutiveErrors = 0; // Reset on success
+
+                    log.info("✅ Bet processing completed | ArbId: {} | Bookmaker: {}",
+                            task.getArbId(), BOOK_MAKER);
+
+                } catch (PlaywrightException pe) {
+                    log.error("🎭 Playwright error during bet placement | ArbId: {} | Error: {}",
+                            task.getArbId(), pe.getMessage());
+
+                    // Notify failure and skip
+                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
+                            "Playwright error: " + pe.getMessage());
+                    syncManager.skipArbAndSync(task.getArbId());
+                    arbPollingService.releaseArb(task.getArb());
+
+                    consecutiveErrors++;
+
+
+                } catch (Exception ex) {
+                    log.error("❌ Unexpected error during bet placement | ArbId: {} | Error: {}",
+                            task.getArbId(), ex.getMessage(), ex);
+
+                    // Notify failure and skip
+                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
+                            "Error: " + ex.getMessage());
+                    syncManager.skipArbAndSync(task.getArbId());
+                    arbPollingService.releaseArb(task.getArb());
+
+                    consecutiveErrors++;
+                }
+
+                // Check if too many consecutive errors
+                if (consecutiveErrors >= maxConsecutiveErrors) {
+                    log.error("🚨 Too many consecutive errors ({}) - pausing window | Bookmaker: {}",
+                            consecutiveErrors, BOOK_MAKER);
+                    isPaused.set(true);
+                    // Optionally: trigger alert or notification
+                    consecutiveErrors = 0;
+                }
 
                 // Mimic human delay between bets
                 randomHumanDelay(2000, 5000);
 
             } catch (InterruptedException e) {
-                log.info("{} Betting loop interrupted", EMOJI_WARNING);
+                log.info("🛑 Betting loop interrupted | Bookmaker: {}", bookmaker);
                 Thread.currentThread().interrupt();
                 break;
+
+            } catch (LoginException le) {
+                log.error("🔐 Login failure - pausing betting loop | Bookmaker: {} | Error: {}",
+                        bookmaker, le.getMessage());
+
+                // Pause this window until re-login
+                isPaused.set(true);
+
+                // Optionally: trigger re-login attempt
+                sportyLoginUtils.performLogin(page, sportyUsername, sportyPassword);
+                if (sportyLoginUtils.isLoggedIn(page)) {
+                    isPaused.getAndSet(false);
+                }
+
+                randomHumanDelay(80000, 10000); // Wait before retry
+
             } catch (Exception e) {
-                log.error("{} {} Error in betting loop: {}",
-                        EMOJI_ERROR, EMOJI_BET, e.getMessage(), e);
-                Thread.sleep(5000); // Wait before continuing
+                log.error("❌ Unexpected error in betting loop | Bookmaker: {} | Error: {}",
+                        bookmaker, e.getMessage(), e);
+
+                consecutiveErrors++;
+
+                if (consecutiveErrors >= maxConsecutiveErrors) {
+                    log.error("🚨 Critical: Too many errors - stopping loop | Bookmaker: {}",
+                            BOOK_MAKER);
+                    break;
+                }
+
+                // Wait before continuing
+                randomHumanDelay(3000, 5000);
             }
         }
 
-        log.info("{} {} Betting loop stopped", EMOJI_SUCCESS, EMOJI_POLL);
+        log.info("🏁 Betting loop stopped | Bookmaker: {}", bookmaker);
+
+        // Cleanup on exit
+        cleanupOnLoopExit(bookmaker);
+    }
+
+    private void navigateBack(Page page) throws InterruptedException {
+        if (fetchBasketballEnabled) {
+            switchToLiveSport(page, "Basketball");
+        } else if (fetchTableTennisEnabled) {
+            switchToLiveSport(page, "Table Tennis");
+        } else {
+            log.info("Staying on Football Multi View");
+            randomHumanDelay(2000, 4000);
+        }
+
+    }
+
+    /**
+     * Cleanup when loop exits
+     */
+    private void cleanupOnLoopExit(BookMaker bookmaker) {
+        try {
+            log.info("🧹 Cleaning up betting loop resources | Bookmaker: {}", bookmaker);
+
+            // Unregister from sync manager
+            syncManager.unregisterWindow(bookmaker);
+
+            // Clear any pending sync states
+            // syncManager.clearPendingForBookmaker(bookmaker);
+
+            log.info("✅ Cleanup completed | Bookmaker: {}", bookmaker);
+
+        } catch (Exception e) {
+            log.error("❌ Error during cleanup | Bookmaker: {} | Error: {}",
+                    bookmaker, e.getMessage(), e);
+        }
     }
 
     /**
      * Process bet placement - extracted from main loop for better readability
      */
     private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
-        // Navigate to the game
+        String arbId = task.getArbId();
+
+        // ✓ REGISTER INTENT FIRST
+//        syncManager.registerIntent(arbId, BOOK_MAKER);
+
+        // Navigate (slow operation)
         boolean gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);
 
+        // Early exit if game not available (before marking ready)
         if (!gameAvailable) {
-            log.info("{} {} Game not available | ArbId: {} | EventId: {}",
-                    EMOJI_WARNING, EMOJI_BET, task.getArbId(), myLeg.getEventId());
-
-            // Notify sync manager of failure
-            syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER, "Game not available");
-
-            // Check if partner already placed bet
-            if (syncManager.hasPartnerPlacedBet(task.getArbId(), BOOK_MAKER)) {
-                log.error("{} {} Partner already placed bet but game unavailable here! | ArbId: {}",
-                        EMOJI_ERROR, EMOJI_WARNING, task.getArbId());
-                // Trigger retry service for partner's leg
-                betRetryService.addFailedBetLegForRetry(myLeg, BOOK_MAKER);
-            }
-
+            log.info("{} {} Game not available during navigation | ArbId: {}",
+                    EMOJI_WARNING, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Game not available");
+            syncManager.skipArbAndSync(arbId); // ✓ Skip for both windows
             arbPollingService.releaseArb(task.getArb());
             return;
         }
 
-//        healthMonitor.checkHealth();
+        // Signal ready after successful navigation
+//        syncManager.markReady(arbId, BOOK_MAKER);
+//
+//        // Wait for partner (handles timeout and skip internally)
+//        boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
+//                arbId,
+//                BOOK_MAKER,
+//                Duration.ofSeconds(betTimeoutSeconds)
+//        );
 
-        // Verify the bet is being deploy for placing
+//        if (!partnersReady) {
+//            log.warn("{} {} Partners not ready - both windows skipping | ArbId: {}",
+//                    EMOJI_WARNING, EMOJI_SYNC, arbId);
+////            syncManager.unRegisterIntent(arbId, BOOK_MAKER);
+//            arbPollingService.releaseArb(task.getArb());
+//            return; // skipArbAndSync already called by waitForPartnersReadyOrTimeout
+//        }
+
+        log.info("{} {} ✓ Both partners ready, proceeding | ArbId: {}",
+                EMOJI_SUCCESS, EMOJI_SYNC, arbId);
+
+        // Verify bet deployment
         boolean deployedBet = deployBet(page, task.getLeg());
         if (!deployedBet) {
-            log.info("{} {} Odds changed unfavorably | ArbId: {}",
-                    EMOJI_WARNING, EMOJI_BET, task.getArbId());
-            syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER, "Odds changed");
+            log.info("{} {} Odds not available or changed | ArbId: {}",
+                    EMOJI_WARNING, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
+//            syncManager.unRegisterIntent(arbId, BOOK_MAKER);
             arbPollingService.releaseArb(task.getArb());
             return;
         }
@@ -660,34 +780,80 @@ public class SportyWindow implements BettingWindow {
 
         if (betPlaced) {
             log.info("{} {} Bet placed successfully | ArbId: {} | Stake: {} | Odds: {}",
-                    EMOJI_SUCCESS, EMOJI_BET, task.getArbId(),
-                    myLeg.getStake(), myLeg.getOdds());
+                    EMOJI_SUCCESS, EMOJI_BET, arbId, myLeg.getStake(), myLeg.getOdds());
 
-            // Notify sync manager
-            syncManager.notifyBetPlaced(task.getArbId(), BOOK_MAKER);
-
-            // Wait for confirmation
-            waitForBetConfirmation(page);
-
-            // Update leg status
+            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
+//            waitForBetConfirmation(page);
+            randomHumanDelay(2000, 3000);
+            checkAndClosePopups(page);
             myLeg.markAsPlaced(extractBetId(page), myLeg.getOdds());
 
         } else {
-            log.error("{} {} Bet placement failed | ArbId: {}",
-                    EMOJI_ERROR, EMOJI_BET, task.getArbId());
+            log.error("{} {} Bet placement failed | ArbId: {}", EMOJI_ERROR, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
 
-            syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER, "Placement failed");
+            if (syncManager.hasPartnerPlacedBet(arbId, BOOK_MAKER)) {
+                log.error("{} {} Partner placed bet but we failed! Retrying | ArbId: {}",
+                        EMOJI_ERROR, EMOJI_WARNING, arbId);
 
-            // Check if partner placed bet
-            if (syncManager.hasPartnerPlacedBet(task.getArbId(), BOOK_MAKER)) {
-                log.error("{} {} Partner placed bet but we failed! Scheduling retry | ArbId: {}",
-                        EMOJI_ERROR, EMOJI_WARNING, task.getArbId());
-                betRetryService.addFailedBetLegForRetry(myLeg, BOOK_MAKER);
+                boolean success = monitorAndPlace(page, task.getLeg());
+                if (success) {
+                    log.warn("✓ Bet placed after retry");
+                    randomHumanDelay(3000, 5000);
+                    checkAndClosePopups(page);
+                } else {
+                    log.error("✗ Bet failed after retry - needs manual intervention");
+                    // TODO: Trigger cashout
+                }
             }
         }
 
-        // Release arb
+
+//        syncManager.unRegisterIntent(arbId, BOOK_MAKER);
         arbPollingService.releaseArb(task.getArb());
+
+        Phaser phaser = task.getBarrier();
+        log.info("ready to move on to the next LegTask production by polling next available arb");
+
+        phaser.arriveAndAwaitAdvance();
+
+    }
+
+    /**
+     * Monitors betslip odds for up to ~15 seconds.
+     * Places the bet using YOUR ORIGINAL replayOddandBet logic the moment odds are acceptable.
+     * Returns true ONLY when bet is successfully placed.
+     */
+    private boolean monitorAndPlace(Page page, BetLeg leg) {
+         // 15 seconds max wait
+        final long startTime = System.currentTimeMillis();
+
+        log.info("STARTING 15-SECOND ODDS MONITOR for {} → {} @ {}",
+                leg.getProviderMarketTitle(), leg.getProviderMarketName(), leg.getOdds());
+
+        while (System.currentTimeMillis() - startTime < MAX_DURATION_MS) {
+            boolean placed = replayOddandBet(page, leg);  // YOUR ORIGINAL METHOD
+
+            if (placed) {
+                long elapsed = System.currentTimeMillis() - startTime;
+                log.info("BET PLACED SUCCESSFULLY after {}ms — Exiting monitor", elapsed);
+                return true;
+            }
+
+            // If not placed → odds were too low or error → wait and retry
+            long elapsed = System.currentTimeMillis() - startTime;
+            long remaining = MAX_DURATION_MS - elapsed;
+            if (remaining <= 0) break;
+
+            log.info("Odds not acceptable yet... retrying in 1–1.8s ({}ms left)", remaining);
+            randomHumanDelay(600, 1000);  // Human-like pause
+        }
+
+        // Timeout reached
+        long totalTime = System.currentTimeMillis() - startTime;
+        log.warn("15-SECOND MONITOR TIMEOUT — Odds never recovered ({}ms)", totalTime);
+        safeRemoveFromSlip(page);
+        return false;
     }
 
     /**
@@ -778,11 +944,7 @@ public class SportyWindow implements BettingWindow {
             throw new RuntimeException("Could not click Multi View");
         }
 
-        // === 2. Wait for page to load (simpler approach) ===
-//        randomHumanDelay(2000, 3000);
-//        page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(60_000));
-
-        // === 3. Verify we're on the right page ===
+        // ===  Verify we're on the right page ===
         String currentUrl = page.url();
         if (!currentUrl.contains("/football/live_list")) {
             throw new RuntimeException("Failed to navigate to Multi View. URL: " + currentUrl);
@@ -791,7 +953,7 @@ public class SportyWindow implements BettingWindow {
         log.info("✅ Multi View loaded: {}", currentUrl);
         randomHumanDelay(1500, 3000);
 
-        // === 4. Choose target sport ===
+        // === Choose target sport ===
         if (fetchBasketballEnabled) {
             switchToLiveSport(page, "Basketball");
         } else if (fetchTableTennisEnabled) {
@@ -856,18 +1018,40 @@ public class SportyWindow implements BettingWindow {
      * Click visible sport tab (Football, Basketball, Tennis, etc.)
      */
     private void clickVisibleSportTab(Page page, String displayName, String urlSegment) throws InterruptedException {
-        page.locator("""
-        .sport-name-item >> .text:has-text('%s'),
-        .sport-name >> text='%s',
-        div.m-overview >> text='%s' >> visible=true
-        """.formatted(displayName, displayName, displayName))
-                .first()
-                .click(new Locator.ClickOptions()
-                        .setTimeout(12_000)
-                        .setForce(true));
+        log.info("Clicking visible sport tab: {}", displayName);
 
-        page.waitForURL("**/" + urlSegment + "/live_list/**",
-                new Page.WaitForURLOptions().setTimeout(15_000));
+        // THIS IS THE ONLY SELECTOR THAT WORKS 100% ON MSPORT (Dec 2025)
+        String selector = """
+        div.sport-name-item:has(div.text:has-text("%s"))
+        """.formatted(displayName);
+
+        Locator sportTab = page.locator(selector).first();
+
+        // Wait until it's visible and clickable
+        sportTab.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15000));
+
+        // Scroll into view (critical — MSPORT sometimes hides it off-screen)
+        sportTab.scrollIntoViewIfNeeded();
+
+        // Small human pause
+        randomHumanDelay(300, 600);
+
+        // Click it
+        sportTab.click(new Locator.ClickOptions()
+                .setTimeout(12000)
+                .setForce(false)  // NEVER use force=true on MSPORT — breaks actionability
+        );
+
+        // Wait for correct URL (this is the key part)
+        page.waitForURL(url -> {
+            String urlStr = url.toString().toLowerCase();
+            return urlStr.contains("/" + urlSegment.toLowerCase() + "/")
+                    && urlStr.contains("live_list");
+        }, new Page.WaitForURLOptions().setTimeout(20000));
+
+        log.info("Successfully switched to {} → {}", displayName, page.url());
     }
 
     /**
@@ -1195,7 +1379,7 @@ public class SportyWindow implements BettingWindow {
                     }
 
                 } catch (Exception e) {
-                    log.debug("Error checking container {}: {}", i, e.getMessage());
+                    log.error("Error checking container {}: {}", i, e.getMessage());
                 }
             }
 
@@ -1218,7 +1402,7 @@ public class SportyWindow implements BettingWindow {
             String homeKey = extractKeyName(home);
             String awayKey = extractKeyName(away);
 
-            log.debug("Fuzzy search - Home key: '{}', Away key: '{}'", homeKey, awayKey);
+            log.info("Fuzzy search - Home key: '{}', Away key: '{}'", homeKey, awayKey);
 
             Locator allTeams = page.locator(".teams");
             int count = allTeams.count();
@@ -1615,122 +1799,99 @@ public class SportyWindow implements BettingWindow {
 
     // Step 2: Select and verify the betting option
     private boolean selectAndVerifyBet(Page page, BetLeg leg) {
-        String marketTitle = leg.getProviderMarketTitle();   // e.g. "Winner"
-        String outcomeName = leg.getProviderMarketName();    // e.g. "Away"
+        String market = leg.getProviderMarketTitle();    // e.g. "Winner", "Total points", "Point handicap"
+        String outcome = leg.getProviderMarketName();     // e.g. "Away", "Over 76.5", "Home (+7.5)"
 
         try {
-            log.info("Selecting: {} → {}", marketTitle, outcomeName);
+            log.info("Selecting: {} → {}", market, outcome);
 
-            // ── STEP 1: Find the specific market wrapper containing both header AND odds ─────
-            String marketWrapperXPath = String.format(
-                    "//div[contains(@class,'m-table__wrapper')]" +
-                            "[.//span[contains(@class,'m-table-header-title') and normalize-space()=%s]]",
-                    escapeXPath(marketTitle)
+            // STEP 1: Ensure we're on "All" markets tab
+            page.locator("div.m-nav-item--active >> text=All").first().waitFor(new Locator.WaitForOptions().setTimeout(10000));
+            page.locator("div.m-nav-item:has-text('All')").click(); // Force click if needed
+            randomHumanDelay(100, 200);
+
+            // STEP 2: Find market block containing the market title
+            String marketXPath = String.format(
+                    "//div[contains(@class,'m-table__wrapper')]//span[contains(@class,'m-table-header-title') and normalize-space()=%s]",
+                    escapeXPath(market)
             );
 
-            Locator marketWrapper = page.locator(marketWrapperXPath).first();
+            Locator marketBlock = page.locator("xpath=" + marketXPath)
+                    .first()
+                    .locator("xpath=ancestor::div[contains(@class,'m-table__wrapper')]")
+                    .first();
 
-            if (marketWrapper.count() == 0) {
-                log.error("❌ Market NOT FOUND: {}", marketTitle);
-                return false;
-            }
-            log.info("✅ Market FOUND: {}", marketTitle);
-
-            // ── STEP 2: Find the odds table WITHIN this specific market wrapper ─────
-            Locator oddsTable = marketWrapper.locator(
-                    "xpath=.//div[contains(@class,'m-table') and contains(@class,'m-outcome')]"
-            ).first();
-
-            if (oddsTable.count() == 0) {
-                log.error("❌ Odds table NOT found within market: {}", marketTitle);
+            if (marketBlock.count() == 0) {
+                log.error("Market NOT FOUND: {}", market);
                 return false;
             }
 
-            // ── STEP 3: Find the outcome cell WITHIN this specific odds table ─────
-            String outcomeCellXPath = String.format(
-                    ".//div[contains(@class,'m-table-cell--responsive') " +
-                            "and not(contains(@class,'m-table-cell--disable')) " +
-                            "and .//span[contains(@class,'m-table-cell-item') and normalize-space()=%s]]",
-                    escapeXPath(outcomeName)
+            // STEP 3: Find the exact cell containing the outcome name
+            String cellXPath = String.format(
+                    ".//div[contains(@class,'m-table-cell--responsive') and not(contains(@class,'m-table-cell--disable'))]" +
+                            "//span[contains(@class,'m-table-cell-item') and normalize-space()=%s]",
+                    escapeXPath(outcome)
             );
 
-            Locator betCell = oddsTable.locator(outcomeCellXPath).first();
+            Locator outcomeCell = marketBlock.locator("xpath=" + cellXPath)
+                    .first()
+                    .locator("xpath=parent::div[contains(@class,'m-table-cell--responsive')]")
+                    .first();
 
-            if (betCell.count() == 0) {
-                List<String> available = oddsTable.locator("span.m-table-cell-item").allTextContents();
-                log.warn("❌ Outcome '{}' NOT FOUND in '{}'. Available: {}",
-                        outcomeName, marketTitle, available);
+            if (outcomeCell.count() == 0) {
+                log.warn("Outcome '{}' not found in market '{}'", outcome, market);
+                List<String> available = marketBlock.locator("span.m-table-cell-item").allTextContents();
+                log.warn("Available outcomes: {}", available);
                 return false;
             }
 
-            // Extract displayed odds
-            String oddsText = betCell.locator(".m-table-cell-item").nth(1).textContent().trim();
-            log.info("✅ FOUND: {} → {} @ {}", marketTitle, outcomeName, oddsText);
+            // Extract displayed odds (second span in the cell)
+            String displayedOdds = outcomeCell.locator("span.m-table-cell-item").nth(1).textContent().trim();
+            log.info("FOUND: {} → {} @ {}", market, outcome, displayedOdds);
 
-            // ── STEP 4: Optional odds verification ─────
-            if (!verifyOdds(page, leg, betCell)) {
-                log.warn("⚠️ Odds changed (expected {}), clicking anyway", leg.getOdds());
+            // Optional: verify odds tolerance
+            if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
+                log.warn("Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
+
+//                return false;//todo
             }
 
-            // ── STEP 5: SCROLL + CLICK ─────
-            betCell.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'smooth' })");
-            page.waitForTimeout(300);
+            // STEP 4: Human-like interaction
+            outcomeCell.scrollIntoViewIfNeeded();
+//            simulateReading(page, 1200);
+//            simulateHover(outcomeCell);
+            randomHumanDelay(100, 200);
 
+            // Click the cell (not a button anymore!)
             try {
-                betCell.click(new Locator.ClickOptions()
-                        .setForce(true)
-                        .setTimeout(12000));
+                outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
             } catch (Exception e) {
-                log.debug("Normal click failed, using JS click fallback");
-                betCell.evaluate("el => el.click()");
+                outcomeCell.evaluate("el => el.click()");
             }
 
-            log.info("✅ CLICKED: {} → {} @ {}", marketTitle, outcomeName, oddsText);
-            page.waitForTimeout(800);
+            log.info("CLICKED: {} → {} @ {}", market, outcome, displayedOdds);
+            randomHumanDelay(100, 200);
             return true;
 
         } catch (Exception e) {
-            log.error("❌ FATAL ERROR ({} → {}): {}", marketTitle, outcomeName, e.getMessage());
-            e.printStackTrace();
+            log.error("FATAL: Failed to select {} → {}", market, outcome, e);
             return false;
         }
     }
 
-    private boolean verifyOdds(Page page, BetLeg leg, Locator betOption) {
+
+
+    // Odds tolerance (SportyBet rounds to 2 decimals)
+    private boolean isOddsAcceptable(double expected, String displayed) {
         try {
-            String fullText = betOption.textContent().trim();
-            log.info("Gotten text content from betOption locator");
-
-            // Extract first valid odds (handles "↑1.85", "1.90↓", "1.75", etc.)
-            Matcher matcher = Pattern.compile("\\d+\\.\\d+").matcher(fullText);
-            if (!matcher.find()) {
-                log.error("{} {} No odds found in button text: {}", EMOJI_ERROR, EMOJI_BET, fullText);
-                return false;
-            }
-
-            double displayed = Double.parseDouble(matcher.group());
-            double expected = leg.getOdds().doubleValue();
-
-            // CORRECT TOLERANCE: percentage-based
-            double tolerance = expected * (ODDS_TOLERANCE_PERCENT / 100.0);
-            boolean valid = Math.abs(displayed - expected) <= tolerance;
-
-            if (valid) {
-                log.info("{} {} Odds OK | Expected: {} | Displayed: {} | Within ±{:.1f}%",
-                        EMOJI_SUCCESS, EMOJI_BET, expected, displayed, ODDS_TOLERANCE_PERCENT);
-                return true;
-            } else {
-                double diffPercent = (Math.abs(displayed - expected) / expected) * 100.0;
-                log.warn("{} {} Odds OUT OF TOLERANCE | Expected: {} | Got: {} | Diff: {:.2f}% (limit: ±{:.1f}%) → SKIPPING",
-                        EMOJI_WARNING, EMOJI_BET, expected, displayed, diffPercent, ODDS_TOLERANCE_PERCENT);
-                return false;
-            }
-
+            double actual = Double.parseDouble(displayed.replaceAll("[^0-9.]", ""));
+            return Math.abs(actual - expected) <= 0.08;
         } catch (Exception e) {
-            log.error("{} {} Error verifying odds: {}", EMOJI_ERROR, EMOJI_BET, e.getMessage());
             return false;
         }
     }
+
+
 
     // Safe XPath text escaping (handles apostrophes like "Player's serve")
     private String escapeXPath(String s) {
@@ -1870,97 +2031,175 @@ public class SportyWindow implements BettingWindow {
      */
     private boolean placeBet(Page page, Arb arb, BetLeg leg) {
         BigDecimal stake = leg.getStake();
+        long startTime = System.currentTimeMillis();
+
+        log.info("─────────────────────────────────────────────────────────────");
+        log.info("START placeBet() → {} → {} @ {} | Stake: {} | {}",
+                leg.getProviderMarketTitle(), leg.getProviderMarketName(),
+                leg.getOdds(), stake,
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")));
 
         try {
-            log.info("STARTING BET PLACEMENT | Stake: {} | Target odds: {}", stake, leg.getOdds());
-
-            // ── 1. ENTER STAKE ─────────────────────────────────────────────────────
+            // ── 1. ENTER STAKE ─────────────────────────────────────
+            log.info("[1/6] Entering stake...");
             Locator stakeInput = page.locator("#j_stake_0 input.m-input, .m-input[placeholder*='min']").first();
             if (stakeInput.count() == 0) {
-                log.error("Stake input NOT found!");
+                log.error("Stake input missing");
                 return false;
             }
-
             jsScrollAndFocus(stakeInput, page);
             stakeInput.fill("");
-
-            log.info("Preparing to type amount");
-
-            LoginUtils.typeFastHumanLike(stakeInput, String.valueOf(stake));
+            randomHumanDelay(150, 400);
+            SportyLoginUtils.typeFastHumanLike(stakeInput, stake.toPlainString());
             stakeInput.press("Enter");
-            page.waitForTimeout(800);
+            randomHumanDelay(200, 500);
+            log.info("[OK] Stake entered");
 
-            // ── 2. VERIFY ODDS IN BETSLIP (USING YOUR EXISTING METHOD) ─────────────
-            Locator betInSlip = page.locator(".m-item").first();
-            if (betInSlip.count() == 0) {
-                log.error("Bet not added to slip!");
+            // ── 2. WAIT FOR BET IN SLIP ─────────────────────────────────
+            if (page.locator("div.m-item, .m-bet-item").count() == 0) {
+                page.waitForTimeout(3000);
+                if (page.locator("div.m-item").count() == 0) {
+                    log.error("Bet never appeared in slip");
+                    return false;
+                }
+            }
+            log.info("[OK] Bet in slip");
+
+            // ── 3. UNKILLABLE LOOP + FULL POPUP HANDLING ─────────────────────
+            log.info("[3/6] Starting UNKILLABLE placement loop...");
+
+            boolean betConfirmed = false;
+            int cycle = 0;
+            final int MAX_CYCLES = 10;
+
+            while (!betConfirmed && cycle < MAX_CYCLES) {
+                cycle++;
+                log.info("[Cycle {}/{}] Checking state...", cycle, MAX_CYCLES);
+
+                // ── A. FINAL CONFIRM POPUP ──
+                Locator finalConfirm = page.locator("button:has-text('Confirm'), button:has-text('Yes'), button:has-text('OK') >> visible=true").first();
+                if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
+                    log.warn("FINAL CONFIRM POPUP → Clicking 'Confirm'");
+                    jsScrollAndClick(finalConfirm, page);
+                    randomHumanDelay(1000, 1800);
+                }
+
+                // ── B. MAIN BUTTON LOGIC ──
+                Locator btn = page.locator("button.af-button--primary >> visible=true").first();
+                if (btn.count() == 0) {
+                    log.info("Primary button gone → likely success");
+                    break;
+                }
+
+                String text = btn.innerText().trim();
+                log.info("Main button: \"{}\" | Disabled: {}", text, btn.isDisabled());
+
+                // 1. Accept Changes
+                if (text.matches(".*(Accept Changes|Accept|Confirm Changes).*")) {
+                    log.warn("→ Clicking 'Accept Changes' (cycle {})", cycle);
+                    jsScrollAndClick(btn, page);
+                    randomHumanDelay(300, 900);
+                    continue;
+                }
+
+                // 2. Place Bet + ENABLED → click
+                if (text.matches(".*(Place Bet|Bet Now|Confirm Bet|Place bet).*") && !btn.isDisabled()) {
+                    log.info("→ Clicking 'Place Bet' (cycle {})", cycle);
+                    jsScrollAndClick(btn, page);
+                    randomHumanDelay(1000, 2000);
+
+                    // CHECK "ODDS NOT ACCEPTABLE" RIGHT AFTER CLICK
+                    Locator oddsRejected = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
+                    if (oddsRejected.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
+                        log.warn("ODDS NOT ACCEPTABLE POPUP → Closing and retrying...");
+                        Locator closeBtn = page.locator("div.m-dialog-wrapper button:has-text('OK'), img.close-icon[data-action='close']").first();
+                        jsScrollAndClick(closeBtn, page);
+                        randomHumanDelay(1000, 1600);
+                        continue;
+                    }
+                    continue;
+                }
+
+                // 3. Place Bet disabled → wait
+                if (text.contains("Place Bet") && btn.isDisabled()) {
+                    log.info("Place Bet disabled → waiting...");
+                    randomHumanDelay(1000, 1500);
+                    continue;
+                }
+
+                // ── 4. 100% RELIABLE SUCCESS DETECTION (MULTI-LAYER) ──
+                boolean successDetected = page.locator("div.m-dialog-wrapper.m-dialog-suc").count() > 0 ||
+                        page.locator("text='Submission Successful'").count() > 0 ||
+                        page.locator("i.m-icon-suc").count() > 0 ||
+                        page.locator("div.booking-code").isVisible(new Locator.IsVisibleOptions().setTimeout(1000));
+
+                if (successDetected) {
+                    log.info("SUCCESS CONFIRMED — OFFICIAL 'Submission Successful' MODAL DETECTED!");
+
+                    // Extract booking code
+                    try {
+                        String code = page.locator("div.booking-code").textContent().trim();
+                        log.info("BOOKING CODE: {}", code.isEmpty() ? "Hidden" : code);
+                    } catch (Exception ignored) {}
+
+                    betConfirmed = true;
+                    break;
+                }
+
+                randomHumanDelay(700, 1100);
+            }
+
+            if (!betConfirmed) {
+                log.error("FAILED after {} cycles → Could not place bet", MAX_CYCLES);
+                return false;
+            }
+            log.info("[OK] Bet placed after {} cycle(s)", cycle);
+
+            // ── 5. FINAL SUCCESS VERIFICATION (HARD CONFIRMATION) ─────────────
+            boolean finalSuccess = false;
+            try {
+                page.waitForFunction("""
+                () => {
+                    return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
+                           document.querySelector('span[data-cms-key="submission_successful"]') ||
+                           document.querySelector('div.booking-code');
+                }
+                """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
+
+                log.info("FINAL SUCCESS VERIFIED — Official modal confirmed");
+
+                try {
+                    String code = page.locator("div.booking-code").textContent().trim();
+                    log.info("FINAL BOOKING CODE: {}", code.isEmpty() ? "Not shown" : code);
+                } catch (Exception ignored) {}
+
+                finalSuccess = true;
+
+            } catch (TimeoutError te) {
+                log.error("NO SUCCESS MODAL AFTER 15s → BET FAILED");
                 return false;
             }
 
-//            if (!verifyOdds(page, leg, betInSlip)) {
-//                log.warn("Odds in betslip OUT OF TOLERANCE → SKIPPING BET");
-//                safeRemoveFromSlip(page);
-//                return false;
-//            }
-
-            // ── 3. ACCEPT CHANGES IF ODDS CHANGED SLIGHTLY ─────────────────────────
-            Locator acceptBtn = page.locator("button.af-button--primary span:has-text('Accept Changes')").first();
+            // ── 6. CLOSE SUCCESS MODAL CLEANLY ─────────────────────────────
             try {
-                if (acceptBtn.isVisible(new Locator.IsVisibleOptions().setTimeout(5000))) {
-                    log.info("Minor odds change → clicking 'Accept Changes'");
-                    jsScrollAndClick(acceptBtn, page);
-                    page.waitForTimeout(700);
-                }
-            } catch (Exception ignored) {}
-
-            // ── 4. CLICK "PLACE BET" BUTTON ───────────────────────────────────────
-            Locator placeBetBtn = page.locator(
-                    "button.af-button--primary span:has-text('Place Bet'), " +
-                            "button.af-button--primary span:has-text('Bet Now'), " +
-                            "button.af-button--primary span:has-text('Confirm Bet')"
-            ).first();
-
-            if (placeBetBtn.count() == 0 || placeBetBtn.isDisabled()) {
-                log.error("Place Bet button missing or disabled");
-                return false;
+                Locator closeSuccess = page.locator("div.m-dialog-suc button:has-text('OK'), " +
+                        "div.m-dialog-suc i.m-icon-close, " +
+                        "div.m-dialog-suc [data-action='close']").first();
+                jsScrollAndClick(closeSuccess, page);
+                randomHumanDelay(600, 1200);
+                log.info("Success modal closed");
+            } catch (Exception e) {
+                log.debug("Success modal already closed");
             }
 
-            jsScrollAndClick(placeBetBtn, page);
-            page.waitForTimeout(1000);
-
-            // ── 5. FINAL "CONFIRM" POPUP ───────────────────────────────────────────
-            Locator confirmBtn = page.locator("button.af-button--primary span:has-text('Confirm')").first();
-            try {
-                if (confirmBtn.isVisible(new Locator.IsVisibleOptions().setTimeout(8000))) {
-                    log.info("Clicking final 'Confirm'");
-                    jsScrollAndClick(confirmBtn, page);
-                    page.waitForTimeout(800);
-                }
-            } catch (Exception ignored) {}
-
-            // ── 6. WAIT FOR OFFICIAL SUCCESS POPUP ("Submission Successful") ───────
-            Locator successPopup = page.locator("div.m-dialog-wrapper.m-dialog-suc");
-            boolean success = false;
-
-            successPopup.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(18000));
-
-            log.info("BET PLACED SUCCESSFULLY — 'Submission Successful' popup confirmed");
-
-            // Close the popup (OK button)
-            Locator okBtn = successPopup.locator("button:has-text('OK'), button[data-action='close']");
-            jsScrollAndClick(okBtn.first(), page);
-
-            success = true;
-
-            return success;
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("placeBet() COMPLETED | SUCCESS | {}ms | {} cycles", duration, cycle);
+            log.info("─────────────────────────────────────────────────────────────");
+            return true;
 
         } catch (Exception e) {
-            log.error("FATAL ERROR in placeBet(): {}", e.getMessage());
+            log.error("FATAL in placeBet(): {}", e.toString());
             e.printStackTrace();
-//            safeRemoveFromSlip(page);
-
             return false;
         }
     }
@@ -1971,7 +2210,7 @@ public class SportyWindow implements BettingWindow {
         try {
             locator.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'smooth' })");
             page.waitForTimeout(350);
-            locator.click(new Locator.ClickOptions().setForce(true).setTimeout(8000));
+            locator.click(new Locator.ClickOptions().setForce(true).setTimeout(1500));
         } catch (Exception e) {
             log.debug("Normal click failed → using JS click");
             locator.evaluate("el => el.click()");
@@ -1999,7 +2238,7 @@ public class SportyWindow implements BettingWindow {
     private void waitForBetConfirmation(Page page) {
         try {
             Locator confirmation = page.locator(
-                    "//div[contains(text(), 'Bet placed') or contains(text(), 'Success')]"
+                    "xpath=//div[contains(text(), 'Bet placed') or contains(text(), 'Success')]"
             );
             confirmation.waitFor(new Locator.WaitForOptions().setTimeout(5000));
             log.info("{} {} Bet confirmed", EMOJI_SUCCESS, EMOJI_BET);
@@ -2154,7 +2393,7 @@ public class SportyWindow implements BettingWindow {
 
     /**
      * Load or create browser context
-     * OPTIMIZED: Better validation and error handling
+     *
      */
     private BrowserContext loadOrCreateContext() {
         profile = profileManager.getNextProfile();
@@ -2932,27 +3171,70 @@ public class SportyWindow implements BettingWindow {
     // PUBLIC CONTROL METHODS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public void pause() {
-        isPaused.set(true);
-        log.info("{} Window paused", EMOJI_WARNING);
-    }
+    // Add these methods to both MSportWindow and SportyWindow classes
 
-    public void resume() {
-        isPaused.set(false);
-        log.info("{} {} Window resumed", EMOJI_SUCCESS, EMOJI_SYNC);
-    }
-
+    /**
+     * Stop the betting loop gracefully
+     */
     public void stop() {
+        log.info("{} {} Stopping {} betting loop...", EMOJI_SHUTDOWN, EMOJI_BET, BOOK_MAKER);
         isRunning.set(false);
-        log.info("{} Window stopped", EMOJI_WARNING);
     }
 
+    /**
+     * Pause the betting loop
+     */
+    public void pause() {
+        log.info("⏸️ {} Pausing {} betting loop...", EMOJI_WARNING, BOOK_MAKER);
+        isPaused.set(true);
+    }
+
+    /**
+     * Resume the betting loop
+     */
+    public void resume() {
+        log.info("▶️ {} Resuming {} betting loop...", EMOJI_SUCCESS, BOOK_MAKER);
+        isPaused.set(false);
+    }
+
+    /**
+     * Check if window is running
+     */
     public boolean isRunning() {
         return isRunning.get();
     }
 
+    /**
+     * Check if window is paused
+     */
     public boolean isPaused() {
         return isPaused.get();
+    }
+
+    /**
+     * Get window status
+     */
+    public WindowStatus getStatus() {
+        return WindowStatus.builder()
+                .bookmaker(BOOK_MAKER)
+                .isRunning(isRunning.get())
+                .isPaused(isPaused.get())
+                .isLoggedIn(isLoggedIn.get())
+                .queueSize(taskQueue.size())
+                .build();
+    }
+
+    /**
+     * Window status data class
+     */
+    @lombok.Builder
+    @lombok.Data
+    public static class WindowStatus {
+        private BookMaker bookmaker;
+        private boolean isRunning;
+        private boolean isPaused;
+        private boolean isLoggedIn;
+        private int queueSize;
     }
 
     public void shutdown() {

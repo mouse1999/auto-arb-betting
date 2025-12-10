@@ -14,57 +14,20 @@ import java.util.List;
 public class ScraperConfig {
     private final List<String> BROWSER_FlAGS= Arrays.asList(
             // === Core Stealth Flags ===
-            "--disable-blink-features=AutomationControlled",
-            "--disable-features=UserAgentClientHint",  // Important for client hints control
-
-            // === Performance & Stability ===
             "--no-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-http2",
-            "--enable-quic",
-            "--quic-version=h3-29",
-
-            // === GPU & Rendering (UPDATED - GPU enabled) ===
-            "--use-gl=swiftshader",           // Software GPU instead of --disable-gpu
-            "--enable-webgl",                 // Enable WebGL for realism
-            "--disable-accelerated-2d-canvas", // Canvas protection
-            "--disable-gpu-sandbox",
-            "--disable-software-rasterizer",  // Keep this for headless stability
-
-            // === UI & Behavior ===
+            "--disable-blink-features=AutomationControlled",
             "--disable-infobars",
-            "--disable-web-security",
             "--disable-extensions",
             "--disable-default-apps",
             "--disable-popup-blocking",
             "--disable-notifications",
-            "--disable-translate",
             "--mute-audio",
-            "--hide-scrollbars",
-            "--remote-debugging-port=0",
-
-            // === Browser Initialization ===
             "--no-first-run",
-            "--no-service-autorun",
-            "--no-default-browser-check",
-            "--password-store=basic",
             "--lang=en-US",
-
-            // === Process & Memory (OPTIONAL - remove if causing issues) ===
-            // "--single-process",           // Can cause instability
-            // "--no-zygote",               // Can cause instability
-
-            // === Additional Stealth Flags ===
             "--disable-background-timer-throttling",
             "--disable-backgrounding-occluded-windows",
-            "--disable-renderer-backgrounding",
-            "--disable-features=TranslateUI",
-            "--disable-ipc-flooding-protection",
-            "--disable-client-side-phishing-detection",
-            "--disable-hang-monitor",
-            "--disable-sync",
-            "--metrics-recording-only",
-            "--aggressive-cache-discard"
+            "--disable-renderer-backgrounding"
 
 
 

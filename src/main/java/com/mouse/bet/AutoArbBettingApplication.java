@@ -5,6 +5,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.tasks.Bet9jaOddsFetcher;
 import com.mouse.bet.tasks.SportyBetOddsFetcher;
+import com.mouse.bet.window.MSportWindow;
 import com.mouse.bet.window.SportyWindow;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -18,8 +19,8 @@ public class AutoArbBettingApplication {
 //		Bet9jaOddsFetcher fetcher = context.getBean(Bet9jaOddsFetcher.class);
 //		SportyBetOddsFetcher fetcher = context.getBean(SportyBetOddsFetcher.class);
 
-		SportyWindow window = context.getBean(SportyWindow.class);
-		window.run();
+//		MSportWindow window = context.getBean(MSportWindow.class);
+//		window.run();
 
 
 

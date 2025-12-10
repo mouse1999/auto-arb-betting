@@ -10,6 +10,8 @@ import java.time.Duration;
 
 public class MockTaskSupplier {
 
+
+
     private LegTask legTask;
     private BetLeg leg;
 
@@ -23,16 +25,18 @@ public class MockTaskSupplier {
                 .stake(BigDecimal.TEN)
                 .profitPercent(BigDecimal.valueOf(12))
                 .league("TT_cup")
-                .homeTeam("Misiak, Mateusz")
-                .awayTeam("Trela, Mateusz")
+                .homeTeam("Dlask, Marek")
+                .awayTeam("Vyskocil, Zbynek")
                 .isPrimaryLeg(true)
-                .sportEnum(SportEnum.TABLE_TENNIS)
-                .odds(BigDecimal.valueOf(2.0))
+                .sportEnum(SportEnum.BASKETBALL)
+                .odds(BigDecimal.valueOf(1.5))
                 .providerMarketName("Away")
                 .providerMarketTitle("Winner")
                 .stake(BigDecimal.TEN)
 
                 .build();
+
+
 
         legTask = LegTask.builder()
                 .arbId("arb123")
@@ -41,10 +45,9 @@ public class MockTaskSupplier {
                 .leg(leg)
                 .build();
 
-        // Misiak, Mateusz vs Trela, Mateusz
-// SportyTV Match Tracker
 
     }
+
 
     public LegTask poll() {
         return legTask;
@@ -56,3 +59,4 @@ public class MockTaskSupplier {
 
 
 }
+
