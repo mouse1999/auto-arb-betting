@@ -25,13 +25,13 @@ public class MockTaskSupplier {
                 .stake(BigDecimal.TEN)
                 .profitPercent(BigDecimal.valueOf(12))
                 .league("TT_cup")
-                .homeTeam("Dlask, Marek")
-                .awayTeam("Vyskocil, Zbynek")
+                .homeTeam("Bahcesehir Koleji")
+                .awayTeam("FC Universitatea Cluj")
                 .isPrimaryLeg(true)
                 .sportEnum(SportEnum.BASKETBALL)
                 .odds(BigDecimal.valueOf(1.5))
-                .providerMarketName("Away")
-                .providerMarketTitle("Winner")
+                .providerMarketName("Over 176.5")
+                .providerMarketTitle("O/U (incl. OT)")
                 .stake(BigDecimal.TEN)
 
                 .build();

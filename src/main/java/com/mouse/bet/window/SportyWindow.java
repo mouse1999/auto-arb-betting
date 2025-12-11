@@ -171,6 +171,104 @@ public class SportyWindow implements BettingWindow, Runnable {
         }
     }
 
+
+    private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
+        String arbId = task.getArbId();
+
+        // ✓ REGISTER INTENT FIRST
+//        syncManager.registerIntent(arbId, BOOK_MAKER);
+
+        // Navigate (slow operation)
+        boolean gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);
+
+        // Early exit if game not available (before marking ready)
+        if (!gameAvailable) {
+            log.info("{} {} Game not available during navigation | ArbId: {}",
+                    EMOJI_WARNING, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Game not available");
+            syncManager.skipArbAndSync(arbId); // ✓ Skip for both windows
+            arbPollingService.releaseArb(task.getArb());
+            return;
+        }
+
+        // Signal ready after successful navigation
+//        syncManager.markReady(arbId, BOOK_MAKER);
+//
+//        // Wait for partner (handles timeout and skip internally)
+//        boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
+//                arbId,
+//                BOOK_MAKER,
+//                Duration.ofSeconds(betTimeoutSeconds)
+//        );
+
+//        if (!partnersReady) {
+//            log.warn("{} {} Partners not ready - both windows skipping | ArbId: {}",
+//                    EMOJI_WARNING, EMOJI_SYNC, arbId);
+////            syncManager.unRegisterIntent(arbId, BOOK_MAKER);
+//            arbPollingService.releaseArb(task.getArb());
+//            return; // skipArbAndSync already called by waitForPartnersReadyOrTimeout
+//        }
+
+        log.info("{} {} ✓ Both partners ready, proceeding | ArbId: {}",
+                EMOJI_SUCCESS, EMOJI_SYNC, arbId);
+
+        // Verify bet deployment
+        boolean deployedBet = deployBet(page, task.getLeg());
+        if (!deployedBet) {
+            log.info("{} {} Odds not available or changed | ArbId: {}",
+                    EMOJI_WARNING, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
+//            syncManager.unRegisterIntent(arbId, BOOK_MAKER);
+            arbPollingService.releaseArb(task.getArb());
+            return;
+        }
+
+        // Place the bet
+        boolean betPlaced = placeBet(page, task.getArb(), myLeg);
+
+        if (betPlaced) {
+            log.info("{} {} Bet placed successfully | ArbId: {} | Stake: {} | Odds: {}",
+                    EMOJI_SUCCESS, EMOJI_BET, arbId, myLeg.getStake(), myLeg.getOdds());
+
+            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
+//            waitForBetConfirmation(page);
+            randomHumanDelay(2000, 3000);
+            sportyLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+            checkAndClosePopups(page);
+            myLeg.markAsPlaced(extractBetId(page), myLeg.getOdds());
+
+        } else {
+            log.error("{} {} Bet placement failed | ArbId: {}", EMOJI_ERROR, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
+
+            if (syncManager.hasPartnerPlacedBet(arbId, BOOK_MAKER)) {
+                log.error("{} {} Partner placed bet but we failed! Retrying | ArbId: {}",
+                        EMOJI_ERROR, EMOJI_WARNING, arbId);
+
+                boolean success = monitorAndPlace(page, task.getLeg());
+                if (success) {
+                    log.warn("✓ Bet placed after retry");
+                    randomHumanDelay(3000, 5000);
+                    sportyLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+                    checkAndClosePopups(page);
+                } else {
+                    log.error("✗ Bet failed after retry - needs manual intervention");
+                    // TODO: Trigger cashout
+                }
+            }
+        }
+
+
+//        syncManager.unRegisterIntent(arbId, BOOK_MAKER);
+        arbPollingService.releaseArb(task.getArb());
+
+        Phaser phaser = task.getBarrier();
+        log.info("ready to move on to the next LegTask production by polling next available arb");
+
+        phaser.arriveAndAwaitAdvance();
+
+    }
+
     /**
      * Main entry point - runs the betting window with retry logic
      * OPTIMIZED: Better error categorization and recovery
@@ -310,6 +408,13 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             // 🔔 Check for any pop-ups after login
             checkAndClosePopups(page);
+
+            boolean savedBalance = sportyLoginUtils.updateWalletBalance(page, BOOK_MAKER);
+            if (savedBalance) {
+                log.info("{} balance saved for balance tracking purposes", BOOK_MAKER);
+            }else {
+                log.warn("{} balance was not saved due to not been able to locate the amount element");
+            }
 
             mimicHumanBehavior(page);
             goToLivePage(page);
@@ -689,14 +794,9 @@ public class SportyWindow implements BettingWindow, Runnable {
     }
 
     private void navigateBack(Page page) throws InterruptedException {
-        if (fetchBasketballEnabled) {
-            switchToLiveSport(page, "Basketball");
-        } else if (fetchTableTennisEnabled) {
-            switchToLiveSport(page, "Table Tennis");
-        } else {
-            log.info("Staying on Football Multi View");
-            randomHumanDelay(2000, 4000);
-        }
+        page.goBack(new Page.GoBackOptions().setTimeout(15000));
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        log.info("{} Returned to previous page", EMOJI_NAVIGATION);
 
     }
 
@@ -724,100 +824,7 @@ public class SportyWindow implements BettingWindow, Runnable {
     /**
      * Process bet placement - extracted from main loop for better readability
      */
-    private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
-        String arbId = task.getArbId();
 
-        // ✓ REGISTER INTENT FIRST
-//        syncManager.registerIntent(arbId, BOOK_MAKER);
-
-        // Navigate (slow operation)
-        boolean gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);
-
-        // Early exit if game not available (before marking ready)
-        if (!gameAvailable) {
-            log.info("{} {} Game not available during navigation | ArbId: {}",
-                    EMOJI_WARNING, EMOJI_BET, arbId);
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Game not available");
-            syncManager.skipArbAndSync(arbId); // ✓ Skip for both windows
-            arbPollingService.releaseArb(task.getArb());
-            return;
-        }
-
-        // Signal ready after successful navigation
-//        syncManager.markReady(arbId, BOOK_MAKER);
-//
-//        // Wait for partner (handles timeout and skip internally)
-//        boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
-//                arbId,
-//                BOOK_MAKER,
-//                Duration.ofSeconds(betTimeoutSeconds)
-//        );
-
-//        if (!partnersReady) {
-//            log.warn("{} {} Partners not ready - both windows skipping | ArbId: {}",
-//                    EMOJI_WARNING, EMOJI_SYNC, arbId);
-////            syncManager.unRegisterIntent(arbId, BOOK_MAKER);
-//            arbPollingService.releaseArb(task.getArb());
-//            return; // skipArbAndSync already called by waitForPartnersReadyOrTimeout
-//        }
-
-        log.info("{} {} ✓ Both partners ready, proceeding | ArbId: {}",
-                EMOJI_SUCCESS, EMOJI_SYNC, arbId);
-
-        // Verify bet deployment
-        boolean deployedBet = deployBet(page, task.getLeg());
-        if (!deployedBet) {
-            log.info("{} {} Odds not available or changed | ArbId: {}",
-                    EMOJI_WARNING, EMOJI_BET, arbId);
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
-//            syncManager.unRegisterIntent(arbId, BOOK_MAKER);
-            arbPollingService.releaseArb(task.getArb());
-            return;
-        }
-
-        // Place the bet
-        boolean betPlaced = placeBet(page, task.getArb(), myLeg);
-
-        if (betPlaced) {
-            log.info("{} {} Bet placed successfully | ArbId: {} | Stake: {} | Odds: {}",
-                    EMOJI_SUCCESS, EMOJI_BET, arbId, myLeg.getStake(), myLeg.getOdds());
-
-            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
-//            waitForBetConfirmation(page);
-            randomHumanDelay(2000, 3000);
-            checkAndClosePopups(page);
-            myLeg.markAsPlaced(extractBetId(page), myLeg.getOdds());
-
-        } else {
-            log.error("{} {} Bet placement failed | ArbId: {}", EMOJI_ERROR, EMOJI_BET, arbId);
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
-
-            if (syncManager.hasPartnerPlacedBet(arbId, BOOK_MAKER)) {
-                log.error("{} {} Partner placed bet but we failed! Retrying | ArbId: {}",
-                        EMOJI_ERROR, EMOJI_WARNING, arbId);
-
-                boolean success = monitorAndPlace(page, task.getLeg());
-                if (success) {
-                    log.warn("✓ Bet placed after retry");
-                    randomHumanDelay(3000, 5000);
-                    checkAndClosePopups(page);
-                } else {
-                    log.error("✗ Bet failed after retry - needs manual intervention");
-                    // TODO: Trigger cashout
-                }
-            }
-        }
-
-
-//        syncManager.unRegisterIntent(arbId, BOOK_MAKER);
-        arbPollingService.releaseArb(task.getArb());
-
-        Phaser phaser = task.getBarrier();
-        log.info("ready to move on to the next LegTask production by polling next available arb");
-
-        phaser.arriveAndAwaitAdvance();
-
-    }
 
     /**
      * Monitors betslip odds for up to ~15 seconds.

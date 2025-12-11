@@ -21,6 +21,7 @@ import com.mouse.bet.service.ArbPollingService;
 import com.mouse.bet.service.BetLegRetryService;
 import com.mouse.bet.tasks.LegTask;
 import com.mouse.bet.utils.MSportLoginUtils;
+import com.mouse.bet.utils.MSportMarketSearchUtils;
 import com.mouse.bet.utils.SportyLoginUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
@@ -37,14 +38,12 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static com.mouse.bet.utils.MSportMarketSearchUtils.*;
 import static com.mouse.bet.utils.WindowUtils.attachAntiDetection;
 
 @Slf4j
@@ -150,6 +149,116 @@ public class MSportWindow implements BettingWindow, Runnable {
             log.error("{} {} Failed to initialize Playwright: {}", EMOJI_ERROR, EMOJI_INIT, e.getMessage(), e);
             throw new RuntimeException("Playwright initialization failed", e);
         }
+    }
+
+
+
+    private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
+        String arbId = task.getArbId();
+
+
+        // REGISTER INTENT FIRST (before any slow operations)
+//        boolean intentRegistered = syncManager.registerIntent(arbId, BOOK_MAKER);
+//        if (!intentRegistered) {
+//            log.warn("{} {} Arb already cancelled - skipping | ArbId: {} | Bookmaker: {}",
+//                    EMOJI_WARNING, EMOJI_SYNC, arbId, BOOK_MAKER);
+//            arbPollingService.releaseArb(task.getArb());
+//            return;
+//        }
+
+        // Navigate (slow operation)
+        boolean gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
+
+        // Early exit if game not available (before marking ready)
+        if (!gameAvailable) {
+            log.info("{} {} Game not available during navigation | ArbId: {}",
+                    EMOJI_WARNING, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Game not available");
+            syncManager.skipArbAndSync(arbId); // ✓ Skip for both window
+
+            arbPollingService.releaseArb(task.getArb());
+            return;
+        }
+
+//        // MARK READY - Check if arb was cancelled during navigation
+//        boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
+//        if (!markedReady) {
+//            log.warn("{} {} Partner timed out while we were navigating - skipping | ArbId: {} | Bookmaker: {}",
+//                    EMOJI_WARNING, EMOJI_SYNC, arbId, BOOK_MAKER);
+//            arbPollingService.releaseArb(task.getArb());
+//            return;
+//        }
+//
+//        // WAIT FOR PARTNER (with timeout detection)
+//        boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
+//                arbId,
+//                BOOK_MAKER,
+//                Duration.ofSeconds(betTimeoutSeconds)
+//        );
+//
+//        if (!partnersReady) {
+//            log.warn("{} {} Partners not ready - both windows skipping | ArbId: {}",
+//                    EMOJI_WARNING, EMOJI_SYNC, arbId);
+//            arbPollingService.releaseArb(task.getArb());
+//            return; // skipArbAndSync already called by waitForPartnersReadyOrTimeout
+//        }
+
+        log.info("{} {} ✓ Both partners ready, proceeding | ArbId: {}",
+                EMOJI_SUCCESS, EMOJI_SYNC, arbId);
+
+        // Verify bet deployment
+        boolean deployedBet = deployBet(page, task.getLeg());
+        if (!deployedBet) {
+            log.info("{} {} Odds not available or changed | ArbId: {}",
+                    EMOJI_WARNING, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
+            arbPollingService.releaseArb(task.getArb());
+            return;
+        }
+
+        // Place the bet
+        boolean betPlaced = placeBet(page, task.getArb(), myLeg);
+
+        if (betPlaced) {
+            log.info("{} {} Bet placed successfully | ArbId: {} | Stake: {} | Odds: {}",
+                    EMOJI_SUCCESS, EMOJI_BET, arbId, myLeg.getStake(), myLeg.getOdds());
+
+            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
+            waitForBetConfirmation(page);
+            randomHumanDelay(2000, 3000);
+            mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+            closeSuccessModal(page);
+            myLeg.markAsPlaced(extractBetId(page), myLeg.getOdds());
+
+        } else {
+            log.error("{} {} Bet placement failed | ArbId: {}", EMOJI_ERROR, EMOJI_BET, arbId);
+            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
+
+            if (syncManager.hasPartnerPlacedBet(arbId, BOOK_MAKER)) {
+                log.error("{} {} Partner placed bet but we failed! Retrying | ArbId: {}",
+                        EMOJI_ERROR, EMOJI_WARNING, arbId);
+
+                boolean success = monitorAndPlace(page, task.getLeg());
+                if (success) {
+                    log.warn("✓ Bet placed after retry");
+                    randomHumanDelay(3000, 5000);
+                    mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+                    closeSuccessModal(page);
+                } else {
+                    log.error("✗ Bet failed after retry - needs manual intervention");
+                    // TODO: Trigger cashout
+                }
+            }
+        }
+
+//        syncManager.unRegisterIntent(arbId, BOOK_MAKER);
+
+        arbPollingService.releaseArb(task.getArb());
+
+        Phaser phaser = task.getBarrier();
+        log.info("ready to move on to the next LegTask production by polling next available arb");
+        phaser.arriveAndAwaitAdvance();
+
     }
     @Override
     public void run() {
@@ -285,6 +394,14 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             // 🔔 Check for any pop-ups after login
             closeWinningPopup(page);
+            boolean savedBalance = mSportLoginUtils.updateWalletBalance(page, BOOK_MAKER);
+            if (savedBalance) {
+                log.info("{} balance saved for balance tracking purposes", BOOK_MAKER);
+            }else {
+                log.warn("{} balance was not saved due to not been able to locate the amount element");
+            }
+
+
 
             mimicHumanBehavior(page);
             goToLivePage(page);
@@ -706,111 +823,7 @@ public class MSportWindow implements BettingWindow, Runnable {
     /**
      *
      */
-    private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
-        String arbId = task.getArbId();
 
-
-        // REGISTER INTENT FIRST (before any slow operations)
-//        boolean intentRegistered = syncManager.registerIntent(arbId, BOOK_MAKER);
-//        if (!intentRegistered) {
-//            log.warn("{} {} Arb already cancelled - skipping | ArbId: {} | Bookmaker: {}",
-//                    EMOJI_WARNING, EMOJI_SYNC, arbId, BOOK_MAKER);
-//            arbPollingService.releaseArb(task.getArb());
-//            return;
-//        }
-
-        // Navigate (slow operation)
-        boolean gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
-
-        // Early exit if game not available (before marking ready)
-        if (!gameAvailable) {
-            log.info("{} {} Game not available during navigation | ArbId: {}",
-                    EMOJI_WARNING, EMOJI_BET, arbId);
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Game not available");
-            syncManager.skipArbAndSync(arbId); // ✓ Skip for both window
-
-            arbPollingService.releaseArb(task.getArb());
-            return;
-        }
-
-//        // MARK READY - Check if arb was cancelled during navigation
-//        boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
-//        if (!markedReady) {
-//            log.warn("{} {} Partner timed out while we were navigating - skipping | ArbId: {} | Bookmaker: {}",
-//                    EMOJI_WARNING, EMOJI_SYNC, arbId, BOOK_MAKER);
-//            arbPollingService.releaseArb(task.getArb());
-//            return;
-//        }
-//
-//        // WAIT FOR PARTNER (with timeout detection)
-//        boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
-//                arbId,
-//                BOOK_MAKER,
-//                Duration.ofSeconds(betTimeoutSeconds)
-//        );
-//
-//        if (!partnersReady) {
-//            log.warn("{} {} Partners not ready - both windows skipping | ArbId: {}",
-//                    EMOJI_WARNING, EMOJI_SYNC, arbId);
-//            arbPollingService.releaseArb(task.getArb());
-//            return; // skipArbAndSync already called by waitForPartnersReadyOrTimeout
-//        }
-
-        log.info("{} {} ✓ Both partners ready, proceeding | ArbId: {}",
-                EMOJI_SUCCESS, EMOJI_SYNC, arbId);
-
-        // Verify bet deployment
-        boolean deployedBet = deployBet(page, task.getLeg());
-        if (!deployedBet) {
-            log.info("{} {} Odds not available or changed | ArbId: {}",
-                    EMOJI_WARNING, EMOJI_BET, arbId);
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
-            arbPollingService.releaseArb(task.getArb());
-            return;
-        }
-
-        // Place the bet
-        boolean betPlaced = placeBet(page, task.getArb(), myLeg);
-
-        if (betPlaced) {
-            log.info("{} {} Bet placed successfully | ArbId: {} | Stake: {} | Odds: {}",
-                    EMOJI_SUCCESS, EMOJI_BET, arbId, myLeg.getStake(), myLeg.getOdds());
-
-            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
-            waitForBetConfirmation(page);
-            randomHumanDelay(2000, 3000);
-            closeSuccessModal(page);
-            myLeg.markAsPlaced(extractBetId(page), myLeg.getOdds());
-
-        } else {
-            log.error("{} {} Bet placement failed | ArbId: {}", EMOJI_ERROR, EMOJI_BET, arbId);
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
-
-            if (syncManager.hasPartnerPlacedBet(arbId, BOOK_MAKER)) {
-                log.error("{} {} Partner placed bet but we failed! Retrying | ArbId: {}",
-                        EMOJI_ERROR, EMOJI_WARNING, arbId);
-
-                boolean success = monitorAndPlace(page, task.getLeg());
-                if (success) {
-                    log.warn("✓ Bet placed after retry");
-                    randomHumanDelay(3000, 5000);
-                    closeSuccessModal(page);
-                } else {
-                    log.error("✗ Bet failed after retry - needs manual intervention");
-                    // TODO: Trigger cashout
-                }
-            }
-        }
-
-//        syncManager.unRegisterIntent(arbId, BOOK_MAKER);
-
-        arbPollingService.releaseArb(task.getArb());
-
-        Phaser phaser = task.getBarrier();
-        log.info("ready to move on to the next LegTask production by polling next available arb");
-        phaser.arriveAndAwaitAdvance();
-
-    }
 
 
 
@@ -1747,102 +1760,56 @@ public class MSportWindow implements BettingWindow, Runnable {
     }
     // Step 2: Select and verify the betting option
     private boolean selectAndVerifyBet(Page page, BetLeg leg) {
-        String market = leg.getProviderMarketTitle();    // e.g. "Winner", "Correct score", "Point handicap"
-        String outcome = leg.getProviderMarketName();     // e.g. "Home", "3:2", "+2.5"
+        String market = leg.getProviderMarketTitle();    // e.g. "Winner", "O/U Total Points", "Point Handicap"
+        String outcome = leg.getProviderMarketName();     // e.g. "Home", "Over 76.5", "+2.5"
 
         try {
             log.info("Selecting: {} → {}", market, outcome);
 
-
-            // Find market block containing the market title
-            String marketXPath = String.format(
-                    "//div[@class='m-market-item']" +
-                            "[.//h1[@class='m-market-item--name']//span[normalize-space(text())=%s]]",
-                    escapeXPath(market)
-            );
-
-            Locator marketBlock = page.locator("xpath=" + marketXPath).first();
-
-            if (marketBlock.count() == 0) {
-                log.error("Market NOT FOUND: {}", market);
+            // Find and expand market block
+            Locator marketBlock = findAndExpandMarket(page, market);
+            if (marketBlock == null) {
                 return false;
             }
 
-            // Check if market is expanded (arrow icon should have 'expanded' class)
-            Locator expandIcon = marketBlock.locator(".ms-icon-trangle.expanded");
-            if (expandIcon.count() == 0) {
-                log.info("Market '{}' is collapsed, expanding...", market);
-                marketBlock.locator(".ms-btn-arrow").click();
-                randomHumanDelay(200, 400);
-            }
+            // Detect market type and use appropriate selection strategy
+            MSportMarketSearchUtils.MarketType marketType = detectMarketType(market, outcome);
+            log.info("Detected market type: {}", marketType);
 
-            // Find the exact outcome cell containing the outcome name
-            // MSport uses different structures for different market types
-            String cellXPath = String.format(
-                    ".//div[contains(@class,'m-outcome') and contains(@class,'multiple') and not(contains(@class,'disabled'))]" +
-                            "[.//div[@class='desc' and normalize-space(text())=%s]]",
-                    escapeXPath(outcome)
-            );
-
-            Locator outcomeCell = marketBlock.locator("xpath=" + cellXPath).first();
-
-            if (outcomeCell.count() == 0) {
-                log.warn("Outcome '{}' not found in market '{}'", outcome, market);
-
-                // Log available outcomes for debugging
-                List<String> available = marketBlock
-                        .locator(".m-outcome .desc")
-                        .allTextContents()
-                        .stream()
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toList());
-                log.warn("Available outcomes: {}", available);
+            // Select outcome based on market type
+            Locator outcomeCell = selectOutcomeByType(marketBlock, marketType, outcome);
+            if (outcomeCell == null) {
+                logAvailableOutcomes(marketBlock, marketType);
                 return false;
             }
 
-            // Check if outcome is disabled (has lock icon or disabled class)
-            if (outcomeCell.locator("i[aria-label='disabled']").count() > 0) {
+            // Verify outcome is not disabled
+            if (isOutcomeDisabled(outcomeCell)) {
                 log.warn("Outcome '{}' is currently disabled/locked", outcome);
                 return false;
             }
 
-            // Extract displayed odds
-            Locator oddsElement = outcomeCell.locator("div.odds");
-            if (oddsElement.count() == 0) {
+            // Extract and verify odds
+            String displayedOdds = extractOdds(outcomeCell, marketType);
+            if (displayedOdds == null) {
                 log.warn("No odds found for outcome '{}'", outcome);
                 return false;
             }
 
-            String displayedOdds = oddsElement.textContent().trim();
             log.info("FOUND: {} → {} @ {}", market, outcome, displayedOdds);
 
             // Optional: verify odds tolerance
             if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
                 log.warn("Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
-
-                // return false; //todo
+                // return false; //todo: Uncomment if strict odds checking needed
             }
 
-            // STEP 4: Human-like interaction
-            outcomeCell.scrollIntoViewIfNeeded();
-            // Uncomment for more human-like behavior
-            // simulateReading(page, 1200);
-            // simulateHover(outcomeCell);
-            randomHumanDelay(100, 200);
-
-            // Click the outcome cell
-            try {
-                outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
-            } catch (Exception e) {
-                log.error("Direct click failed, trying JS click");
-                outcomeCell.evaluate("el => el.click()");
+            // Human-like interaction and click
+            if (!clickOutcome(outcomeCell, market, outcome, displayedOdds)) {
+                return false;
             }
 
-            log.info("CLICKED: {} → {} @ {}", market, outcome, displayedOdds);
-            randomHumanDelay(300, 500);
-
-            // STEP 5: Verify the bet was added to betslip
+            // Verify bet was added to betslip
             if (!verifyBetInBetslip(page, market, outcome)) {
                 log.warn("Bet may not have been added to betslip");
                 return false;
@@ -1852,6 +1819,169 @@ public class MSportWindow implements BettingWindow, Runnable {
 
         } catch (Exception e) {
             log.error("FATAL: Failed to select {} → {}", market, outcome, e);
+            return false;
+        }
+    }
+
+    // Extract odds from outcome cell
+    private String extractOdds(Locator outcomeCell, MSportMarketSearchUtils.MarketType marketType) {
+        try {
+            Locator oddsElement = outcomeCell.locator("div.odds, .odds");
+            if (oddsElement.count() == 0) {
+                return null;
+            }
+            return oddsElement.textContent().trim();
+        } catch (Exception e) {
+            log.error("Error extracting odds: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // Click outcome with human-like behavior
+    private boolean clickOutcome(Locator outcomeCell, String market, String outcome, String odds) {
+        try {
+            outcomeCell.scrollIntoViewIfNeeded();
+            randomHumanDelay(100, 200);
+
+            // Try standard click first
+            try {
+                outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
+            } catch (Exception e) {
+                log.warn("Direct click failed, trying JS click");
+                outcomeCell.evaluate("el => el.click()");
+            }
+
+            log.info("CLICKED: {} → {} @ {}", market, outcome, odds);
+            randomHumanDelay(300, 500);
+            return true;
+
+        } catch (Exception e) {
+            log.error("Failed to click outcome: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    // Log available outcomes for debugging
+    // Log available outcomes for debugging
+    private void logAvailableOutcomes(Locator marketBlock, MarketType marketType) {
+        try {
+            if (marketType == MarketType.OVER_UNDER || marketType == MarketType.POINT_HANDICAP) {
+                logHandicapOrOverUnderOutcomes(marketBlock, marketType);
+            } else {
+                logStandardOutcomes(marketBlock);
+            }
+        } catch (Exception e) {
+            log.debug("Could not log available outcomes: {}", e.getMessage());
+        }
+    }
+
+    // Log outcomes in tabular format for Handicap and Over/Under markets
+    private void logHandicapOrOverUnderOutcomes(Locator marketBlock, MarketType marketType) {
+        try {
+            log.warn("Available {} outcomes:", marketType);
+
+            // Get column headers if they exist
+            List<String> headers = marketBlock
+                    .locator(".m-market-row .m-title")
+                    .allTextContents()
+                    .stream()
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+
+            if (!headers.isEmpty()) {
+                log.warn("  Columns: {}", String.join(" | ", headers));
+                log.warn("  " + "-".repeat(60));
+            }
+
+            // Get all market rows
+            Locator rows = marketBlock.locator(".m-market-row.m-market-row");
+            int rowCount = rows.count();
+
+            for (int i = 0; i < rowCount; i++) {
+                Locator row = rows.nth(i);
+                Locator outcomes = row.locator(".m-outcome");
+                int outcomeCount = outcomes.count();
+
+                List<String> rowData = new ArrayList<>();
+
+                for (int j = 0; j < outcomeCount; j++) {
+                    Locator outcome = outcomes.nth(j);
+
+                    // Get description (handicap value or line)
+                    String desc = "";
+                    Locator descElement = outcome.locator(".desc");
+                    if (descElement.count() > 0) {
+                        desc = descElement.textContent().trim();
+                    }
+
+                    // Get odds
+                    String odds = "";
+                    Locator oddsElement = outcome.locator(".odds");
+                    if (oddsElement.count() > 0) {
+                        odds = oddsElement.textContent().trim();
+                    }
+
+                    // Check if disabled
+                    boolean disabled = outcome.getAttribute("class").contains("disabled");
+                    String status = disabled ? " [LOCKED]" : "";
+
+                    // Format the cell
+                    if (!desc.isEmpty() && !odds.isEmpty()) {
+                        rowData.add(String.format("%-8s @ %-6s%s", desc, odds, status));
+                    } else if (!desc.isEmpty()) {
+                        rowData.add(desc);
+                    } else if (!odds.isEmpty()) {
+                        rowData.add(odds + status);
+                    }
+                }
+
+                if (!rowData.isEmpty()) {
+                    log.warn("  Row {}: {}", i + 1, String.join(" | ", rowData));
+                }
+            }
+
+        } catch (Exception e) {
+            log.debug("Error logging handicap/O/U outcomes: {}", e.getMessage());
+        }
+    }
+
+    // Log outcomes for standard markets (Winner, BTTS, etc.)
+    private void logStandardOutcomes(Locator marketBlock) {
+        try {
+            log.warn("Available outcomes:");
+            log.warn("  " + "-".repeat(50));
+
+            Locator outcomes = marketBlock.locator(".m-outcome:not(.disabled)");
+            int count = outcomes.count();
+
+            for (int i = 0; i < count; i++) {
+                Locator outcome = outcomes.nth(i);
+
+                // Get description
+                String desc = outcome.locator(".desc").textContent().trim();
+
+                // Get odds
+                String odds = "";
+                Locator oddsElement = outcome.locator(".odds");
+                if (oddsElement.count() > 0) {
+                    odds = oddsElement.textContent().trim();
+                }
+
+                log.warn("  {} - {} @ {}", i + 1, desc, odds);
+            }
+
+        } catch (Exception e) {
+            log.debug("Error logging standard outcomes: {}", e.getMessage());
+        }
+    }
+
+    private boolean isOutcomeDisabled(Locator outcomeCell) {
+        try {
+            // Check for disabled class or lock icon
+            return outcomeCell.getAttribute("class").contains("disabled") ||
+                    outcomeCell.locator("i[aria-label='disabled']").count() > 0;
+        } catch (Exception e) {
             return false;
         }
     }

@@ -3,14 +3,23 @@ package com.mouse.bet.utils;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.TimeoutError;
+import com.microsoft.playwright.options.WaitForSelectorState;
+import com.mouse.bet.entity.Wallet;
+import com.mouse.bet.enums.BookMaker;
+import com.mouse.bet.finance.WalletService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class MSportLoginUtils {
+
+    private final WalletService walletService;
 
     /**
      * Performs login on MSport website
@@ -358,6 +367,94 @@ public class MSportLoginUtils {
             Thread.sleep(randomDelay(minMs, maxMs));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+
+
+    /**
+     * Updates wallet balance for a specific bookmaker
+     * @param page The Playwright Page object
+     * @param bookMaker The bookmaker enum (e.g., BookMaker.MSPORT)
+     * @return true if balance was successfully updated, false otherwise
+     */
+    public  boolean updateWalletBalance(Page page, BookMaker bookMaker) {
+        try {
+            log.info("Updating wallet balance for bookmaker: {}", bookMaker);
+
+            // Wait for balance element to be visible with timeout
+            Locator balanceContainer = page.locator(".account--balance.account-item");
+            balanceContainer.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(10000));
+
+            // Get the balance text
+            String balanceText = balanceContainer.textContent().trim();
+
+            // Extract numeric value
+            BigDecimal balance = extractBalanceAmount(balanceText);
+
+            if (balance == null) {
+                log.error("Failed to extract balance amount from text: {}", balanceText);
+                return false;
+            }
+
+            log.info("Current {} balance: NGN {}", bookMaker, balance);
+
+            // Save balance using WalletService
+            Wallet updatedWallet = walletService.saveBalance(bookMaker, balance);
+
+            if (updatedWallet != null) {
+                log.info("Successfully updated {} wallet balance to NGN {}", bookMaker, balance);
+                return true;
+            } else {
+                log.warn("Failed to save {} balance to database", bookMaker);
+                return false;
+            }
+
+        } catch (Exception e) {
+            log.error("Error updating wallet balance for {}: {}", bookMaker, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Extracts the numeric balance amount from balance text
+     * @param balanceText The balance text (e.g., "NGN 47.90")
+     * @return BigDecimal balance or null if extraction fails
+     */
+    private BigDecimal extractBalanceAmount(String balanceText) {
+        try {
+            // Remove currency code and whitespace, extract number
+            // Pattern: "NGN 47.90" or "NGN47.90" or "47.90"
+            String cleaned = balanceText
+                    .replaceAll("NGN", "")
+                    .replaceAll("[^0-9.]", "")
+                    .trim();
+
+            if (cleaned.isEmpty()) {
+                return null;
+            }
+
+            return new BigDecimal(cleaned);
+
+        } catch (NumberFormatException e) {
+            log.error("Failed to parse balance amount: {}", balanceText, e);
+            return null;
+        }
+    }
+
+
+
+    public void spendAmount(BookMaker bookMaker, BigDecimal betAmount, String arbId) {
+        Wallet updatedWallet = walletService.spend(bookMaker, betAmount);
+
+        if (updatedWallet != null) {
+            log.info("SUCCESS: Bet stake deducted for arbId={}, bookmaker={}: {} - New balance: {}",
+                    arbId, bookMaker, betAmount, updatedWallet.getAvailableBalance());
+        }else {
+            log.error("FAILED: Could not deduct bet stake for arbId={}, bookmaker={}: {} - Spend operation returned null",
+                    arbId, bookMaker, betAmount);
         }
     }
 }

@@ -3,16 +3,24 @@ package com.mouse.bet.utils;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.Cookie;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import com.mouse.bet.entity.Wallet;
+import com.mouse.bet.enums.BookMaker;
+import com.mouse.bet.finance.WalletService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class SportyLoginUtils {
+
+    private final WalletService walletService;
 
     /**
      * Performs login on Sporty website
@@ -357,6 +365,95 @@ public class SportyLoginUtils {
         return Character.isUpperCase(correctChar)
                 ? Character.toUpperCase(wrongChar)
                 : wrongChar;
+    }
+
+
+    /**
+     * Updates the wallet balance by scraping the current balance from SportyBet page
+     * Uses WalletService.saveBalance() to persist the balance
+     * @param page The Playwright Page object
+     * @param bookMaker The bookmaker enum (e.g., BookMaker.SPORTYBET)
+     * @return true if balance was successfully updated, false otherwise
+     */
+    public boolean updateWalletBalance(Page page, BookMaker bookMaker) {
+        try {
+            log.info("Updating wallet balance for bookmaker: {}", bookMaker);
+
+            // Wait for balance element to be visible with timeout
+            // SportyBet uses .m-bablance-wrapper > .m-balance for balance display
+            Locator balanceContainer = page.locator(".m-bablance-wrapper .m-balance#j_balance");
+            balanceContainer.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(10000));
+
+            // Get the balance text (e.g., "NGN 258.68")
+            String balanceText = balanceContainer.textContent().trim();
+
+            // Extract numeric value
+            BigDecimal balance = extractBalanceAmount(balanceText);
+
+            if (balance == null) {
+                log.error("Failed to extract balance amount from text: {}", balanceText);
+                return false;
+            }
+
+            log.info("Current {} balance: NGN {}", bookMaker, balance);
+
+            // Save balance using WalletService
+            Wallet updatedWallet = walletService.saveBalance(bookMaker, balance);
+
+            if (updatedWallet != null) {
+                log.info("Successfully updated {} wallet balance to NGN {}", bookMaker, balance);
+                return true;
+            } else {
+                log.warn("Failed to save {} balance to database", bookMaker);
+                return false;
+            }
+
+        } catch (Exception e) {
+            log.error("Error updating wallet balance for {}: {}", bookMaker, e.getMessage(), e);
+            return false;
+        }
+    }
+
+
+    /**
+     * Extracts the numeric balance amount from balance text
+     * Works for both MSport and SportyBet formats
+     * @param balanceText The balance text (e.g., "NGN 258.68" or "NGN 47.90")
+     * @return BigDecimal balance or null if extraction fails
+     */
+    private BigDecimal extractBalanceAmount(String balanceText) {
+        try {
+            // Remove currency code and whitespace, extract number
+            // Pattern: "NGN 258.68" or "NGN258.68" or "258.68"
+            String cleaned = balanceText
+                    .replaceAll("NGN", "")
+                    .replaceAll("[^0-9.]", "")
+                    .trim();
+
+            if (cleaned.isEmpty()) {
+                return null;
+            }
+
+            return new BigDecimal(cleaned);
+
+        } catch (NumberFormatException e) {
+            log.error("Failed to parse balance amount: {}", balanceText, e);
+            return null;
+        }
+    }
+
+    public void spendAmount(BookMaker bookMaker, BigDecimal betAmount, String arbId) {
+        Wallet updatedWallet = walletService.spend(bookMaker, betAmount);
+
+        if (updatedWallet != null) {
+            log.info("SUCCESS: Bet stake deducted for arbId={}, bookmaker={}: {} - New balance: {}",
+                    arbId, bookMaker, betAmount, updatedWallet.getAvailableBalance());
+        }else {
+            log.error("FAILED: Could not deduct bet stake for arbId={}, bookmaker={}: {} - Spend operation returned null",
+                    arbId, bookMaker, betAmount);
+        }
     }
 
 
