@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Console appender for general logs -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================= -->
+    <!-- ORCHESTRATOR LOGS -->
+    <!-- ============================================= -->
+    <appender name="ORCHESTRATOR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/orchestrator/arb-orchestrator.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/orchestrator/arb-orchestrator-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================= -->
+    <!-- BETTING FLOW LOGS - Per Bookmaker -->
+    <!-- ============================================= -->
+
+    <!-- MSport Betting Logs -->
+    <appender name="MSPORT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/bookmakers/msport-betting.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/bookmakers/msport-betting-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- SportyBet Betting Logs -->
+    <appender name="SPORTY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/bookmakers/sporty-betting.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/bookmakers/sporty-betting-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Bet9ja Betting Logs -->
+    <appender name="BET9JA_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/bookmakers/bet9ja-betting.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/bookmakers/bet9ja-betting-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Combined betting flow logs (all bookmakers) -->
+    <appender name="ALL_BETTING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/betting-flow-all.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/betting-flow-all-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================= -->
+    <!-- SYNC MANAGER LOGS -->
+    <!-- ============================================= -->
+    <appender name="SYNC_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/sync/window-sync.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/sync/window-sync-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================= -->
+    <!-- LOGGER CONFIGURATIONS -->
+    <!-- ============================================= -->
+
+    <!-- Orchestrator Logger -->
+    <logger name="com.mouse.bet.manager.ArbOrchestrator" level="INFO" additivity="false">
+        <appender-ref ref="ORCHESTRATOR_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- Betting Flow Logger (routes to all betting files) -->
+    <logger name="com.mouse.bet.logservice.BettingFlowLogger" level="INFO" additivity="false">
+        <appender-ref ref="ALL_BETTING_FILE"/>
+        <appender-ref ref="MSPORT_FILE"/>
+        <appender-ref ref="SPORTY_FILE"/>
+        <appender-ref ref="BET9JA_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- MSportWindow Logger -->
+    <logger name="com.mouse.bet.window.MSportWindow" level="DEBUG" additivity="false">
+        <appender-ref ref="MSPORT_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- SportyWindow Logger -->
+    <logger name="com.mouse.bet.window.SportyWindow" level="DEBUG" additivity="false">
+        <appender-ref ref="SPORTY_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+
+
+    <!-- Root logger (everything else) -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

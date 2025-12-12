@@ -10,5 +10,5 @@ import java.math.BigDecimal;
 @Setter
 @Getter
 public class ArbConfig {
-    private BigDecimal TOTAL_STAKE = BigDecimal.valueOf(50_000);
+    private BigDecimal TOTAL_STAKE = BigDecimal.valueOf(100);
 }

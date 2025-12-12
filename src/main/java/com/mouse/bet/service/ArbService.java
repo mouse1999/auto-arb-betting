@@ -10,12 +10,14 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +37,8 @@ public class ArbService {
     // Minimum session duration for reliable metrics (in seconds)
     @Value("${arb.min.reliable.session.seconds:10}")
     private int minReliableSessionSeconds;
+    @Value("${arb.max.continuity.breaks:2}")
+    private int maxContinuityBreaks; //
 
     // Emoji constants
     private static final String EMOJI_SAVE = "💾";
@@ -437,41 +441,71 @@ public class ArbService {
      * Fetch top arbs by metrics (with continuity validation)
      */
     public List<Arb> fetchTopArbsByMetrics(BigDecimal minProfit, int limit) {
-        log.info("{} {} Fetching top arbs | MinProfit: {}% | Limit: {}",
-                EMOJI_SEARCH, EMOJI_TROPHY, minProfit, limit);
+        log.info("{} {} Starting fetchTopArbsByMetrics | minProfit={}%, limit={}, maxContinuityBreaks={}",
+                EMOJI_SEARCH, EMOJI_TROPHY, minProfit, limit, maxContinuityBreaks);
 
         Instant now = Instant.now();
-        List<Arb> pool = arbRepository.findActiveCandidates(
+
+        Page<Arb> page = arbRepository.findLiveArbsForBetting(
                 now,
                 minProfit,
-                PageRequest.of(0, Math.max(limit * 5, 100), Sort.by(Sort.Order.desc("profitPercentage")))
+                PageRequest.of(0,
+                        Math.max(limit * 5, 100),
+                        Sort.by(
+                                Sort.Order.desc("profitPercentage"),
+                                Sort.Order.desc("lastUpdatedAt")
+                        ))
         );
 
-        log.info("{} Found {} candidates", EMOJI_CHART, pool.size());
+        List<Arb> pool = page.getContent();
+        long totalCandidates = page.getTotalElements();
 
+        log.info("{} Found {} candidates in DB (total matching: {}, page size: {})",
+                EMOJI_CHART, pool.size(), totalCandidates, page.getSize());
+
+        if (pool.isEmpty()) {
+            log.warn("{} No live arbs found for minProfit={}%, session={}s, breaks<={}",
+                    EMOJI_WARNING, minProfit, minReliableSessionSeconds, maxContinuityBreaks);
+            return Collections.emptyList();
+        }
+
+        // Final filters + logging
         List<Arb> topArbs = pool.stream()
-                .filter(Arb::isShouldBet)
-                .filter(arb -> arb.hasReliableMetrics(minReliableSessionSeconds))  // NEW: Filter by continuity
+                .filter(arb -> {
+                    boolean should = arb.isShouldBet();
+                    if (!should) log.debug("{} Skipped {} | shouldBet=false", EMOJI_WARNING, arb.getArbId());
+                    return should;
+                })
+                .filter(arb -> {
+                    long duration = arb.getCurrentSessionDurationSeconds();
+                    boolean reliable = duration >= minReliableSessionSeconds;
+                    if (!reliable) {
+                        log.debug("{} Skipped {} | session={}s (need >= {}s)",
+                                EMOJI_WARNING, arb.getArbId(), duration, minReliableSessionSeconds);
+                    }
+                    return reliable;
+                })
                 .sorted(Comparator.comparingDouble(this::calculateScore).reversed())
                 .limit(limit)
                 .toList();
 
-        log.info("{} {} Top {} arbs selected (reliable sessions only)",
-                EMOJI_SUCCESS, EMOJI_FIRE, topArbs.size());
+        log.info("{} {} Top {} arbs selected after scoring (limit={})",
+                EMOJI_SUCCESS, EMOJI_FIRE, topArbs.size(), limit);
 
         if (!topArbs.isEmpty()) {
             Arb best = topArbs.get(0);
-            log.info("{} {} BEST ARB | ArbId: {} | Profit: {}% | Score: {:.2f} | Session: {}s | Breaks: {}",
+            double score = calculateScore(best);
+            log.info("{} {} BEST ARB | ArbId={} | Profit={} | Score={:.2f} | Session={}s | Breaks={} | Sport={}",
                     EMOJI_TROPHY, EMOJI_FIRE,
-                    best.getArbId(),
-                    best.getProfitPercentage(),
-                    calculateScore(best),
-                    best.getCurrentSessionDurationSeconds(),
-                    best.getContinuityBreakCount());
+                    best.getArbId(), best.getProfitPercentage(), score,
+                    best.getCurrentSessionDurationSeconds(), best.getContinuityBreakCount(),
+                    best.getSportEnum());
         }
 
         return topArbs;
     }
+
+
 
     /**
      * Calculate composite score for ranking
@@ -506,20 +540,5 @@ public class ArbService {
         return b == null ? 0.0 : b.doubleValue();
     }
 
-    /**
-     * Get arb by ID
-     */
-    public Arb getArbByNormalEventId(String normalEventId) {
-        log.debug("{} {} Fetching arb | ID: {}", EMOJI_SEARCH, EMOJI_TARGET, normalEventId);
 
-        Arb arb = arbRepository.findByArbId(normalEventId).orElse(null);
-
-        if (arb != null) {
-            log.debug("{} Arb found | Profit: {}%", EMOJI_SUCCESS, arb.getProfitPercentage());
-        } else {
-            log.debug("{} Arb not found", EMOJI_WARNING);
-        }
-
-        return arb;
-    }
 }

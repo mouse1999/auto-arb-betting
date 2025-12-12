@@ -19,6 +19,7 @@ import com.mouse.bet.service.ScraperCycleSyncService;
 import com.mouse.bet.service.SportyBetService;
 import com.mouse.bet.utils.DecompressionUtil;
 import com.mouse.bet.utils.JsonParser;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -202,13 +203,12 @@ public class SportyBetOddsFetcher implements Runnable {
     // ==================== MAIN RUN ====================
     @Override
     public void run() {
-        log.info("=== Starting SportyBetOddsFetcher (Live Arb Optimized with Shared OkHttp) ===");
         log.info("InitialCadence={}s, Dedup={}ms, StaleThreshold={}ms, DetailThreads={}, ProcessingThreads={}",
                 MIN_SCHEDULER_PERIOD_SEC, EVENT_DEDUP_WINDOW_MS, STALE_DATA_THRESHOLD_MS,
                 EVENT_DETAIL_THREADS, PROCESSING_THREADS);
 
 
-        playwrightRef.set(Playwright.create());
+
 
         try {
             performInitialSetupWithRetry();
@@ -225,6 +225,24 @@ public class SportyBetOddsFetcher implements Runnable {
         } finally {
             cleanup();
 
+        }
+    }
+
+    @PostConstruct
+    public void init() {
+        log.info("=== Starting SportyBetOddsFetcher (Live Arb Optimized with Shared OkHttp) ===");
+        try {
+            playwrightRef.set(Playwright.create());
+//            browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
+//                    .setHeadless(false)
+//                    .setArgs(scraperConfig.getBROWSER_FlAGS())
+//                    .setSlowMo(50));
+
+            log.info("{} {} Playwright initialized successfully");
+
+        } catch (Exception e) {
+            log.error("Failed to initialize  Playwright: {}", e.getMessage(), e);
+            throw new RuntimeException("Playwright initialization failed", e);
         }
     }
 
@@ -634,18 +652,18 @@ public class SportyBetOddsFetcher implements Runnable {
             return true;
         }
 
-        if (timeouts >= 3) {
+        if (timeouts >= 30) {
             log.info("Timeout threshold reached: {} consecutive timeouts", timeouts);
             return true;
         }
 
-        if (timeSinceLastRotation > 300_000 && requests > 800) {
+        if (timeSinceLastRotation > 300_000 && requests > 1500) {
             log.info("Proactive profile rotation: {}s elapsed, {} requests made",
                     timeSinceLastRotation / 1000, requests);
             return true;
         }
 
-        if (requests > 800) {
+        if (requests > 1500) {
             log.info("Proactive profile rotation: {} requests threshold reached", requests);
             return true;
         }
@@ -1826,7 +1844,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 log.info("Navigation attempt {} to {}", attempt + 1, SPORT_PAGE);
                 page.navigate(SPORT_PAGE, new Page.NavigateOptions()
                         .setTimeout(60_000)
-                        .setWaitUntil(WaitUntilState.NETWORKIDLE));
+                        .setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
                 page.waitForSelector("body", new Page.WaitForSelectorOptions()
                         .setTimeout(30_000));
                 log.info("Navigation successful on attempt {}", attempt + 1);

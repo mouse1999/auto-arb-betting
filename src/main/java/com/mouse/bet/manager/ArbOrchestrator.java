@@ -44,9 +44,6 @@ public class ArbOrchestrator {
     private final ArbService arbService;
     private final ArbPollingService arbPollingService;
 
-    /** Max time for all legs (including retries) to complete. */
-//    private Duration legTimeout;
-
     @Value("${sporty.poll.interval.ms:2000}")
     private long pollIntervalMs;
 
@@ -68,118 +65,192 @@ public class ArbOrchestrator {
     public void registerWorker(BookMaker bookmaker, BlockingQueue<LegTask> queue) {
         Objects.requireNonNull(bookmaker);
         Objects.requireNonNull(queue);
+        log.info("Registering worker | Bookmaker: {} | QueueCapacity: {}",
+                bookmaker, queue.remainingCapacity() + queue.size());
+
         workerQueues.put(bookmaker, queue);
         registeredWorkers = Set.copyOf(workerQueues.keySet());
+
+        log.info("Worker registered successfully | Bookmaker: {} | TotalRegisteredWorkers: {}",
+                bookmaker, registeredWorkers.size());
     }
 
     /** Non-blocking: put an Arb into the single slot; returns false if busy. */
     public boolean tryLoadArb(Arb arb) {
         Objects.requireNonNull(arb);
-        return arbQueue.offer(arb);
+        boolean loaded = arbQueue.offer(arb);
+
+        if (loaded) {
+            log.info("Arb loaded into queue (non-blocking) | ArbId: {} | Status: {} | LegsCount: {}",
+                    arb.getArbId(), arb.getStatus(), arb.getLegs().size());
+        } else {
+            log.warn("Failed to load Arb (queue full) | ArbId: {} | QueueSize: {}",
+                    arb.getArbId(), arbQueue.size());
+        }
+
+        return loaded;
     }
 
     /** Blocking: put an Arb into the single slot; waits until free. */
     public void loadArb(Arb arb) throws InterruptedException {
         Objects.requireNonNull(arb);
+        log.info("Attempting to load Arb (blocking) | ArbId: {} | QueueSize: {}",
+                arb.getArbId(), arbQueue.size());
+
         arbQueue.put(arb);
+
+        log.info("Arb loaded into queue (blocking completed) | ArbId: {} | Status: {} | LegsCount: {}",
+                arb.getArbId(), arb.getStatus(), arb.getLegs().size());
     }
 
     /** Start the orchestrator loop. Safe to call multiple times. */
     public void start() {
         if (running.compareAndSet(false, true)) {
+            log.info("Starting ArbOrchestrator | RegisteredWorkers: {} | PollIntervalMs: {}",
+                    registeredWorkers, pollIntervalMs);
             orchestratorExec.submit(this::runLoop);
+        } else {
+            log.debug("ArbOrchestrator start() called but already running");
         }
     }
 
     /** Stop the orchestrator loop. */
     public void stop() {
+        log.info("Stopping ArbOrchestrator | CurrentQueueSize: {}", arbQueue.size());
         running.set(false);
         orchestratorExec.shutdownNow();
+        log.info("ArbOrchestrator shutdown initiated");
     }
 
     private void runLoop() {
-        log.info("ArbOrchestrator started.");
+        log.info("ArbOrchestrator loop started | Thread: {}", Thread.currentThread().getName());
+
         while (running.get()) {
             try {
-                // Try to take an Arb from the single-slot queue; if empty, proactively fetch one
+                // Try to take an Arb from the single-slot queue
+                log.trace("Polling arb queue | QueueSize: {}", arbQueue.size());
                 Arb arb = arbQueue.poll(150, TimeUnit.MILLISECONDS);
+
                 if (arb == null) {
+                    log.debug("Arb queue empty, fetching next candidate from polling service");
+
                     // Only fetch when queue is empty → prevents flooding
                     arbPollingService.fetchNextArbCandidate()
                             .ifPresent(candidate -> {
+                                log.info("Fetched new arb candidate | ArbId: {} | Status: {} | Profit: {} | LegsCount: {}",
+                                        candidate.getArbId(),
+                                        candidate.getStatus(),
+                                        candidate.getProfitPercentage(),
+                                        candidate.getLegs().size());
+
                                 if (tryLoadArb(candidate)) {
-                                    log.info("Loaded new arb into orchestrator | ArbId: {}", candidate.getArbId());
+                                    log.info("Successfully loaded fetched arb into orchestrator | ArbId: {}",
+                                            candidate.getArbId());
+                                } else {
+                                    log.warn("Failed to load fetched arb (queue full) | ArbId: {}",
+                                            candidate.getArbId());
                                 }
                             });
+
                     arb = arbQueue.poll(200, TimeUnit.MILLISECONDS);
-                    if (arb == null)
+                    if (arb == null) {
+                        log.trace("No arb available after polling, sleeping for {}ms", pollIntervalMs);
                         Thread.sleep(pollIntervalMs);
-                    continue;
+                        continue;
+                    }
                 }
 
+                log.info("=== Processing Arb | ArbId: {} | Status: {} | LegsCount: {} ===",
+                        arb.getArbId(), arb.getStatus(), arb.getLegs().size());
 
                 processOneArb(arb);
 
+                log.info("=== Completed Processing Arb | ArbId: {} | FinalStatus: {} ===",
+                        arb.getArbId(), arb.getStatus());
+
             } catch (InterruptedException ie) {
+                log.warn("ArbOrchestrator loop interrupted", ie);
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception ex) {
-                log.error("Orchestrator loop error", ex);
+                log.error("Orchestrator loop error | ErrorType: {} | Message: {}",
+                        ex.getClass().getSimpleName(), ex.getMessage(), ex);
             }
         }
-        log.info("ArbOrchestrator stopped.");
+
+        log.info("ArbOrchestrator loop stopped | FinalQueueSize: {}", arbQueue.size());
     }
 
-
-
     private void processOneArb(Arb arb) throws InterruptedException {
+        log.info("Starting arb processing | ArbId: {} | CurrentStatus: {}",
+                arb.getArbId(), arb.getStatus());
+
         // Mark as IN_PROGRESS to avoid being picked again
         arb.setStatus(Status.IN_PROGRESS);
         arbService.saveArb(arb);
+        log.info("Arb marked as IN_PROGRESS | ArbId: {}", arb.getArbId());
 
         Map<BookMaker, BetLeg> legsByBook = legsByBookmaker(arb);
+        log.info("Arb legs grouped by bookmaker | ArbId: {} | BookmakersCount: {} | Bookmakers: {}",
+                arb.getArbId(), legsByBook.size(), legsByBook.keySet());
 
         // If Arb has no legs, just complete it.
         if (legsByBook.isEmpty()) {
-            log.info("Arb {} has no legs. Completing.", arb.getArbId());
+            log.warn("Arb has no legs, completing immediately | ArbId: {}", arb.getArbId());
             arb.setStatus(Status.COMPLETED);
             arbService.saveArb(arb);
             return;
         }
 
-        // all legs must have a registered worker.
-        //    If any leg's bookmaker isn't registered, fail the Arb immediately.
+        // All legs must have a registered worker
         Set<BookMaker> missingWorkers = new HashSet<>(legsByBook.keySet());
-        missingWorkers.removeAll(registeredWorkers); // anything left is missing
+        missingWorkers.removeAll(registeredWorkers);
+
         if (!missingWorkers.isEmpty()) {
-            log.warn("Arb {} rejected: no registered workers for {}", arb.getArbId(), missingWorkers);
+            log.error("Arb rejected - missing workers | ArbId: {} | MissingWorkers: {} | RegisteredWorkers: {}",
+                    arb.getArbId(), missingWorkers, registeredWorkers);
             arb.setStatus(Status.FAILED);
             arbService.saveArb(arb);
             return;
         }
 
+        log.info("All required workers available | ArbId: {} | RequiredBookmakers: {}",
+                arb.getArbId(), legsByBook.keySet());
+
         // Targets are exactly the bookmakers that have legs on this Arb
         List<BookMaker> targets = new ArrayList<>(legsByBook.keySet());
-
         Phaser barrier = new Phaser(targets.size());
-
         ConcurrentMap<BookMaker, LegResult> results = new ConcurrentHashMap<>();
 
-        // Dispatch tasks to matching workers only .
+        log.info("Initializing leg dispatch | ArbId: {} | TargetsCount: {} | PhaserParties: {}",
+                arb.getArbId(), targets.size(), barrier.getRegisteredParties());
+
+        // Dispatch tasks to matching workers only
         for (BookMaker bm : targets) {
             BlockingQueue<LegTask> q = workerQueues.get(bm);
+
             if (q == null) {
-                // Defensive
-                log.warn("Worker queue for {} missing at dispatch time. Failing Arb {}.", bm, arb.getArbId());
+                log.error("Worker queue missing at dispatch time | ArbId: {} | Bookmaker: {} | FailingArb",
+                        arb.getArbId(), bm);
                 arb.setStatus(Status.FAILED);
                 arbService.saveArb(arb);
                 return;
             }
 
+            BetLeg leg = legsByBook.get(bm);
+            log.info("Preparing leg task | ArbId: {} | Bookmaker: {} | LegId: {} | Market: {} | Selection: {} | Odds: {} | Stake: {}",
+                    arb.getArbId(),
+                    bm,
+                    leg.getId(),
+                    leg.getProviderMarketTitle(),
+                    leg.getProviderMarketName(),
+                    leg.getOdds(),
+                    leg.getStake());
+
             LegTask task = LegTask.builder()
                     .arbId(arb.getArbId())
                     .arb(arb)
-                    .leg(legsByBook.get(bm))
+                    .leg(leg)
                     .bookmaker(bm)
                     .maxRetries(maxRetries)
                     .retryBackoff(retryBackoff)
@@ -187,27 +258,58 @@ public class ArbOrchestrator {
                     .results(results)
                     .build();
 
+            log.debug("Dispatching leg task to worker queue | ArbId: {} | Bookmaker: {} | QueueSize: {} | QueueCapacity: {}",
+                    arb.getArbId(), bm, q.size(), q.remainingCapacity());
+
             q.put(task); // may block briefly if worker's queue is full
+
+            log.info("Leg task dispatched successfully | ArbId: {} | Bookmaker: {} | LegId: {} | QueueSize: {}",
+                    arb.getArbId(), bm, leg.getId(), q.size());
         }
+
+        log.info("All leg tasks dispatched, waiting for completion | ArbId: {} | TotalLegs: {} | PhaserPhase: {}",
+                arb.getArbId(), targets.size(), barrier.getPhase());
 
         // BLOCK until ALL leg tasks finish
         int phase = barrier.getPhase();
         barrier.awaitAdvance(phase);
 
+        log.info("All leg tasks completed | ArbId: {} | ResultsReceived: {} | ExpectedResults: {}",
+                arb.getArbId(), results.size(), targets.size());
+
+        // Log individual leg results
+        results.forEach((bookmaker, result) -> {
+            log.info("Leg result | ArbId: {} | Bookmaker: {} | Success: {} | Message: {}",
+                    arb.getArbId(), bookmaker, result.success(), result.message());
+        });
+
         boolean allSuccess = results.size() == targets.size()
                 && results.values().stream().allMatch(LegResult::success);
 
-        arb.setStatus(allSuccess ? Status.COMPLETED : Status.FAILED);
+        Status finalStatus = allSuccess ? Status.COMPLETED : Status.FAILED;
+        arb.setStatus(finalStatus);
         arbService.saveArb(arb);
 
-        log.info("Arb {} finished with status {}.", arb.getArbId(), arb.getStatus());
+        if (allSuccess) {
+            log.info("Arb completed successfully | ArbId: {} | Status: {} | SuccessfulLegs: {}/{}",
+                    arb.getArbId(), finalStatus, results.size(), targets.size());
+        } else {
+            long failedCount = results.values().stream().filter(r -> !r.success()).count();
+            log.error("Arb failed | ArbId: {} | Status: {} | FailedLegs: {} | SuccessfulLegs: {} | TotalLegs: {}",
+                    arb.getArbId(), finalStatus, failedCount, results.size() - failedCount, targets.size());
+        }
     }
-
 
     private Map<BookMaker, BetLeg> legsByBookmaker(Arb arb) {
-        return arb.getLegs().stream()
+        Map<BookMaker, BetLeg> grouped = arb.getLegs().stream()
                 .collect(Collectors.toMap(BetLeg::getBookmaker, l -> l, (a, b) -> a));
+
+        log.debug("Grouped legs by bookmaker | ArbId: {} | Groups: {}",
+                arb.getArbId(),
+                grouped.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(Collectors.joining(", ")));
+
+        return grouped;
     }
-
-
 }

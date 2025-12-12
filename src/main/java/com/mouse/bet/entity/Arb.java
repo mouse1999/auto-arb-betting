@@ -26,14 +26,15 @@ import java.util.*;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 @Entity
-@Table(
-        name = "arb",
-        indexes = {
-                @Index(name = "idx_arb_sport", columnList = "sportEnum"),
-                @Index(name = "idx_arb_status_active", columnList = "status,active"),
-                @Index(name = "idx_arb_expires_at", columnList = "expiresAt")
-        }
-)
+@Table(name = "arb", indexes = {
+        // Existing ones...
+        @Index(name = "idx_arb_status_active_profit", columnList = "status, active, profitPercentage"),
+//        @Index(name = "idx_arb_session_duration", columnList = "currentSessionDurationSeconds"),
+        @Index(name = "idx_arb_continuity_breaks", columnList = "continuityBreakCount"),
+        @Index(name = "idx_arb_confidence", columnList = "confidenceScore"),
+        @Index(name = "idx_arb_last_seen", columnList = "lastSeenAt"),
+        @Index(name = "idx_arb_expires_at_status", columnList = "expiresAt, status, active")
+})
 @EntityListeners(AuditingEntityListener.class)
 @ToString(exclude = {"legs", "history"})
 public class Arb {

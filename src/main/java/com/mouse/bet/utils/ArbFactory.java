@@ -267,7 +267,7 @@ public class ArbFactory {
                 .stakeB(rawStakeB)
                 .legs(List.of(legA, legB))
                 .profitPercentage(profit)
-                .shouldBet(shouldBet)
+                .shouldBet(true) //todo
                 .build();
         legA.setArb(newArb);
         legB.setArb(newArb);

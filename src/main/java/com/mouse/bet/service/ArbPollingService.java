@@ -1,10 +1,10 @@
 package com.mouse.bet.service;
 
 import com.mouse.bet.entity.Arb;
-import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.enums.Status;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,8 +27,10 @@ public class ArbPollingService {
     private final Random random = new Random();
 
     // Configurable via @Value or constructor
-    private final BigDecimal minProfitPercentage = BigDecimal.TEN; // 10%
-    private final int FETCH_LIMIT = 5;
+    @Value("${arb.min.profit.percentage:10.0}")
+    private BigDecimal minProfitPercentage;
+    @Value("${arb.fetch.limit:5}")
+    private int fetchLimit;
 
 
 
@@ -38,7 +40,7 @@ public class ArbPollingService {
      */
     public Optional<Arb> fetchNextArbCandidate() {
         try {
-            List<Arb> candidates = arbService.fetchTopArbsByMetrics(minProfitPercentage, FETCH_LIMIT);
+            List<Arb> candidates = arbService.fetchTopArbsByMetrics(minProfitPercentage, fetchLimit);
 
             if (candidates.isEmpty()) {
                 log.info("No arb candidates above {}% profit", minProfitPercentage);
@@ -64,14 +66,14 @@ public class ArbPollingService {
     /**
      * Helper: release arb if orchestrator rejects it early
      */
-    public void releaseArb(Arb arb) {
+    public void killArb(Arb arb) {
         if (arb == null) return;
         try {
-            arb.setStatus(Status.EXPIRED); // or whatever your "free" status is
+            arb.setStatus(Status.EXPIRED);
             arbService.saveArb(arb);
-            log.debug("Arb released back to pool: {}", arb.getArbId());
+            log.debug("Arb killed back : {}", arb.getArbId());
         } catch (Exception e) {
-            log.warn("Failed to release arb {}", arb.getArbId(), e);
+            log.warn("Failed to kill arb {}", arb.getArbId(), e);
         }
     }
 

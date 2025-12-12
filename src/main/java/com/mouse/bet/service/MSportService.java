@@ -138,8 +138,8 @@ public class MSportService implements OddService<MSportEvent> {
                 .flatMap(market -> market.getOutcomes().stream().map(outcome -> {
                     String key = generateProviderKey(market, outcome);
                     return Map.entry(key, new MarketMeta(
+                            market.getDescription(), // the name feild of each market appears to be the title on the frontend
                             outcome.getDescription(), // name of the outcome to be chosen appears to be description
-                            market.getName(), // the name feild of each market appears to be the title on the frontend
                             market.getGroup(),
                             market.getSpecifiers(),
                             market.getId()+""
@@ -288,8 +288,8 @@ public class MSportService implements OddService<MSportEvent> {
                 .gameScore(getGameScoreList(event.getScoreOfSection()))
                 .period(event.getStatusDescription())
                 .playedSeconds(event.getPlayedTime())
-                .providerMarketName(meta != null ? meta.name()  : null)
-                .providerMarketTitle(meta != null ? meta.title() : null)
+                .providerMarketName(meta != null ? meta.outcomeName()  : null)
+                .providerMarketTitle(meta != null ? meta.desc() : null)
                 .marketId(String.valueOf(meta != null ? meta.marketId() : null))
                 .build();
     }

@@ -15,7 +15,7 @@ public class ArbCalculator {
     //method to roound the stake amount to avoid detection of arbing activites
     //a method to take in total stake amount and an arb as parammeter and return update arb with stakes for each betleg or bookie
     private static final int DEFAULT_DECIMAL_PLACES = 2;
-    private static final BigDecimal MIN_STAKE = new BigDecimal("1000");
+    private static final BigDecimal MIN_STAKE = new BigDecimal("10");
     private static final BigDecimal MAX_RANDOMIZATION_PERCENTAGE = new BigDecimal("0.05"); // 5%
     private static final BigDecimal MAX_STAKE = new BigDecimal("50000");
     private static final BigDecimal STEP_50  = new BigDecimal("50");

@@ -1,0 +1,4 @@
+2025-12-12 22:33:26.817 [restartedMain] INFO  com.mouse.bet.window.MSportWindow - 🚀 🎯 Initializing MSportWindow with Playwright...
+2025-12-12 22:34:30.644 [restartedMain] INFO  com.mouse.bet.window.MSportWindow - ✅ 🚀 Playwright initialized successfully
+2025-12-12 22:34:30.645 [restartedMain] INFO  com.mouse.bet.window.MSportWindow - Registering MSport Window for Bet placing
+2025-12-12 22:34:33.437 [restartedMain] INFO  com.mouse.bet.window.MSportWindow - safe starting arb orchestrator in M_SPORT window

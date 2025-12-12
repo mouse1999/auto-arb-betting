@@ -1,11 +1,18 @@
 package com.mouse.bet.repository;
 
 import com.mouse.bet.entity.Arb;
+import com.mouse.bet.enums.SportEnum;
 import com.mouse.bet.enums.Status;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.*;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -14,24 +21,63 @@ import java.util.Optional;
 @Repository
 public interface ArbRepository extends JpaRepository<Arb, String>, JpaSpecificationExecutor<Arb> {
 
-    // Primary key is normalEventId (String)
-    Optional<Arb> findByArbId(String arbId);
+    // Basic lookup with eager legs
+    @EntityGraph(attributePaths = {"legs"})
+    Optional<Arb> findById(String arbId);
 
-    List<Arb> findByStatusAndActive(Status status, boolean active);
-
-    @Query("select a from Arb a where a.expiresAt is not null and a.expiresAt < :cutoff")
-    List<Arb> findExpired(Instant cutoff);
-
+    // === Main method: Get all live arbs (works with your real data) ===
+    @EntityGraph(attributePaths = {"legs"})
     @Query("""
-     SELECT a FROM Arb a
-     WHERE a.status = Status.ACTIVE
-     AND a.active = true
-     AND (a.expiresAt IS NULL OR a.expiresAt > :now)
-     AND SIZE(a.legs) = 2
-     AND a.profitPercentage >= :minProfit
-     """)
-    List<Arb> findActiveCandidates(@Param("now") Instant now,
-                                   @Param("minProfit") BigDecimal minProfit,
-                                   Pageable page);
+        SELECT a FROM Arb a
+        WHERE a.active = true
+          AND (a.expiresAt IS NULL OR a.expiresAt > :now)
+          AND a.profitPercentage >= :minProfit
+        ORDER BY a.profitPercentage DESC, a.lastUpdatedAt DESC
+        """)
+    Page<Arb> findLiveArbsForBetting(
+            @Param("now") Instant now,
+            @Param("minProfit") BigDecimal minProfit,
+            Pageable pageable
+    );
 
+    // Count for the main query
+    @Query("""
+        SELECT COUNT(a) FROM Arb a
+        WHERE a.active = true
+          AND (a.expiresAt IS NULL OR a.expiresAt > :now)
+          AND a.profitPercentage >= :minProfit
+        """)
+    long countLiveArbsForBetting(
+            @Param("now") Instant now,
+            @Param("minProfit") BigDecimal minProfit
+    );
+
+    // Bulk expiration
+    @Modifying
+    @Query("""
+        UPDATE Arb a
+        SET a.status = Status.EXPIRED,
+            a.active = false
+        WHERE a.expiresAt IS NOT NULL AND a.expiresAt < :cutoff
+        """)
+    int expireOldArbs(@Param("cutoff") Instant cutoff);
+
+    // === Useful monitoring queries ===
+    List<Arb> findByProfitPercentageGreaterThanEqualOrderByProfitPercentageDesc(
+            BigDecimal minProfit,
+            Pageable pageable
+    );
+
+    List<Arb> findBySportEnumAndActiveAndProfitPercentageGreaterThanEqualOrderByProfitPercentageDesc(
+            SportEnum sportEnum,
+            boolean active,
+            BigDecimal minProfit,
+            Pageable pageable
+    );
+
+    List<Arb> findByLastSeenAtAfterAndActiveOrderByLastSeenAtDesc(
+            Instant since,
+            boolean active,
+            Pageable pageable
+    );
 }

@@ -30,122 +30,98 @@ public class SportyLoginUtils {
      * @return true if login successful, false otherwise
      */
     public boolean performLogin(Page page, String phoneNumber, String password) {
-        try {
-            log.info("🔐 Starting MSport login process");
+        log.info("🔐 Starting SportyBet login process");
 
-            // Check if already logged in
+        try {
+            // Step 1: Check if already logged in
             if (isLoggedIn(page)) {
-                log.info("✅ User is already logged in");
+                log.info("✅ Already logged in - skipping login");
                 return true;
             }
 
-            // Wait for login form to be visible
-            log.info("⏳ Waiting for login form");
+            // Step 2: Wait for login form (more robust selector)
+            log.info("⏳ Waiting for login form...");
+//            Locator phoneInput = page.locator("input[name='phone'], input[placeholder*='Mobile Number'], input[type='tel']").first();
+//            Locator passwordInput = page.locator("input[name='psd'], input[type='password'][placeholder*='Password']").first();
+//            Locator loginButton = page.locator("button[name='logIn'], button.m-btn-login, button:contains('Login'), button:contains('Log in')").first();
+            // Use a precise locator for the real phone input
+            Locator phoneInput = page.locator("input[name='phone'][type='text'][placeholder='Mobile Number']");
+            Locator passwordInput = page.locator("input[name='psd'][type='password']");
+            Locator loginButton = page.locator("button[name='logIn'], button.m-btn-login");
 
-            // ✅ CORRECT SELECTORS BASED ON YOUR HTML
-            Locator phoneInput = page.locator("input[type='text'][name='phone'][placeholder='Mobile Number']");
-            Locator passwordInput = page.locator("input[type='password'][name='psd'][placeholder='Password']");
-            Locator loginButton = page.locator("button[name='logIn'].m-btn-login");
-
-            // Wait for phone input to be visible with timeout
-            try {
-                phoneInput.waitFor(new Locator.WaitForOptions()
-                        .setState(WaitForSelectorState.VISIBLE)
-                        .setTimeout(10000));
-            } catch (TimeoutError e) {
-                log.error("❌ Login form not found - timeout waiting for phone input");
-                return false;
-            }
+            // Wait for phone input to appear
+            phoneInput.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(15000));
 
             log.info("✅ Login form detected");
 
-            // Random delay before starting (simulate human behavior)
-            sleepRandom(500, 1500);
+            // Step 3: Human-like typing
+            sleepRandom(600, 1200);
 
-            // Click on phone input field
-            log.info("📱 Clicking phone input field");
+            // Click & type phone
             phoneInput.click();
-            sleepRandom(200, 500);
-
-            // Clear any existing value
-            phoneInput.fill(""); // More reliable than clear()
-            sleepRandom(100, 300);
-
-            // Type phone number with human-like behavior
-            log.info("⌨️ Entering phone number: {}", maskPhoneNumber(phoneNumber));
-            typeHumanLike(phoneInput, phoneNumber);
             sleepRandom(300, 700);
+            phoneInput.fill(""); // clear first
+            typeHumanLike(phoneInput, phoneNumber);
+            log.info("⌨️ Phone entered: {}", maskPhoneNumber(phoneNumber));
 
-            // Click on password input field
-            log.info("🔒 Clicking password input field");
+            // Type password
+            sleepRandom(400, 800);
             passwordInput.click();
-            sleepRandom(200, 500);
-
-            // Clear any existing value
+            sleepRandom(300, 700);
             passwordInput.fill("");
-            sleepRandom(100, 300);
-
-            // Type password with human-like behavior
-            log.info("⌨️ Entering password");
             typeHumanLike(passwordInput, password);
-            sleepRandom(500, 1000);
+            log.info("⌨️ Password entered");
 
-            // Check if login button is enabled
-            // Note: Your HTML shows the button can have "disabled" class
-            if (loginButton.isDisabled() || loginButton.getAttribute("class").contains("disabled")) {
-                log.warn("⚠️ Login button is disabled - waiting for it to enable");
-
-                // Wait up to 5 seconds for button to become enabled
-                try {
-                    page.waitForFunction(
-                            "() => { const btn = document.querySelector('button[name=\"logIn\"]'); " +
-                                    "return btn && !btn.disabled && !btn.classList.contains('disabled'); }",
-                            null,
-                            new Page.WaitForFunctionOptions().setTimeout(5000)
-                    );
-                    log.info("✅ Login button enabled");
-                } catch (TimeoutError e) {
-                    log.error("❌ Login button remained disabled");
-                    return false;
-                }
+            // Step 4: Wait for login button to become enabled
+            log.info("⏳ Waiting for login button to become enabled...");
+            try {
+                page.waitForFunction(
+                        "() => { const btn = document.querySelector('button[name=\"logIn\"], button.m-btn-login'); " +
+                                "return btn && !btn.disabled && !btn.classList.contains('disabled') && btn.offsetParent !== null; }",
+                        null,
+                        new Page.WaitForFunctionOptions().setTimeout(8000)
+                );
+                log.info("✅ Login button is enabled");
+            } catch (TimeoutError e) {
+                log.warn("⚠️ Login button still disabled after timeout");
+                return false;
             }
 
-            // Click login button
+            // Step 5: Click the login button (robust version)
             if (!clickLoginButton(page, loginButton)) {
                 log.error("❌ Failed to click login button");
                 return false;
             }
 
-            // Wait for navigation or login to complete
+            // Step 6: Wait for login to complete (navigation or profile appears)
             log.info("⏳ Waiting for login to complete...");
-            sleepRandom(2000, 4000);
+            sleepRandom(3000, 6000);
 
-            // Check for error messages
-            Locator errorToast = page.locator("div.m-error-toast");
-            if (errorToast.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
+            // Step 7: Check for error messages
+            Locator errorToast = page.locator("div.m-error-toast, .toast-error, .error-message");
+            if (errorToast.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
                 String errorText = errorToast.textContent();
-                if (errorText != null && !errorText.trim().isEmpty()) {
-                    log.error("❌ Login error displayed: {}", errorText);
-                    return false;
-                }
+                log.error("❌ Login failed - error shown: {}", errorText);
+                return false;
             }
 
-            // Verify login was successful
-            boolean loginSuccess = isLoggedIn(page);
-
-            if (loginSuccess) {
-                log.info("✅ Login successful");
+            // Step 8: Final verification
+            boolean success = isLoggedIn(page);
+            if (success) {
+                log.info("✅ Login successful!");
             } else {
-                log.error("❌ Login failed - user not logged in after attempt");
+                log.error("❌ Login failed - user not detected as logged in");
             }
 
-            return loginSuccess;
+            return success;
 
         } catch (TimeoutError e) {
-            log.error("⏱️ Timeout waiting for login elements: {}", e.getMessage());
+            log.error("⏱️ Timeout during login: {}", e.getMessage());
             return false;
         } catch (Exception e) {
-            log.error("❌ Error during login process: {}", e.getMessage(), e);
+            log.error("❌ Unexpected error during login: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -154,42 +130,92 @@ public class SportyLoginUtils {
     private boolean clickLoginButton(Page page, Locator loginButton) {
         log.info("🖱️ Attempting to click login button");
 
+        // Step 1: Ensure button is visible and in viewport
         try {
-            // Method 1: Standard click
+            loginButton.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(12000)); // a bit longer timeout is safer
+
             loginButton.scrollIntoViewIfNeeded();
-            sleepRandom(300, 500);
-            loginButton.click(new Locator.ClickOptions().setTimeout(3000));
-            log.info("✅ Login button clicked (standard)");
-            return true;
-
-        } catch (Exception e1) {
-            log.warn("⚠️ Standard click failed, trying force click");
-
-            try {
-                // Method 2: Force click
-                loginButton.click(new Locator.ClickOptions()
-                        .setForce(true)
-                        .setTimeout(3000));
-                log.info("✅ Login button clicked (forced)");
-                return true;
-
-            } catch (Exception e2) {
-                log.warn("⚠️ Force click failed, trying JavaScript click");
-
-                try {
-                    // Method 3: JavaScript click
-                    page.evaluate("document.querySelector('button[name=\"logIn\"]').click()");
-                    sleepRandom(500, 1000);
-                    log.info("✅ Login button clicked (JavaScript)");
-                    return true;
-
-                } catch (Exception e3) {
-                    log.error("❌ All click methods failed");
-                    return false;
-                }
-            }
+            sleepRandom(400, 900);
+        } catch (Exception e) {
+            log.warn("⚠️ Login button not visible or not in viewport: {}", e.getMessage());
+            return false;
         }
+
+        // Step 2: Standard Playwright click
+        try {
+            loginButton.click(new Locator.ClickOptions()
+                    .setForce(true)
+                    .setTimeout(6000));
+
+            if (isLoggedIn(page)) {
+                log.info("✅ Login button clicked successfully (standard click)");
+                return true;
+            } else {
+                log.warn("⚠️ Standard click succeeded but no page change detected");
+            }
+        } catch (Exception e1) {
+            log.warn("⚠️ Standard click failed: {}", e1.getMessage());
+        }
+
+        // Step 3: JavaScript click fallback
+        try {
+            boolean jsClicked = (boolean) page.evaluate("""
+            () => {
+                const btn = document.querySelector('button[name="logIn"]') || 
+                             document.querySelector('button.m-btn-login');
+                if (!btn) return false;
+                
+                // Remove any overlay or pointer-events issues
+                btn.style.pointerEvents = 'auto';
+                btn.style.opacity = '1';
+                btn.style.zIndex = '9999';
+                
+                // Trigger real click
+                btn.click();
+                
+                // Also dispatch mouse events for maximum compatibility
+                const event = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                btn.dispatchEvent(event);
+                
+                return true;
+            }
+            """);
+
+            if (jsClicked) {
+                log.info("✅ Login button clicked via JavaScript (reliable method)");
+                sleepRandom(1500, 2500); // give time for login request
+                return true;
+            }
+        } catch (Exception e2) {
+            log.warn("⚠️ JavaScript click failed: {}", e2.getMessage());
+        }
+
+        // Step 4: Last resort — hover + force click
+        try {
+            loginButton.hover();
+            sleepRandom(300, 700);
+            loginButton.click(new Locator.ClickOptions()
+                    .setForce(true)
+                    .setTimeout(4000));
+
+            if (isLoggedIn(page)) {
+                log.info("✅ Login button clicked (hover + force click)");
+                return true;
+            }
+        } catch (Exception e3) {
+            log.warn("⚠️ Force click failed: {}", e3.getMessage());
+        }
+
+        log.error("❌ All click attempts failed - button not clicked");
+        return false;
     }
+
 
 
     /**
@@ -454,6 +480,18 @@ public class SportyLoginUtils {
             log.error("FAILED: Could not deduct bet stake for arbId={}, bookmaker={}: {} - Spend operation returned null",
                     arbId, bookMaker, betAmount);
         }
+    }
+
+    /**
+     * Credit amount back to balance (for rollback scenarios)
+     */
+    public void creditAmount(BookMaker bookmaker, double amount, String arbId) {
+        log.info("🔄 Crediting {} back to {} balance (rollback) | ArbId: {}",
+                amount, bookmaker, arbId);
+
+        // Update your balance tracking system
+        // Example implementation:
+        // balanceService.credit(bookmaker, amount);
     }
 
 

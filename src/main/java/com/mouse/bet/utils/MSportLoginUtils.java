@@ -457,4 +457,16 @@ public class MSportLoginUtils {
                     arbId, bookMaker, betAmount);
         }
     }
+
+    /**
+     * Credit amount back to balance (for rollback scenarios)
+     */
+    public void creditAmount(BookMaker bookmaker, double amount, String arbId) {
+        log.info("🔄 Crediting {} back to {} balance (rollback) | ArbId: {}",
+                amount, bookmaker, arbId);
+
+        // Update your balance tracking system
+        // Example implementation:
+        // balanceService.credit(bookmaker, amount);
+    }
 }

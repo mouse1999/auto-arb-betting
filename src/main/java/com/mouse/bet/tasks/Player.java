@@ -146,6 +146,12 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
             log.warn("⚠️ SportyBet scraper is DISABLED in configuration");
         }
 
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         // ✅ Bet9ja Scraper
         if (scraperConfig.isBet9jaEnabled()) {
             log.info("✅ Bet9ja scraper is ENABLED");

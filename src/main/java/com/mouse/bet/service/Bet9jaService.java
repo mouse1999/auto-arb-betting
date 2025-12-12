@@ -285,8 +285,8 @@ public class Bet9jaService implements OddService<Bet9jaEvent> {
 //                .period(event.getPeriod())
                 .playedSeconds(String.valueOf(event.getLiveInplayState().getClockMinutes()))
                 // Provider meta (best-effort for Bet9ja)
-                .providerMarketName(meta != null ? meta.name() : null)
-                .providerMarketTitle(meta != null ? meta.title() : null)
+                .providerMarketName(meta != null ? meta.outcomeName() : null)
+                .providerMarketTitle(meta != null ? meta.desc() : null)
                 .marketId(meta != null ? String.valueOf(meta.marketId()) : null)
                 .build();
     }

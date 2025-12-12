@@ -137,8 +137,8 @@ public class SportyBetService implements OddService<SportyEvent> {
                 .flatMap(market -> market.getOutcomes().stream().map(outcome -> {
                     String key = generateProviderKey(market, outcome);
                     return Map.entry(key, new MarketMeta(
-                            market.getName(),
-                            market.getTitle(),
+                            market.getDesc(), //description is used as name
+                            outcome.getDesc(),
                             market.getGroup(),
                             market.getSpecifier(),
                             market.getId()
@@ -286,8 +286,8 @@ public class SportyBetService implements OddService<SportyEvent> {
                 .period(event.getPeriod())
                 .playedSeconds(event.getPlayedSeconds())
                 .cashOutAvailable(cashOut)
-                .providerMarketName(meta != null ? meta.name()  : null)
-                .providerMarketTitle(meta != null ? meta.title() : null)
+                .providerMarketName(meta != null ? meta.outcomeName()  : null)
+                .providerMarketTitle(meta != null ? meta.desc() : null)
                 .marketId(String.valueOf(meta != null ? meta.marketId() : null))
                 .navigationLink(makeNavigationLink(event))
 
