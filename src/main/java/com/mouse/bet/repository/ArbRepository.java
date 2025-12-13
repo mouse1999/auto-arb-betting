@@ -28,15 +28,17 @@ public interface ArbRepository extends JpaRepository<Arb, String>, JpaSpecificat
     // === Main method: Get all live arbs (works with your real data) ===
     @EntityGraph(attributePaths = {"legs"})
     @Query("""
-        SELECT a FROM Arb a
-        WHERE a.active = true
-          AND (a.expiresAt IS NULL OR a.expiresAt > :now)
-          AND a.profitPercentage >= :minProfit
-        ORDER BY a.profitPercentage DESC, a.lastUpdatedAt DESC
-        """)
+    SELECT a FROM Arb a
+    WHERE a.active = true
+      AND (a.expiresAt IS NULL OR a.expiresAt > :now)
+      AND a.profitPercentage >= :minProfit
+      AND a.lastUpdatedAt >= :secondsAgo
+    ORDER BY a.profitPercentage DESC, a.lastUpdatedAt DESC
+    """)
     Page<Arb> findLiveArbsForBetting(
             @Param("now") Instant now,
             @Param("minProfit") BigDecimal minProfit,
+            @Param("secondsAgo") Instant secondsAgo,
             Pageable pageable
     );
 

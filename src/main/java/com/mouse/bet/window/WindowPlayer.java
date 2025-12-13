@@ -41,7 +41,7 @@ public class WindowPlayer {
     @Value("${window.player.shutdown.timeout.seconds:30}")
     private int shutdownTimeoutSeconds;
 
-    @Value("${window.player.auto.start:false}")
+    @Value("${window.player.auto.start:true}")
     private boolean autoStart;
 
     /**
@@ -97,7 +97,7 @@ public class WindowPlayer {
         isRunning.set(true);
 
         try {
-            Thread.sleep(5000);
+
             // Submit MSport window
             Future<?> mSportFuture = executorService.submit(() -> {
                 try {

@@ -901,17 +901,19 @@ public class SportyWindow implements BettingWindow, Runnable {
                 log.info("📊 Ready to poll task for betting | Bookmaker: {}", bookmaker);
 
                 // Poll for available Leg task
-                 LegTask task = taskQueue.poll();
+                 LegTask task = arbOrchestrator.getWorkerQueues().get(BOOK_MAKER).poll();
+                 log.info("task polled by {}", BOOK_MAKER);
 //                LegTask task = mockTaskSupplier.poll();
 
                 if (task == null) {
+                    log.info("the polled task is null for {}",BOOK_MAKER);
                     randomHumanDelay(500, 1000); // Small delay to prevent busy waiting
                     consecutiveErrors = 0; // Reset error counter on successful poll
                     continue;
                 }
 
                 log.info("🎯 Arb opportunity retrieved | ArbId: {} | Profit: {}% | Bookmaker: {}",
-                        task.getArbId(), task.getLeg().getProfitPercent(), BOOK_MAKER);
+                        task.getArbId(), task.getArb().getProfitPercentage(), BOOK_MAKER);
 
                 // Validate task
                 BetLeg myLeg = task.getLeg();
@@ -1739,12 +1741,29 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 // Extra verification - wait for match content to load
                 try {
-                    page.waitForSelector(
-                            ".match-details, .game-header, .teams, .odds-container",
-                            new Page.WaitForSelectorOptions().setTimeout(50000) //todo: make a logic to wait for match content to show up if primary bookie
-                    );
-                } catch (Exception e) {
-                    log.error("Match content not immediately visible, continuing anyway");
+                    // Primary: Wait for the main wrapper that contains ALL odds tables
+                    page.waitForSelector(".m-detail-wrapper", new Page.WaitForSelectorOptions()
+                            .setTimeout(3000));
+
+                    log.info("✅ Match content loaded - .m-detail-wrapper detected");
+
+                } catch (TimeoutError e) {
+                    // Fallback 1: Look for any odds table (even if wrapper changed)
+                    try {
+                        page.waitForSelector(".m-table__wrapper, .m-table-row.m-outcome",
+                                new Page.WaitForSelectorOptions().setTimeout(5000));
+                        log.info("✅ Match content detected via fallback (odds tables present)");
+                    } catch (TimeoutError e2) {
+                        // Fallback 2: Look for navigation tabs (All, Main, Game)
+                        try {
+                            page.waitForSelector(".m-nav-item", new Page.WaitForSelectorOptions()
+                                    .setTimeout(3000));
+                            log.info("✅ Match content detected - navigation tabs present");
+                        } catch (TimeoutError e3) {
+                            log.warn("⚠️ Match content not detected - page may have changed or is slow");
+                            // Continue anyway — sometimes odds load later
+                        }
+                    }
                 }
 
                 return true;
@@ -2334,6 +2353,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 Locator btn = page.locator("button.af-button--primary >> visible=true").first();
                 if (btn.count() == 0) {
                     log.info("Primary button gone → likely success");
+                    betConfirmed = true;
                     break;
                 }
 

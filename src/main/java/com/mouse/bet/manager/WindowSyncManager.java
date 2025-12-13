@@ -20,7 +20,7 @@ public class WindowSyncManager {
     private final Map<BookMaker, Object> registeredWindows = new ConcurrentHashMap<>();
 
     // Strategy for determining primary bookmaker
-    private PrimaryBookmakerStrategy primaryStrategy = PrimaryBookmakerStrategy.LOWER_ODDS_FIRST;
+    private PrimaryBookmakerStrategy primaryStrategy = PrimaryBookmakerStrategy.MSPORT_FIRST; //todo: change to lower odd first
 
     /**
      * Register a window (SportyWindow or MsportWindow) with the sync manager

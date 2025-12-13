@@ -241,6 +241,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             syncManager.skipArbAndSync(arbId);
             arbPollingService.killArb(task.getArb());
         } finally {
+            clearBetSlip(page);
             syncManager.unRegisterIntent(arbId, BOOK_MAKER);
         }
     }
@@ -725,7 +726,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 // Navigate with more lenient options
                 page.navigate(M_SPORT_BET_URL, new Page.NavigateOptions()
                         .setTimeout(60000)
-                        .setWaitUntil(WaitUntilState.NETWORKIDLE)); // More lenient than LOAD
+                        .setWaitUntil(WaitUntilState.DOMCONTENTLOADED)); // More lenient than LOAD
 
 //                // Wait for network to be idle (more stable)
 //                page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions()
@@ -885,10 +886,12 @@ public class MSportWindow implements BettingWindow, Runnable {
                 log.info("📊 Ready to poll task for betting | Bookmaker: {}", bookmaker);
 
                 // Poll for available Leg task
-                 LegTask task = taskQueue.poll();
+                LegTask task = arbOrchestrator.getWorkerQueues().get(BOOK_MAKER).poll();
+                log.info("task polled by {}", BOOK_MAKER);
 //                LegTask task = mockTaskSupplier.poll();
 
                 if (task == null) {
+                    log.info("the polled task is null for {}",BOOK_MAKER);
                     randomHumanDelay(500, 1000); // Small delay to prevent busy waiting
                     consecutiveErrors = 0; // Reset error counter on successful poll
                     continue;
@@ -1760,7 +1763,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 try {
                     page.waitForSelector(
                             ".m-event--main, .m-teams, .m-market-box, .match-scores",
-                            new Page.WaitForSelectorOptions().setTimeout(5000)
+                            new Page.WaitForSelectorOptions().setTimeout(3000)
                     );
                 } catch (Exception e) {
                     log.warn("⚠️ Match content not immediately visible, continuing anyway");
@@ -1874,11 +1877,11 @@ public class MSportWindow implements BettingWindow, Runnable {
             }
 
             String betCountText = page.evaluate("""
-            () => {
-                const badge = document.querySelector('#target-betslip .m-count-ball');
-                return badge ? badge.textContent.trim() : '0';
-            }
-            """).toString();
+        () => {
+            const badge = document.querySelector('#target-betslip .m-count-ball');
+            return badge ? badge.textContent.trim() : '0';
+        }
+        """).toString();
 
             boolean wasEmpty = "0".equals(betCountText) || betCountText.isEmpty();
 
@@ -1889,25 +1892,40 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             log.info("{} Clearing {} selection(s)...", EMOJI_TRASH, betCountText);
 
-            // FAST CLEAR (Remove All or bulk JS)
-            Locator removeAllBtn = page.locator("#target-betslip .betslip-setting-right .setting-btn .icon-trash");
-            if (removeAllBtn.count() > 0 && removeAllBtn.first().boundingBox() != null) {
-                removeAllBtn.click(new Locator.ClickOptions().setForce(true).setTimeout(5000));
+            // FAST CLEAR - Try bulk delete first (if available)todo: this bulk delete will need to handle a popup to confirm delete
+//            Locator removeAllBtn = page.locator("#target-betslip .betslip-setting-right .setting-btn .icon-trash");
+//            if (removeAllBtn.count() > 0 && removeAllBtn.first().boundingBox() != null) {
+//                removeAllBtn.click(new Locator.ClickOptions().setForce(true).setTimeout(5000));
+//                page.waitForTimeout(600);
+//            } else {
+                // Fall back to clicking individual close buttons
+                // Based on your HTML: .m-bet-selection .m-close-btn
+                page.evaluate("""
+                () => {
+                    const closeButtons = document.querySelectorAll('#target-betslip .m-bet-selection .m-close-btn');
+                    closeButtons.forEach(btn => btn.click());
+                }
+            """);
+                page.waitForTimeout(800);
+//            }
+
+            // Verify betslip is cleared
+            String finalCount = page.evaluate("""
+        () => {
+            const badge = document.querySelector('#target-betslip .m-count-ball');
+            return badge ? badge.textContent.trim() : '0';
+        }
+        """).toString();
+
+            boolean isCleared = "0".equals(finalCount) || finalCount.isEmpty();
+
+            if (isCleared) {
+                log.info("{} Betslip cleared successfully", EMOJI_SUCCESS);
             } else {
-                page.evaluate("() => document.querySelectorAll('#target-betslip .m-bet-selection .m-close-btn').forEach(b => b.click())");
+                log.warn("{} Betslip may not be fully cleared. Remaining: {}", EMOJI_WARNING, finalCount);
             }
 
-            page.waitForTimeout(600);
-
-//            // THIS IS THE ONLY FIX NEEDED — wait for market list to re-appear
-//            page.locator(".m-market-item").first().waitFor(new Locator.WaitForOptions()
-//                    .setState(WaitForSelectorState.VISIBLE)
-//                    .setTimeout(10000));
-//
-//            page.waitForTimeout(300); // tiny buffer
-
-            log.info("{} Betslip cleared + market list restored", EMOJI_SUCCESS);
-            return true;
+            return isCleared;
 
         } catch (Exception e) {
             log.error("{} Error in clearBetSlip: {}", EMOJI_ERROR, e.getMessage());
@@ -1966,6 +1984,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             // Add any new ones here when you discover them
             List<String> keyPhrases = List.of(
                     "point handicap",
+                    "game handicap",
                     "total games",
                     "total points",
                     "game winner",
@@ -2280,46 +2299,102 @@ public class MSportWindow implements BettingWindow, Runnable {
                 return false;
             }
 
-            // STEP 2: Find the exact selection using the REAL structure
-            // Key elements from your HTML:
-            // - <span class="market-title">Home</span>   ← this is the OUTCOME
-            // - <div class="selection-market">Winner</div> ← this is the MARKET
+            // STEP 2: Get all selections and manually check for match
+            List<ElementHandle> selections = page.locator("div.m-bet-selection").elementHandles();
 
-            Locator selection = page.locator("div.m-bet-selection")
-                    .filter(new Locator.FilterOptions()
-                            .setHas(page.locator("span.market-title").filter(
-                                    new Locator.FilterOptions().setHasText(outcome.trim())
-                            )))
-                    .filter(new Locator.FilterOptions()
-                            .setHas(page.locator("div.selection-market").filter(
-                                    new Locator.FilterOptions().setHasText(market.trim())
-                            )));
-
-            boolean found = selection.count() > 0;
-
-            if (found) {
-                String odds = selection.locator("span.m-betslip-odds span").first().textContent().trim();
-                log.info("{} Bet verified in betslip: {} → {} @ {}", EMOJI_SUCCESS, market, outcome, odds);
-                return true;
-            } else {
-                log.warn("{} Bet NOT found in betslip | Expected: {} | Market: {}", EMOJI_WARNING, outcome, market);
-
-                // DEBUG: Print all current selections
-                page.locator("div.m-bet-selection").all().forEach(el -> {
-                    String teams = el.locator(".m-teams").textContent();
-                    String marketTitle = el.locator("span.market-title").textContent();
-                    String selectionMarket = el.locator("div.selection-market").textContent();
-                    String odds = el.locator("span.m-betslip-odds span").textContent();
-                    log.debug("Betslip has: {} | {} | {} @ {}", teams.trim(), selectionMarket.trim(), marketTitle.trim(), odds.trim());
-                });
-
+            if (selections.isEmpty()) {
+                log.warn("{} No selections found in betslip", EMOJI_WARNING);
                 return false;
             }
 
+            // Normalize search strings for flexible matching
+            String normalizedMarket = normalizeText(market);
+            String normalizedOutcome = normalizeText(outcome);
+
+            log.debug("Searching betslip for: Market='{}' (normalized: '{}'), Outcome='{}' (normalized: '{}')",
+                    market, normalizedMarket, outcome, normalizedOutcome);
+
+            // Check each selection
+            for (ElementHandle selectionHandle : selections) {
+                try {
+                    String teams = selectionHandle.querySelector(".m-teams").textContent().trim();
+                    String marketTitle = selectionHandle.querySelector("span.market-title").textContent().trim();
+                    String selectionMarket = selectionHandle.querySelector("div.selection-market").textContent().trim();
+                    String odds = selectionHandle.querySelector("span.m-betslip-odds span").textContent().trim();
+
+                    log.debug("Checking selection: Teams='{}' | Market='{}' | Outcome='{}' @ {}",
+                            teams, selectionMarket, marketTitle, odds);
+
+                    // Normalize actual values
+                    String normalizedActualMarket = normalizeText(selectionMarket);
+                    String normalizedActualOutcome = normalizeText(marketTitle);
+
+                    // Check if this selection matches
+                    boolean marketMatches = normalizedActualMarket.contains(normalizedMarket)
+                            || normalizedMarket.contains(normalizedActualMarket);
+                    boolean outcomeMatches = normalizedActualOutcome.contains(normalizedOutcome)
+                            || normalizedOutcome.contains(normalizedActualOutcome);
+
+                    if (marketMatches && outcomeMatches) {
+                        log.info("{} ✅ Bet verified in betslip: {} → {} @ {}",
+                                EMOJI_SUCCESS, selectionMarket, marketTitle, odds);
+                        return true;
+                    }
+
+                } catch (Exception innerEx) {
+                    log.debug("Error reading selection details: {}", innerEx.getMessage());
+                    continue;
+                }
+            }
+
+            // If we get here, no match was found
+            log.warn("{} ❌ Bet NOT found in betslip | Expected: {} | Market: {}",
+                    EMOJI_WARNING, outcome, market);
+
+            // DEBUG: Print all current selections for troubleshooting
+            log.error("=== ALL BETSLIP SELECTIONS ===");
+            int index = 1;
+            for (ElementHandle selectionHandle : selections) {
+                try {
+                    String teams = selectionHandle.querySelector(".m-teams").textContent().trim();
+                    String marketTitle = selectionHandle.querySelector("span.market-title").textContent().trim();
+                    String selectionMarket = selectionHandle.querySelector("div.selection-market").textContent().trim();
+                    String odds = selectionHandle.querySelector("span.m-betslip-odds span").textContent().trim();
+
+                    log.error("   {}. {} | {} | {} @ {}",
+                            index++, teams, selectionMarket, marketTitle, odds);
+                } catch (Exception e) {
+                    log.error("   {}. [Could not read selection]", index++);
+                }
+            }
+            log.error("=== END OF BETSLIP ===");
+
+            return false;
+
         } catch (Exception e) {
-            log.error("{} Failed to verify bet in betslip: {}", EMOJI_ERROR, e.getMessage());
-            return false; // NEVER return true on exception
+            log.error("{} Failed to verify bet in betslip: {}", EMOJI_ERROR, e.getMessage(), e);
+            return false;
         }
+    }
+
+    /**
+     * Normalizes text for flexible matching by:
+     * - Converting to lowercase
+     * - Removing extra whitespace
+     * - Removing common prefixes like "1st game -", "2nd set -", etc.
+     */
+    private String normalizeText(String text) {
+        if (text == null) return "";
+
+        String normalized = text.toLowerCase().trim();
+
+        // Remove common prefixes (e.g., "1st game - ", "2nd set - ", etc.)
+        normalized = normalized.replaceAll("^\\d+(st|nd|rd|th)\\s+(game|set|map|period)\\s*-\\s*", "");
+
+        // Collapse multiple spaces
+        normalized = normalized.replaceAll("\\s+", " ");
+
+        return normalized;
     }
 
     /**
@@ -2366,9 +2441,9 @@ public class MSportWindow implements BettingWindow, Runnable {
         }
 
         // 2. Verify market exists
-        if (!selectMarketByTitle(page, leg.getProviderMarketTitle())) {
-            return false;
-        }
+//        if (!selectMarketByTitle(page, leg.getProviderMarketTitle())) {
+//            return false;
+//        }
 
         // 3. Select and verify bet
         if (!selectAndVerifyBet(page, leg)) {

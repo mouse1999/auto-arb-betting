@@ -33,6 +33,9 @@ import java.util.*;
         @Index(name = "idx_arb_continuity_breaks", columnList = "continuityBreakCount"),
         @Index(name = "idx_arb_confidence", columnList = "confidenceScore"),
         @Index(name = "idx_arb_last_seen", columnList = "lastSeenAt"),
+        @Index(name = "idx_arb_last_updated", columnList = "lastUpdatedAt"),
+        @Index(name = "idx_arb_profit_last_updated", columnList = "profitPercentage, lastUpdatedAt"), // composite for your ORDER BY
+
         @Index(name = "idx_arb_expires_at_status", columnList = "expiresAt, status, active")
 })
 @EntityListeners(AuditingEntityListener.class)

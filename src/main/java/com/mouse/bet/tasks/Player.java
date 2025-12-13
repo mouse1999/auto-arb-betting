@@ -119,6 +119,12 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         log.info("═══════════════════════════════════════════════════════════");
 
         if (isRunning.compareAndSet(false, true)) {
+            log.info("wait for some minute");
+            try {
+                Thread.sleep(120_000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             startAllScrapers();
             startHealthMonitoring();
         } else {

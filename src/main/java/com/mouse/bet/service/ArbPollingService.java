@@ -27,9 +27,9 @@ public class ArbPollingService {
     private final Random random = new Random();
 
     // Configurable via @Value or constructor
-    @Value("${arb.min.profit.percentage:10.0}")
+    @Value("${arb.min.profit.percentage:4.0}")
     private BigDecimal minProfitPercentage;
-    @Value("${arb.fetch.limit:5}")
+    @Value("${arb.fetch.limit:10}")
     private int fetchLimit;
 
 
@@ -40,25 +40,30 @@ public class ArbPollingService {
      */
     public Optional<Arb> fetchNextArbCandidate() {
         try {
+            log.info("Fetching next arb candidate | minProfit={}%, limit={}",
+                    minProfitPercentage, fetchLimit);
+
             List<Arb> candidates = arbService.fetchTopArbsByMetrics(minProfitPercentage, fetchLimit);
 
             if (candidates.isEmpty()) {
-                log.info("No arb candidates above {}% profit", minProfitPercentage);
+                log.info("No arb candidates found above {}% profit", minProfitPercentage);
                 return Optional.empty();
             }
 
-            // Optional: randomize to avoid always picking same event
+            // Randomly select one to avoid always picking the same (best) one
             Arb selected = candidates.get(random.nextInt(candidates.size()));
 
-            log.info("Selected arb candidate | ArbId: {} | Profit: {}% | Legs: {}",
+            log.info("Selected arb candidate | ArbId={} | Profit={} | Sport={} | League={} | ShouldBet={}",
                     selected.getArbId(),
                     selected.getProfitPercentage(),
-                    selected.getLegs().size());
+                    selected.getSportEnum(),
+                    selected.getLeague(),
+                    selected.isShouldBet());
 
             return Optional.of(selected);
 
         } catch (Exception e) {
-            log.error("Error fetching next arb candidate", e);
+            log.error("Failed to fetch next arb candidate", e);
             return Optional.empty();
         }
     }
@@ -70,6 +75,7 @@ public class ArbPollingService {
         if (arb == null) return;
         try {
             arb.setStatus(Status.EXPIRED);
+            arb.setActive(false);
             arbService.saveArb(arb);
             log.debug("Arb killed back : {}", arb.getArbId());
         } catch (Exception e) {

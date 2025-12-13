@@ -2,41 +2,180 @@ package com.mouse.bet.utils;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Slf4j
 public class MSportMarketSearchUtils {
 
-    public static Locator findAndExpandMarket(Page page, String market) {
+    public static Locator findAndExpandMarket(Page page, String targetMarket) {
+        String method = "findAndExpandMarket(\"" + targetMarket + "\")";
+        log.info("Entering {} – searching for market...", method);
+
         try {
+            // Wait for market list
+            page.locator(".m-market-list").waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(12_000));
+
+            // Get all market titles + visibility + index
+            var markets = page.evaluate("""
+            () => {
+                const items = document.querySelectorAll('.m-market-item');
+                const result = [];
+                items.forEach((item, index) => {
+                    const span = item.querySelector('.m-market-item--name span');
+                    if (span) {
+                        const title = span.textContent.trim();
+                        if (title) {
+                            result.push({
+                                title: title,
+                                index: index,
+                                visible: item.offsetParent !== null && getComputedStyle(item).display !== 'none'
+                            });
+                        }
+                    }
+                });
+                return result;
+            }
+            """);
+
+            // Log all markets (as before)
+            String allMarkets = markets.toString()
+                    .replaceAll("[{}]", "")
+                    .replaceAll(", ", " | ");
+            log.info("Available markets ({} found): [ {} ]",
+                    ((List<?>) markets).size(),
+                    allMarkets.isEmpty() ? "NONE" : allMarkets);
+
+            String targetLower = targetMarket.toLowerCase();
+
+            // List of common "main" phrases that often get prefixed
+            List<String> keyPhrases = List.of(
+                    "point handicap", "game handicap", "total games", "total points",
+                    "game winner", "set winner", "correct score", "total sets",
+                    "total maps", "handicap", "over/under", "match winner", "1x2"
+            );
+
+            String matchedKeyPhrase = null;
+            for (String phrase : keyPhrases) {
+                if (targetLower.contains(phrase)) {
+                    matchedKeyPhrase = phrase;
+                    break;
+                }
+            }
+
+            // Find matching market
+            String matchedTitle = null;
+            for (Object marketObj : (List<?>) markets) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> market = (Map<String, Object>) marketObj;
+                String title = (String) market.get("title");
+                Boolean visible = (Boolean) market.get("visible");
+
+                if (!visible) continue;
+
+                String titleLower = title.toLowerCase();
+                boolean matches = matchedKeyPhrase != null
+                        ? titleLower.contains(matchedKeyPhrase)
+                        : titleLower.contains(targetLower);
+
+                if (matches) {
+                    matchedTitle = title;
+                    log.info("MATCH FOUND → Market: '{}'", title);
+                    break;
+                }
+            }
+
+            if (matchedTitle == null) {
+                log.error("Market containing '{}' NOT FOUND in available markets", targetMarket);
+
+                // === NEW: Log all available betting options inside visible markets ===
+                log.warn("Dumping all visible betting options for debugging...");
+
+                var allOptions = page.evaluate("""
+                () => {
+                    const options = [];
+                    document.querySelectorAll('.m-market-item').forEach(item => {
+                        const marketTitleSpan = item.querySelector('.m-market-item--name span');
+                        const marketTitle = marketTitleSpan ? marketTitleSpan.textContent.trim() : 'UNKNOWN MARKET';
+                        
+                        const isVisible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
+                        if (!isVisible) return;
+
+                        const optionElements = item.querySelectorAll('.m-outcome-item .m-outcome-item--name');
+                        if (optionElements.length > 0) {
+                            const optionTexts = Array.from(optionElements)
+                                .map(el => el.textContent.trim())
+                                .filter(text => text);
+                            if (optionTexts.length > 0) {
+                                options.push({
+                                    market: marketTitle,
+                                    selections: optionTexts
+                                });
+                            }
+                        }
+                    });
+                    return options;
+                }
+                """);
+
+                if (((List<?>) allOptions).isEmpty()) {
+                    log.warn("No betting options found in any visible market (page may still be loading or empty)");
+                } else {
+                    log.warn("Available betting options by market:");
+                    for (Object obj : (List<?>) allOptions) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> entry = (Map<String, Object>) obj;
+                        String marketName = (String) entry.get("market");
+                        List<String> selections = (List<String>) entry.get("selections");
+                        log.warn("   → {}: [ {} ]", marketName, String.join(" | ", selections));
+                    }
+                }
+                // === End of new logging ===
+
+                return null;
+            }
+
+            // Build XPath for the matched market (unchanged)
             String marketXPath = String.format(
                     "//div[@class='m-market-item']" +
                             "[.//h1[@class='m-market-item--name']//span[normalize-space(text())=%s]]",
-                    escapeXPath(market)
+                    escapeXPath(matchedTitle)
             );
 
             Locator marketBlock = page.locator("xpath=" + marketXPath).first();
 
             if (marketBlock.count() == 0) {
-                log.error("Market NOT FOUND: {}", market);
+                log.error("Market block NOT FOUND after match: {}", matchedTitle);
                 return null;
             }
 
-            // Check if market is expanded
+            // Expand logic (unchanged)
             Locator expandIcon = marketBlock.locator(".ms-icon-trangle.expanded");
             if (expandIcon.count() == 0) {
-                log.info("Market '{}' is collapsed, expanding...", market);
-                marketBlock.locator(".ms-btn-arrow").click();
+                log.info("Market '{}' is collapsed, expanding...", matchedTitle);
+                marketBlock.locator(".m-market-item--header").click();
                 randomHumanDelay(200, 400);
+                page.waitForTimeout(300);
+                if (marketBlock.locator(".ms-icon-trangle.expanded").count() > 0) {
+                    log.info("✅ Market '{}' expanded successfully", matchedTitle);
+                } else {
+                    log.warn("⚠️ Market '{}' may not have expanded", matchedTitle);
+                }
+            } else {
+                log.info("Market '{}' is already expanded", matchedTitle);
             }
 
             return marketBlock;
+
         } catch (Exception e) {
-            log.error("Error finding market '{}': {}", market, e.getMessage());
+            log.error("Exception in {}: {}", method, e.getMessage(), e);
             return null;
         }
     }

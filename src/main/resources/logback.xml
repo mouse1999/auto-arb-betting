@@ -131,13 +131,17 @@
         <appender-ref ref="CONSOLE"/>
     </logger>
 
+    <!-- MSportMarketSearchUtils Logger -->
+    <logger name="com.mouse.bet.utils.MSportMarketSearchUtils" level="DEBUG" additivity="false">
+        <appender-ref ref="MSPORT_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
     <!-- SportyWindow Logger -->
     <logger name="com.mouse.bet.window.SportyWindow" level="DEBUG" additivity="false">
         <appender-ref ref="SPORTY_FILE"/>
         <appender-ref ref="CONSOLE"/>
     </logger>
-
-
 
     <!-- Root logger (everything else) -->
     <root level="INFO">
