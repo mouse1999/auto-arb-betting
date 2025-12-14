@@ -3,17 +3,15 @@ package com.mouse.bet.repository;
 import com.mouse.bet.entity.Arb;
 import com.mouse.bet.enums.SportEnum;
 import com.mouse.bet.enums.Status;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.security.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -26,20 +24,20 @@ public interface ArbRepository extends JpaRepository<Arb, String>, JpaSpecificat
     Optional<Arb> findById(String arbId);
 
     // === Main method: Get all live arbs (works with your real data) ===
-    @EntityGraph(attributePaths = {"legs"})
-    @Query("""
+//    @EntityGraph(attributePaths = {"legs"})
+    @Query(value = """
     SELECT a FROM Arb a
+    LEFT JOIN FETCH a.legs
     WHERE a.active = true
-      AND (a.expiresAt IS NULL OR a.expiresAt > :now)
+      AND a.lastUpdatedAt >= :cutoffTime
       AND a.profitPercentage >= :minProfit
-      AND a.lastUpdatedAt >= :secondsAgo
-    ORDER BY a.profitPercentage DESC, a.lastUpdatedAt DESC
+    ORDER BY a.lastUpdatedAt DESC
     """)
-    Page<Arb> findLiveArbsForBetting(
-            @Param("now") Instant now,
-            @Param("minProfit") BigDecimal minProfit,
-            @Param("secondsAgo") Instant secondsAgo,
-            Pageable pageable
+    @QueryHints(@QueryHint(name = "org.hibernate.cacheable", value = "false"))
+    List<Arb> findFreshArbs(
+            @Param("minProfit") double minProfit,
+            @Param("cutoffTime") Instant cutoffTime,
+            @Param("limit") int limit
     );
 
     // Count for the main query

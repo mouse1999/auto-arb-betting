@@ -215,6 +215,22 @@ public class MSportWindow implements BettingWindow, Runnable {
             if (!partnersReady) {
                 flowLogger.logPartnersNotReady(arbId, BOOK_MAKER);
                 arbPollingService.killArb(task.getArb());
+
+                arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
+                    int clearedCount = queue.size();
+                    if (!bookmaker.equals(BOOK_MAKER)) {
+                        LegTask legTask = queue.poll();
+
+                        assert legTask != null;
+                        Phaser phaser = legTask.getBarrier();
+                        phaser.arriveAndAwaitAdvance();
+
+                    }
+
+                    log.info("Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
+                            bookmaker, clearedCount, BOOK_MAKER);
+                });
+                log.info("All worker queues cleared ");
                 return;
             }
 
@@ -239,10 +255,23 @@ public class MSportWindow implements BettingWindow, Runnable {
         } catch (Exception e) {
             flowLogger.logBetPlacementException(arbId, BOOK_MAKER, e);
             syncManager.skipArbAndSync(arbId);
-            arbPollingService.killArb(task.getArb());
+//            arbPollingService.killArb(task.getArb());
         } finally {
             clearBetSlip(page);
+
+            arbPollingService.killArb(task.getArb());
             syncManager.unRegisterIntent(arbId, BOOK_MAKER);
+            randomHumanDelay(500, 1500);
+            try {
+                navigateBack(page);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            randomHumanDelay(2000, 3000);
+
+            Phaser phaser = task.getBarrier();
+            phaser.arriveAndAwaitAdvance();
+
         }
     }
 
@@ -304,17 +333,12 @@ public class MSportWindow implements BettingWindow, Runnable {
             syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
         }
 
-        arbPollingService.killArb(task.getArb());
-
-        Phaser phaser = task.getBarrier();
-        flowLogger.logPrimaryReadyForNext(arbId, BOOK_MAKER);
-        phaser.arriveAndAwaitAdvance();
     }
 
     /**
      * Handle betting as SECONDARY bookmaker (wait for primary, then bet)
      */
-    private void handleSecondaryBetting(Page page, LegTask task, BetLeg myLeg, String arbId) {
+    private void handleSecondaryBetting(Page page, LegTask task, BetLeg myLeg, String arbId) throws InterruptedException {
         flowLogger.logSecondaryWaitingForPrimary(arbId, BOOK_MAKER);
 
         // Wait for primary to complete with timeout
@@ -347,10 +371,6 @@ public class MSportWindow implements BettingWindow, Runnable {
             syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
             flowLogger.logRollbackRequest(arbId, BOOK_MAKER, "Odds not available after primary success");
 
-            arbPollingService.killArb(task.getArb());
-
-            Phaser phaser = task.getBarrier();
-            phaser.arriveAndAwaitAdvance();
             return;
         }
 
@@ -400,11 +420,9 @@ public class MSportWindow implements BettingWindow, Runnable {
             }
         }
 
-        arbPollingService.killArb(task.getArb());
-
-        Phaser phaser = task.getBarrier();
+        ;
         flowLogger.logSecondaryReadyForNext(arbId, BOOK_MAKER);
-        phaser.arriveAndAwaitAdvance();
+
     }
 
     /**
@@ -899,6 +917,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                 log.info("🎯 Arb opportunity retrieved | ArbId: {} | Profit: {}% | Bookmaker: {}",
                         task.getArbId(), task.getLeg().getProfitPercent(), BOOK_MAKER);
+                log.info("{}", task.getArb());
 
                 // Validate task
                 BetLeg myLeg = task.getLeg();
@@ -930,8 +949,6 @@ public class MSportWindow implements BettingWindow, Runnable {
                 try {
                     processBetPlacement(page, task, myLeg);
                     randomHumanDelay(1000, 2300);
-
-                    navigateBack(page);
 //                    mockTaskSupplier.consume();
                     consecutiveErrors = 0; // Reset on success
 
@@ -1110,30 +1127,30 @@ public class MSportWindow implements BettingWindow, Runnable {
      * Navigate to live betting page
      */
     private void goToLivePage(Page page) {
-        final long timeout = 20_000; // 20 seconds max for everything
+        final long timeout = 20_000;
 
-        // try the fastest and most reliable selectors first (with fallback chain)
         try {
-            // Priority 1: Unique ID - fastest & most stable
-            Locator liveBettingLink = page.locator("#header_nav_liveBetting");
-            if (liveBettingLink.isVisible(new Locator.IsVisibleOptions().setTimeout(5000))) {
-                liveBettingLink.click(new Locator.ClickOptions().setTimeout(10000));
+            Locator liveBettingLink = withLocatorRetry(page, "#header_nav_liveBetting",
+                    loc -> loc.isVisible(new Locator.IsVisibleOptions().setTimeout(5000)) ? loc : null,
+                    3, 5000, 1000);
+
+            if (liveBettingLink != null) {
+                withLocatorRetry(page, "#header_nav_liveBetting",
+                        loc -> { loc.click(new Locator.ClickOptions().setTimeout(10000)); return true; },
+                        3, 10000, 1000);
                 log.info("Clicked 'Live Betting' using ID selector");
             } else {
                 throw new Exception("ID locator not visible");
             }
         } catch (Exception e) {
             log.info("ID selector failed, trying fallback...");
-
-            // Priority 2: Text-based CSS selector (very reliable)
             try {
-                Locator liveBettingLink = page.locator("a:has-text('Live Betting')");
-                liveBettingLink.click(new Locator.ClickOptions().setTimeout(10000));
+                withLocatorRetry(page, "a:has-text('Live Betting')",
+                        loc -> { loc.click(new Locator.ClickOptions().setTimeout(10000)); return true; },
+                        3, 10000, 1000);
                 log.info("Clicked 'Live Betting' using text selector");
             } catch (Exception e2) {
                 log.info("Text selector failed, trying accessibility role...");
-
-                // Priority 3: Playwright's recommended auto-healing selector (best for accessibility)
                 try {
                     page.getByRole(AriaRole.LINK,
                                     new Page.GetByRoleOptions().setName("Live Betting").setExact(true))
@@ -1145,15 +1162,11 @@ public class MSportWindow implements BettingWindow, Runnable {
             }
         }
 
-        // Step 2: Wait for navigation to Live Betting page with flexible pattern
         try {
             page.waitForURL(url -> url.toString().contains("/live_matches"),
                     new Page.WaitForURLOptions().setTimeout(timeout));
-
-            // Optional: Extra safety - ensure the live page content is actually loaded
             page.waitForLoadState(LoadState.LOAD,
                     new Page.WaitForLoadStateOptions().setTimeout(15000));
-
             log.info("Successfully navigated to Live Betting page: " + page.url());
         } catch (Exception e) {
             throw new RuntimeException("Failed to load Live Betting page after clicking. Current URL: " + page.url(), e);
@@ -1236,15 +1249,16 @@ public class MSportWindow implements BettingWindow, Runnable {
      * Click visible sport tab (Football, Basketball, Tennis, etc.)
      */
     private void clickVisibleSportTab(Page page, String sportName, String expectedUrlSegment) throws InterruptedException {
-        // Click the sport navigation item by label
-        page.locator("""
-        .m-nav-item:has(.m-label:text-is('%s'))
-        """.formatted(sportName))
-                .click(new Locator.ClickOptions()
-                        .setTimeout(12_000)
-                        .setForce(true));
+        withLocatorRetry(page,
+                String.format(".m-nav-item:has(.m-label:text-is('%s'))", sportName),
+                loc -> {
+                    loc.click(new Locator.ClickOptions()
+                            .setTimeout(12_000)
+                            .setForce(true));
+                    return true;
+                },
+                3, 12000, 1000);
 
-        // Wait for URL change if segment is provided
         if (expectedUrlSegment != null && !expectedUrlSegment.isEmpty()) {
             page.waitForURL("**/" + expectedUrlSegment + "/**",
                     new Page.WaitForURLOptions().setTimeout(15_000));
@@ -1450,34 +1464,31 @@ public class MSportWindow implements BettingWindow, Runnable {
     private boolean tryClickByAriaLabel(Page page, String home, String away) {
         log.info("Strategy 1: Searching by aria-label attribute");
 
-        // Try different aria-label formats
         String[] labelPatterns = {
-                String.format("%s vs %s", home, away),           // "Langer, Ales vs Moravec, Ladislav"
-                String.format("%s - %s", home, away),            // Alternative separator
-                String.format("%s v %s", home, away),            // Short form
-                String.format("%s Vs %s", home, away)            // Capital Vs
+                String.format("%s vs %s", home, away),
+                String.format("%s - %s", home, away),
+                String.format("%s v %s", home, away),
+                String.format("%s Vs %s", home, away)
         };
 
         for (String labelPattern : labelPatterns) {
             try {
-                // Exact aria-label match on the <a> tag
-                Locator match = page.locator(String.format(
-                        ".m-teams a[aria-label='%s']",
-                        labelPattern
-                ));
+                Locator match = withLocatorRetry(page,
+                        String.format(".m-teams a[aria-label='%s']", labelPattern),
+                        loc -> loc.count() > 0 && loc.first().isVisible() ? loc : null,
+                        2, 3000, 500);
 
-                if (match.count() > 0 && match.first().isVisible()) {
+                if (match != null) {
                     log.info("✅ Found by exact aria-label: '{}'", labelPattern);
                     return clickMatchElement(page, match.first());
                 }
 
-                // Case-insensitive aria-label match
-                match = page.locator(String.format(
-                        ".m-teams a[aria-label='%s' i]",
-                        labelPattern
-                ));
+                match = withLocatorRetry(page,
+                        String.format(".m-teams a[aria-label='%s' i]", labelPattern),
+                        loc -> loc.count() > 0 && loc.first().isVisible() ? loc : null,
+                        2, 3000, 500);
 
-                if (match.count() > 0 && match.first().isVisible()) {
+                if (match != null) {
                     log.info("✅ Found by case-insensitive aria-label: '{}'", labelPattern);
                     return clickMatchElement(page, match.first());
                 }
@@ -1487,7 +1498,6 @@ public class MSportWindow implements BettingWindow, Runnable {
             }
         }
 
-        // Try partial aria-label matching (contains both teams)
         try {
             String selector = String.format(
                     ".m-teams a[aria-label*='%s' i][aria-label*='%s' i]",
@@ -1495,9 +1505,11 @@ public class MSportWindow implements BettingWindow, Runnable {
                     escapeForSelector(away)
             );
 
-            Locator match = page.locator(selector);
+            Locator match = withLocatorRetry(page, selector,
+                    loc -> loc.count() > 0 && loc.first().isVisible() ? loc : null,
+                    2, 3000, 500);
 
-            if (match.count() > 0 && match.first().isVisible()) {
+            if (match != null) {
                 log.info("✅ Found by partial aria-label match");
                 return clickMatchElement(page, match.first());
             }
@@ -1517,17 +1529,14 @@ public class MSportWindow implements BettingWindow, Runnable {
         log.info("Strategy 2: Searching by href pattern");
 
         try {
-            // Normalize team names for URL (replace spaces with underscores)
             String homeUrl = home.replace(" ", "_").replace(",", "");
             String awayUrl = away.replace(" ", "_").replace(",", "");
 
-            // Try different URL patterns
             String[] hrefPatterns = {
                     String.format("%s_vs_%s", homeUrl, awayUrl),
                     String.format("%s_vs_%s",
                             homeUrl.replace(".", ""),
                             awayUrl.replace(".", "")),
-                    // Handle URL encoding
                     String.format("%s_vs_%s",
                             urlEncode(home),
                             urlEncode(away))
@@ -1535,12 +1544,12 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             for (String pattern : hrefPatterns) {
                 try {
-                    Locator match = page.locator(String.format(
-                            ".m-teams a[href*='%s']",
-                            pattern
-                    ));
+                    Locator match = withLocatorRetry(page,
+                            String.format(".m-teams a[href*='%s']", pattern),
+                            loc -> loc.count() > 0 && loc.first().isVisible() ? loc : null,
+                            2, 3000, 500);
 
-                    if (match.count() > 0 && match.first().isVisible()) {
+                    if (match != null) {
                         log.info("✅ Found by href pattern: '{}'", pattern);
                         return clickMatchElement(page, match.first());
                     }
@@ -1564,43 +1573,53 @@ public class MSportWindow implements BettingWindow, Runnable {
         log.info("Strategy 3: Searching by team text in .m-teams--info");
 
         try {
-            // Find all m-teams containers
-            Locator allTeamsContainers = page.locator(".m-teams");
-            int count = allTeamsContainers.count();
+            Locator allTeamsContainers = withLocatorRetry(page, ".m-teams",
+                    loc -> loc,
+                    2, 3000, 500);
 
+            if (allTeamsContainers == null) return false;
+
+            int count = allTeamsContainers.count();
             log.debug("Found {} team containers to check", count);
 
-            // Check each teams container
             for (int i = 0; i < count; i++) {
                 Locator teamsContainer = allTeamsContainers.nth(i);
 
                 try {
-                    // Get team name wrappers
-                    Locator teamWrappers = teamsContainer.locator(".m-server-name-wrapper");
+                    Locator teamWrappers = withLocatorRetry(page,
+                            ".m-teams:nth-of-type(" + (i + 1) + ") .m-server-name-wrapper",
+                            loc -> loc,
+                            2, 2000, 300);
 
-                    if (teamWrappers.count() >= 2) {
-                        String homeText = teamWrappers.nth(0)
-                                .locator(".tw-w-full.tw-truncate")
-                                .textContent()
-                                .trim();
+                    if (teamWrappers != null && teamWrappers.count() >= 2) {
+                        String homeText = withLocatorRetry(page,
+                                ".m-teams:nth-of-type(" + (i + 1) + ") .m-server-name-wrapper:nth-of-type(1) .tw-w-full.tw-truncate",
+                                loc -> loc.textContent().trim(),
+                                2, 2000, 300);
 
-                        String awayText = teamWrappers.nth(1)
-                                .locator(".tw-w-full.tw-truncate")
-                                .textContent()
-                                .trim();
+                        String awayText = withLocatorRetry(page,
+                                ".m-teams:nth-of-type(" + (i + 1) + ") .m-server-name-wrapper:nth-of-type(2) .tw-w-full.tw-truncate",
+                                loc -> loc.textContent().trim(),
+                                2, 2000, 300);
 
-                        // Exact match
-                        if (homeText.equals(home) && awayText.equals(away)) {
-                            log.info("✅ Found by exact team text match");
-                            Locator clickTarget = teamsContainer.locator("a").first();
-                            return clickMatchElement(page, clickTarget);
-                        }
+                        if (homeText != null && awayText != null) {
+                            if (homeText.equals(home) && awayText.equals(away)) {
+                                log.info("✅ Found by exact team text match");
+                                Locator clickTarget = withLocatorRetry(page,
+                                        ".m-teams:nth-of-type(" + (i + 1) + ") a",
+                                        loc -> loc.first(),
+                                        2, 2000, 300);
+                                return clickTarget != null && clickMatchElement(page, clickTarget);
+                            }
 
-                        // Case-insensitive match
-                        if (homeText.equalsIgnoreCase(home) && awayText.equalsIgnoreCase(away)) {
-                            log.info("✅ Found by case-insensitive team text match");
-                            Locator clickTarget = teamsContainer.locator("a").first();
-                            return clickMatchElement(page, clickTarget);
+                            if (homeText.equalsIgnoreCase(home) && awayText.equalsIgnoreCase(away)) {
+                                log.info("✅ Found by case-insensitive team text match");
+                                Locator clickTarget = withLocatorRetry(page,
+                                        ".m-teams:nth-of-type(" + (i + 1) + ") a",
+                                        loc -> loc.first(),
+                                        2, 2000, 300);
+                                return clickTarget != null && clickMatchElement(page, clickTarget);
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -1615,7 +1634,6 @@ public class MSportWindow implements BettingWindow, Runnable {
         log.debug("❌ Team text strategy failed");
         return false;
     }
-
     /**
      * Strategy 4: Partial matching (case-insensitive, ignores extra spaces)
      */
@@ -1705,17 +1723,18 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     private boolean clickMatchElement(Page page, Locator matchElement) {
         try {
-            // Ensure element is in viewport
             matchElement.scrollIntoViewIfNeeded();
             randomHumanDelay(500, 1000);
 
-            // Verify it's still visible
-            if (!matchElement.isVisible()) {
+            Boolean isVisible = withLocatorRetry(page, matchElement.toString(),
+                    loc -> matchElement.isVisible(),
+                    2, 2000, 500);
+
+            if (isVisible == null || !isVisible) {
                 log.warn("⚠️ Element not visible after scroll");
                 return false;
             }
 
-            // Get match info for logging
             String matchInfo = "unknown";
             try {
                 String ariaLabel = matchElement.getAttribute("aria-label");
@@ -1727,15 +1746,13 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             log.info("✅ Clicking match: {}", matchInfo);
 
-            // Click with retry logic
             int maxAttempts = 3;
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
                     matchElement.click(new Locator.ClickOptions()
                             .setTimeout(10_000)
-                            .setForce(attempt > 1)); // Force on retry
-
-                    break; // Success
+                            .setForce(attempt > 1));
+                    break;
 
                 } catch (PlaywrightException e) {
                     if (attempt == maxAttempts) {
@@ -1746,7 +1763,6 @@ public class MSportWindow implements BettingWindow, Runnable {
                 }
             }
 
-            // Wait for navigation - MSport URL patterns
             try {
                 page.waitForURL(url ->
                                 url.contains("_vs_") ||
@@ -1759,12 +1775,16 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                 log.info("✅ Navigation successful: {}", page.url());
 
-                // Extra verification - wait for match content to load
                 try {
-                    page.waitForSelector(
+                    withLocatorRetry(page,
                             ".m-event--main, .m-teams, .m-market-box, .match-scores",
-                            new Page.WaitForSelectorOptions().setTimeout(3000)
-                    );
+                            loc -> {
+                                loc.waitFor(new Locator.WaitForOptions()
+                                        .setState(WaitForSelectorState.VISIBLE)
+                                        .setTimeout(3000));
+                                return true;
+                            },
+                            2, 3000, 500);
                 } catch (Exception e) {
                     log.warn("⚠️ Match content not immediately visible, continuing anyway");
                 }
@@ -1774,7 +1794,6 @@ public class MSportWindow implements BettingWindow, Runnable {
             } catch (PlaywrightException e) {
                 log.warn("⚠️ Navigation timeout, checking if we're on match page anyway");
 
-                // Check if URL changed at all
                 String currentUrl = page.url();
                 if (currentUrl.contains("_vs_") ||
                         currentUrl.contains("/sr:match:") ||
@@ -1790,7 +1809,6 @@ public class MSportWindow implements BettingWindow, Runnable {
         } catch (Exception e) {
             log.error("❌ Click error: {}", e.getMessage());
 
-            // Final check if we somehow navigated despite error
             String currentUrl = page.url();
             if (currentUrl.contains("_vs_") ||
                     currentUrl.contains("/sr:match:") ||
@@ -1870,21 +1888,22 @@ public class MSportWindow implements BettingWindow, Runnable {
     // Step 1: Clear bet slip before adding new bet
     private boolean clearBetSlip(Page page) {
         try {
-            Locator betslipContainer = page.locator("#target-betslip .m-betslip");
-            if (betslipContainer.count() == 0) {
+            Locator betslipContainer = withLocatorRetry(page, "#target-betslip .m-betslip",
+                    loc -> loc.count() > 0 ? loc : null, 3, 5000, 1000);
+
+            if (betslipContainer == null) {
                 log.info("{} Betslip container not found", EMOJI_INFO);
                 return true;
             }
 
             String betCountText = page.evaluate("""
-        () => {
-            const badge = document.querySelector('#target-betslip .m-count-ball');
-            return badge ? badge.textContent.trim() : '0';
-        }
-        """).toString();
+    () => {
+        const badge = document.querySelector('#target-betslip .m-count-ball');
+        return badge ? badge.textContent.trim() : '0';
+    }
+    """).toString();
 
             boolean wasEmpty = "0".equals(betCountText) || betCountText.isEmpty();
-
             if (wasEmpty) {
                 log.info("{} Betslip already empty", EMOJI_SUCCESS);
                 return true;
@@ -1892,39 +1911,27 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             log.info("{} Clearing {} selection(s)...", EMOJI_TRASH, betCountText);
 
-            // FAST CLEAR - Try bulk delete first (if available)todo: this bulk delete will need to handle a popup to confirm delete
-//            Locator removeAllBtn = page.locator("#target-betslip .betslip-setting-right .setting-btn .icon-trash");
-//            if (removeAllBtn.count() > 0 && removeAllBtn.first().boundingBox() != null) {
-//                removeAllBtn.click(new Locator.ClickOptions().setForce(true).setTimeout(5000));
-//                page.waitForTimeout(600);
-//            } else {
-                // Fall back to clicking individual close buttons
-                // Based on your HTML: .m-bet-selection .m-close-btn
-                page.evaluate("""
-                () => {
-                    const closeButtons = document.querySelectorAll('#target-betslip .m-bet-selection .m-close-btn');
-                    closeButtons.forEach(btn => btn.click());
-                }
-            """);
-                page.waitForTimeout(800);
-//            }
-
-            // Verify betslip is cleared
-            String finalCount = page.evaluate("""
+            page.evaluate("""
         () => {
-            const badge = document.querySelector('#target-betslip .m-count-ball');
-            return badge ? badge.textContent.trim() : '0';
+            const closeButtons = document.querySelectorAll('#target-betslip .m-bet-selection .m-close-btn');
+            closeButtons.forEach(btn => btn.click());
         }
-        """).toString();
+    """);
+            page.waitForTimeout(800);
+
+            String finalCount = page.evaluate("""
+    () => {
+        const badge = document.querySelector('#target-betslip .m-count-ball');
+        return badge ? badge.textContent.trim() : '0';
+    }
+    """).toString();
 
             boolean isCleared = "0".equals(finalCount) || finalCount.isEmpty();
-
             if (isCleared) {
                 log.info("{} Betslip cleared successfully", EMOJI_SUCCESS);
             } else {
                 log.warn("{} Betslip may not be fully cleared. Remaining: {}", EMOJI_WARNING, finalCount);
             }
-
             return isCleared;
 
         } catch (Exception e) {
@@ -2140,7 +2147,6 @@ public class MSportWindow implements BettingWindow, Runnable {
             outcomeCell.scrollIntoViewIfNeeded();
             randomHumanDelay(100, 200);
 
-            // Try standard click first
             try {
                 outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
             } catch (Exception e) {
@@ -2275,9 +2281,14 @@ public class MSportWindow implements BettingWindow, Runnable {
 
     private boolean isOutcomeDisabled(Locator outcomeCell) {
         try {
-            // Check for disabled class or lock icon
-            return outcomeCell.getAttribute("class").contains("disabled") ||
-                    outcomeCell.locator("i[aria-label='disabled']").count() > 0;
+            String className = outcomeCell.getAttribute("class");
+            Integer disabledIconCount = withLocatorRetry(outcomeCell.page(),
+                    outcomeCell.toString() + " i[aria-label='disabled']",
+                    loc -> loc.count(),
+                    2, 1000, 300);
+
+            return (className != null && className.contains("disabled")) ||
+                    (disabledIconCount != null && disabledIconCount > 0);
         } catch (Exception e) {
             return false;
         }
@@ -2288,33 +2299,31 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     private boolean verifyBetInBetslip(Page page, String market, String outcome) {
         try {
-            // STEP 1: Fast check — is betslip open and has selections?
-            String countText = page.locator("#target-betslip .m-count-ball, .m-count-ball-wrap .m-count-ball")
-                    .first()
-                    .textContent()
-                    .trim();
+            String countText = withLocatorRetry(page,
+                    "#target-betslip .m-count-ball, .m-count-ball-wrap .m-count-ball",
+                    loc -> loc.first().textContent().trim(),
+                    3, 5000, 1000);
 
             if ("0".equals(countText) || countText.isEmpty()) {
                 log.warn("{} Betslip is empty (count = {})", EMOJI_WARNING, countText);
                 return false;
             }
 
-            // STEP 2: Get all selections and manually check for match
-            List<ElementHandle> selections = page.locator("div.m-bet-selection").elementHandles();
+            List<ElementHandle> selections = withLocatorRetry(page, "div.m-bet-selection",
+                    loc -> loc.elementHandles(),
+                    3, 5000, 1000);
 
-            if (selections.isEmpty()) {
+            if (selections == null || selections.isEmpty()) {
                 log.warn("{} No selections found in betslip", EMOJI_WARNING);
                 return false;
             }
 
-            // Normalize search strings for flexible matching
             String normalizedMarket = normalizeText(market);
             String normalizedOutcome = normalizeText(outcome);
 
             log.debug("Searching betslip for: Market='{}' (normalized: '{}'), Outcome='{}' (normalized: '{}')",
                     market, normalizedMarket, outcome, normalizedOutcome);
 
-            // Check each selection
             for (ElementHandle selectionHandle : selections) {
                 try {
                     String teams = selectionHandle.querySelector(".m-teams").textContent().trim();
@@ -2325,11 +2334,9 @@ public class MSportWindow implements BettingWindow, Runnable {
                     log.debug("Checking selection: Teams='{}' | Market='{}' | Outcome='{}' @ {}",
                             teams, selectionMarket, marketTitle, odds);
 
-                    // Normalize actual values
                     String normalizedActualMarket = normalizeText(selectionMarket);
                     String normalizedActualOutcome = normalizeText(marketTitle);
 
-                    // Check if this selection matches
                     boolean marketMatches = normalizedActualMarket.contains(normalizedMarket)
                             || normalizedMarket.contains(normalizedActualMarket);
                     boolean outcomeMatches = normalizedActualOutcome.contains(normalizedOutcome)
@@ -2347,28 +2354,8 @@ public class MSportWindow implements BettingWindow, Runnable {
                 }
             }
 
-            // If we get here, no match was found
             log.warn("{} ❌ Bet NOT found in betslip | Expected: {} | Market: {}",
                     EMOJI_WARNING, outcome, market);
-
-            // DEBUG: Print all current selections for troubleshooting
-            log.error("=== ALL BETSLIP SELECTIONS ===");
-            int index = 1;
-            for (ElementHandle selectionHandle : selections) {
-                try {
-                    String teams = selectionHandle.querySelector(".m-teams").textContent().trim();
-                    String marketTitle = selectionHandle.querySelector("span.market-title").textContent().trim();
-                    String selectionMarket = selectionHandle.querySelector("div.selection-market").textContent().trim();
-                    String odds = selectionHandle.querySelector("span.m-betslip-odds span").textContent().trim();
-
-                    log.error("   {}. {} | {} | {} @ {}",
-                            index++, teams, selectionMarket, marketTitle, odds);
-                } catch (Exception e) {
-                    log.error("   {}. [Could not read selection]", index++);
-                }
-            }
-            log.error("=== END OF BETSLIP ===");
-
             return false;
 
         } catch (Exception e) {
@@ -2376,6 +2363,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             return false;
         }
     }
+
 
     /**
      * Normalizes text for flexible matching by:
@@ -2462,62 +2450,87 @@ public class MSportWindow implements BettingWindow, Runnable {
 
     // Optional: Verify bet appeared in slip
     private boolean verifyBetSlip(Page page, BetLeg leg) {
-        String outcome = leg.getProviderMarketName();   // e.g. "Home", "3:2", "+2.5"
-        String market = leg.getProviderMarketTitle();   // e.g. "Winner", "Correct score"
+        String outcome = leg.getProviderMarketName();
+        String market = leg.getProviderMarketTitle();
 
         try {
-            // Wait for betslip container to be visible
-            Locator betslip = page.locator("#target-betslip .m-betslip");
-            betslip.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(8000));
+            Locator betslip = withLocatorRetry(page, "#target-betslip .m-betslip",
+                    loc -> {
+                        loc.waitFor(new Locator.WaitForOptions()
+                                .setState(WaitForSelectorState.VISIBLE)
+                                .setTimeout(8000));
+                        return loc;
+                    },
+                    3, 8000, 1000);
 
-            // Wait specifically for the bet selection to appear
-            Locator betItem = betslip.locator(".m-selections-list .m-bet-selection").first();
-            betItem.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(3000));
+            if (betslip == null) return false;
 
-            // Extract and verify details
-            String displayedOutcome = betItem.locator(".m-stake-info .m-title .market-title").textContent().trim();
-            String displayedMarket = betItem.locator(".selection-market").textContent().trim();
-            String displayedOdds = betItem.locator(".m-betslip-odds span").last().textContent().trim();
+            Locator betItem = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection",
+                    loc -> {
+                        loc.first().waitFor(new Locator.WaitForOptions()
+                                .setState(WaitForSelectorState.VISIBLE)
+                                .setTimeout(3000));
+                        return loc.first();
+                    },
+                    3, 3000, 500);
 
-            // Get team info (format: "Team1 vs Team2")
-            Locator teamsLocator = betItem.locator(".m-team-info .m-teams");
+            if (betItem == null) return false;
+
+            String displayedOutcome = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection .m-stake-info .m-title .market-title",
+                    loc -> loc.textContent().trim(),
+                    2, 2000, 500);
+
+            String displayedMarket = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection .selection-market",
+                    loc -> loc.textContent().trim(),
+                    2, 2000, 500);
+
+            String displayedOdds = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection .m-betslip-odds span",
+                    loc -> loc.last().textContent().trim(),
+                    2, 2000, 500);
+
+            Locator teamsLocator = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection .m-team-info .m-teams",
+                    loc -> loc.count() > 0 ? loc : null,
+                    2, 2000, 500);
+
             String displayedTeams = "";
-            if (teamsLocator.count() > 0) {
+            if (teamsLocator != null) {
                 displayedTeams = teamsLocator.textContent().trim().replaceAll("\\s+", " ");
             }
 
-            boolean isLive = betItem.locator(".m-live-tag").count() > 0;
+            Integer suspendedCount = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection .m-unusual-tag",
+                    loc -> loc.count(),
+                    2, 1000, 300);
 
-            // Check if bet is suspended or has issues
-            boolean isSuspended = betItem.locator(".m-unusual-tag").count() > 0;
+            boolean isSuspended = suspendedCount != null && suspendedCount > 0;
             String suspendedStatus = "";
             if (isSuspended) {
-                suspendedStatus = betItem.locator(".m-unusual-tag").textContent().trim();
+                suspendedStatus = withLocatorRetry(page,
+                        "#target-betslip .m-betslip .m-selections-list .m-bet-selection .m-unusual-tag",
+                        loc -> loc.textContent().trim(),
+                        2, 1000, 300);
             }
 
-            // Verify outcome matches
-            if (!displayedOutcome.equalsIgnoreCase(outcome)) {
+            if (displayedOutcome != null && !displayedOutcome.equalsIgnoreCase(outcome)) {
                 log.warn("{} Outcome mismatch: expected '{}' but found '{}'", EMOJI_WARNING, outcome, displayedOutcome);
                 return false;
             }
 
-            // Verify market matches
-            if (!displayedMarket.equalsIgnoreCase(market)) {
+            if (displayedMarket != null && !displayedMarket.equalsIgnoreCase(market)) {
                 log.warn("{} Market mismatch: expected '{}' but found '{}'", EMOJI_WARNING, market, displayedMarket);
                 return false;
             }
 
-            // Check if bet is suspended
             if (isSuspended) {
                 log.warn("{} BET IS SUSPENDED: {} | Status: {}", EMOJI_WARNING, displayedOutcome, suspendedStatus);
                 return false;
             }
 
-            // Verify odds if needed
             try {
                 double expectedOdds = leg.getOdds().doubleValue();
                 double actualOdds = Double.parseDouble(displayedOdds);
@@ -2525,11 +2538,16 @@ public class MSportWindow implements BettingWindow, Runnable {
                 if (!isOddsAcceptable(expectedOdds, displayedOdds)) {
                     log.warn("{} Odds mismatch in betslip: expected {} but found {}",
                             EMOJI_WARNING, expectedOdds, actualOdds);
-                    // Don't fail verification, just warn
                 }
             } catch (NumberFormatException e) {
                 log.debug("Could not parse odds for verification: {}", displayedOdds);
             }
+
+            Integer liveTagCount = withLocatorRetry(page,
+                    "#target-betslip .m-betslip .m-selections-list .m-bet-selection .m-live-tag",
+                    loc -> loc.count(),
+                    2, 1000, 300);
+            boolean isLive = liveTagCount != null && liveTagCount > 0;
 
             log.info("{} BET VERIFIED IN SLIP: {} | Market: {} | Odds: {} | Match: {} | Live: {}",
                     EMOJI_SUCCESS, displayedOutcome, displayedMarket, displayedOdds, displayedTeams, isLive);
@@ -2739,7 +2757,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                     log.info("→ Clicking button (cycle {}) - Text: {}", cycle, originalText);
 
                     // CLICK 1: First click
-                    jsScrollAndClick(btn, page);
+                   findAndClickPlaceBet(page);
                     randomHumanDelay(500, 800); // Short delay
 
                     // ── CHECK FOR SUCCESS IMMEDIATELY AFTER FIRST CLICK ──
@@ -2839,6 +2857,43 @@ public class MSportWindow implements BettingWindow, Runnable {
         }
     }
 
+    private void findAndClickPlaceBet(Page page) {
+        String[] selectors = {
+                "button.v-button.m-place-btn",  // More specific - matches your HTML
+                "button.m-place-btn",
+                "button:has-text('Place Bet')",
+                "#target-betslip button.v-button"
+        };
+
+        for (String selector : selectors) {
+            try {
+                Locator btn = page.locator(selector).first();
+
+                // Check if visible
+                btn.waitFor(new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(3000));
+
+                // Scroll into view
+                btn.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'instant' })");
+                page.waitForTimeout(200);
+
+                // Click immediately while element is fresh
+                btn.click(new Locator.ClickOptions()
+                        .setForce(true)
+                        .setTimeout(5000));
+
+                log.info("Place bet button clicked successfully with selector: {}", selector);
+                return;
+
+            } catch (Exception e) {
+                log.debug("Selector '{}' failed: {}", selector, e.getMessage());
+            }
+        }
+
+        log.error("Failed to click place bet button with all selectors");
+    }
+
 
     /**
      * ROBUST button finder - uses class-based selector with short timeout
@@ -2846,45 +2901,42 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     private Locator findPlaceBetButton(Page page) {
         try {
-            // Primary strategy: Use class selector (most reliable)
-            Locator btn = page.locator("button.m-place-btn");
+            Locator btn = withLocatorRetry(page, "button.m-place-btn",
+                    loc -> {
+                        loc.waitFor(new Locator.WaitForOptions()
+                                .setState(WaitForSelectorState.VISIBLE)
+                                .setTimeout(3000));
+                        return loc.count() > 0 ? loc.first() : null;
+                    },
+                    2, 500, 300);
 
-            // Wait with SHORT timeout (3 seconds instead of 30)
-            btn.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(3000));
-
-            if (btn.count() > 0) {
-                log.debug("Button found via class selector");
-                return btn.first();
+            if (btn != null) {
+                log.info("Button found via class selector");
+                return btn;
             }
-        } catch (TimeoutError e) {
-            log.debug("Button not found via class selector (timeout)");
         } catch (Exception e) {
-            log.debug("Error finding button via class: {}", e.getMessage());
+            log.info("Button not found via class selector");
         }
 
-        // Fallback strategy: Try broader selectors with very short timeout
         try {
-            Locator fallbackBtn = page.locator(
-                    "button.v-button.m-place-btn, " +
-                            "button[type='button'].m-place-btn, " +
-                            "#target-betslip button.v-button"
-            ).first();
+            Locator fallbackBtn = withLocatorRetry(page,
+                    "button.v-button.m-place-btn, button[type='button'].m-place-btn, #target-betslip button.v-button",
+                    loc -> {
+                        loc.first().waitFor(new Locator.WaitForOptions()
+                                .setState(WaitForSelectorState.VISIBLE)
+                                .setTimeout(1000));
+                        return loc.count() > 0 ? loc.first() : null;
+                    },
+                    2, 1000, 500);
 
-            fallbackBtn.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(1000));
-
-            if (fallbackBtn.count() > 0) {
-                log.debug("Button found via fallback selector");
+            if (fallbackBtn != null) {
+                log.info("Button found via fallback selector");
                 return fallbackBtn;
             }
         } catch (Exception e) {
-            log.debug("Fallback button search also failed");
+            log.info("Fallback button search also failed");
         }
 
-        // No button found
         log.warn("Place bet button not found after all attempts");
         return null;
     }
@@ -3030,87 +3082,44 @@ public class MSportWindow implements BettingWindow, Runnable {
         try {
             log.debug("Checking for success modal...");
 
-            // Primary detection: Main success container
-            Locator successModal = page.locator("div.m-betslip-success");
+            Locator successModal = withLocatorRetry(page, "div.m-betslip-success",
+                    loc -> loc.count() > 0 && loc.first().isVisible(
+                            new Locator.IsVisibleOptions().setTimeout(2000)) ? loc : null,
+                    3, 2000, 500);
 
-            if (successModal.count() == 0 || !successModal.first().isVisible(
-                    new Locator.IsVisibleOptions().setTimeout(2000))) {
+            if (successModal == null) {
                 log.debug("Success modal not visible");
                 return false;
             }
 
             log.info("✅ SUCCESS MODAL DETECTED!");
 
-            // Secondary validation: Check for "Bet Successful!" title
-            Locator successTitle = page.locator(
-                    "div.m-betslip-success div.m-title:has-text('Bet Successful!')"
-            );
+            Locator successTitle = withLocatorRetry(page,
+                    "div.m-betslip-success div.m-title:has-text('Bet Successful!')",
+                    loc -> loc.count() > 0 ? loc : null,
+                    2, 2000, 500);
 
-            if (successTitle.count() == 0) {
+            if (successTitle == null) {
                 log.warn("⚠️ Success container found but 'Bet Successful!' title missing");
                 return false;
             }
 
-            // Tertiary validation: Check for green checkmark icon
-            Locator greenCheckmark = page.locator(
-                    "div.m-betslip-success i.inline-svg.tw-text-green"
-            );
-
-            if (greenCheckmark.count() == 0) {
-                log.warn("⚠️ Success title found but green checkmark missing");
-            }
-
-            // Extract and log bet confirmation details
             boolean bookingCodeFound = false;
-
-            // Extract Booking Code (CRITICAL)
             try {
-                Locator bookingCodeSpan = page.locator(
-                        "div.m-info-item:has-text('Booking Code') span.tw-text-black"
-                ).first();
+                String bookingCode = withLocatorRetry(page,
+                        "div.m-info-item:has-text('Booking Code') span.tw-text-black",
+                        loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(1000))
+                                ? loc.first().textContent().trim() : null,
+                        3, 1000, 500);
 
-                if (bookingCodeSpan.isVisible(new Locator.IsVisibleOptions().setTimeout(1000))) {
-                    String bookingCode = bookingCodeSpan.textContent().trim();
+                if (bookingCode != null) {
                     log.info("📋 Booking Code: {}", bookingCode);
                     bookingCodeFound = true;
-                } else {
-                    log.warn("⚠️ Booking code element not visible");
                 }
             } catch (Exception e) {
                 log.warn("⚠️ Could not extract booking code: {}", e.getMessage());
             }
 
-            // Extract Bet Type
-            try {
-                String betType = page.locator(
-                        "div.m-bet-type div.tw-text-black"
-                ).first().textContent().trim();
-                log.info("📊 Bet Type: {}", betType);
-            } catch (Exception e) {
-                log.debug("Could not extract bet type: {}", e.getMessage());
-            }
-
-            // Extract Stake
-            try {
-                String stake = page.locator(
-                        "div.m-stake div.tw-font-bold"
-                ).first().textContent().trim();
-                log.info("💰 Stake: {}", stake);
-            } catch (Exception e) {
-                log.debug("Could not extract stake: {}", e.getMessage());
-            }
-
-            // Extract To Return
-            try {
-                String toReturn = page.locator(
-                        "div.m-to-return div.tw-font-bold"
-                ).first().textContent().trim();
-                log.info("💵 To Return: {}", toReturn);
-            } catch (Exception e) {
-                log.debug("Could not extract to return: {}", e.getMessage());
-            }
-
-            // Validate we have at least the booking code
             if (!bookingCodeFound) {
                 log.error("❌ SUCCESS MODAL DETECTED BUT NO BOOKING CODE → BET MAY HAVE FAILED");
                 return false;
@@ -3132,12 +3141,14 @@ public class MSportWindow implements BettingWindow, Runnable {
         try {
             log.info("Closing success modal...");
 
-            Locator okButton = page.locator(
+            Locator okButton = withLocatorRetry(page,
                     "div.betslip-success--footer button.btn--cancel:has-text('OK'), " +
-                            "div.m-betslip-success button:has-text('OK')"
-            ).first();
+                            "div.m-betslip-success button:has-text('OK')",
+                    loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(2000))
+                            ? loc.first() : null,
+                    2, 2000, 500);
 
-            if (okButton.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
+            if (okButton != null) {
                 jsScrollAndClick(okButton, page);
                 randomHumanDelay(500, 1000);
                 log.info("✅ Success modal closed");
@@ -3411,33 +3422,42 @@ public class MSportWindow implements BettingWindow, Runnable {
      * Find stake input with multiple selector strategies
      */
     private Locator findStakeInput(Page page, int attempt) {
-        // Wait for betslip to be present
         page.waitForSelector("aside.aside-betslip-cashout",
                 new Page.WaitForSelectorOptions().setTimeout(10000));
 
-        // Different strategies based on attempt number
         switch (attempt) {
             case 3:
-                // Strategy 1: Original selector
-                return page.locator("div.m-bet-selection >> div.m-single-input-wrap >> input[placeholder='min. 10']").first();
+                return withLocatorRetry(page,
+                        "div.m-bet-selection >> div.m-single-input-wrap >> input[placeholder='min. 10']",
+                        loc -> loc.first(),
+                        2, 3000, 500);
 
             case 2:
-                // Strategy 2: Alternative selector from HTML structure
-                return page.locator("div.m-bet-selection .bet-input input[placeholder='min. 10']").first();
+                return withLocatorRetry(page,
+                        "div.m-bet-selection .bet-input input[placeholder='min. 10']",
+                        loc -> loc.first(),
+                        2, 3000, 500);
 
-//PRIORITY CASE
             case 1:
-                // Strategy 3: Use the "Singles" section input
-                Locator singlesInput = page.locator("div.m-mutiple-edit .bet-input input").first();
-                if (singlesInput.count() > 0) {
+                Locator singlesInput = withLocatorRetry(page,
+                        "div.m-mutiple-edit .bet-input input",
+                        loc -> loc.count() > 0 ? loc.first() : null,
+                        2, 3000, 500);
+
+                if (singlesInput != null) {
                     log.info("Using Singles section input as fallback");
                     return singlesInput;
                 }
-                // Strategy 4: Last resort - any stake input
-                return page.locator("input[placeholder*='min']").first();
+                return withLocatorRetry(page,
+                        "input[placeholder*='min']",
+                        loc -> loc.first(),
+                        2, 3000, 500);
 
             default:
-                return page.locator("input[placeholder*='min'], input[placeholder*='Min']").first();
+                return withLocatorRetry(page,
+                        "input[placeholder*='min'], input[placeholder*='Min']",
+                        loc -> loc.first(),
+                        2, 3000, 500);
         }
     }
 
@@ -3550,21 +3570,26 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     private void enableAcceptOddsChanges(Page page) {
         try {
-            // Multiple selectors to find the checkbox
-            Locator checkbox = page.locator(
+            Locator checkbox = withLocatorRetry(page,
                     "div.checkbox-square.nochecked, " +
                             "div.checkbox-square-wrap:has-text('Accept odds changes') div.checkbox-square.nochecked, " +
-                            "div:has-text('Accept odds changes') div.checkbox-square.nochecked"
-            ).first();
+                            "div:has-text('Accept odds changes') div.checkbox-square.nochecked",
+                    loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(2000))
+                            ? loc.first() : null,
+                    2, 2000, 500);
 
-            if (checkbox.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
+            if (checkbox != null) {
                 log.info("'Accept odds changes' checkbox is UNCHECKED → Enabling it");
                 jsScrollAndClick(checkbox, page);
                 randomHumanDelay(300, 600);
 
-                // Verify it was checked
-                Locator checkedBox = page.locator("div.checkbox-square:not(.nochecked)").first();
-                if (checkedBox.isVisible(new Locator.IsVisibleOptions().setTimeout(1000))) {
+                Locator checkedBox = withLocatorRetry(page,
+                        "div.checkbox-square:not(.nochecked)",
+                        loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(1000))
+                                ? loc.first() : null,
+                        2, 1000, 300);
+
+                if (checkedBox != null) {
                     log.info("[OK] 'Accept odds changes' ENABLED");
                 }
             } else {
@@ -3574,6 +3599,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             log.debug("Could not enable 'Accept odds changes': {}", e.getMessage());
         }
     }
+
 
     /**
      * Handles odds changes during the betting loop
@@ -3900,14 +3926,12 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     private String extractBetTeams(Page page) {
         try {
-            Locator teamsLocator = page.locator(
+            return withLocatorRetry(page,
                     "div.m-team-info div.m-teams, " +
-                            "div.m-bet-selection div.m-teams"
-            ).first();
-
-            if (teamsLocator.isVisible(new Locator.IsVisibleOptions().setTimeout(1000))) {
-                return teamsLocator.textContent().trim().replaceAll("\\s+", " ");
-            }
+                            "div.m-bet-selection div.m-teams",
+                    loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(1000))
+                            ? loc.first().textContent().trim().replaceAll("\\s+", " ") : null,
+                    2, 1000, 300);
         } catch (Exception e) {
             log.debug("Could not extract teams: {}", e.getMessage());
         }
@@ -4316,29 +4340,36 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     private void hoverOverRandomMatch(Page page) {
         try {
-            // MSport-specific match selectors
             String[] matchSelectors = {
-                    ".m-event",                    // Primary match container
-                    ".m-event.live",              // Live matches specifically
-                    "div[data-v-5c37632f].m-event", // Match with data attribute
-                    ".m-event--main",             // Match main content area
-                    ".m-teams"                    // Teams section
+                    ".m-event",
+                    ".m-event.live",
+                    "div[data-v-5c37632f].m-event",
+                    ".m-event--main",
+                    ".m-teams"
             };
 
             for (String selector : matchSelectors) {
-                Locator matches = page.locator(selector);
+                Locator matches = withLocatorRetry(page, selector,
+                        loc -> loc,
+                        2, 2000, 500);
+
+                if (matches == null) continue;
+
                 int count = matches.count();
 
                 if (count > 0) {
-                    // Pick a random match (prefer first 5 visible ones)
                     int randomIndex = ThreadLocalRandom.current().nextInt(0, Math.min(count, 5));
                     Locator randomMatch = matches.nth(randomIndex);
 
-                    if (randomMatch.isVisible()) {
+                    Boolean isVisible = withLocatorRetry(page, selector,
+                            loc -> loc.nth(randomIndex).isVisible(),
+                            2, 2000, 500);
+
+                    if (isVisible != null && isVisible) {
                         log.info("Hovering over random match (index: {})", randomIndex);
                         randomMatch.hover();
                         Thread.sleep(ThreadLocalRandom.current().nextInt(800, 1500));
-                        return; // Success, exit
+                        return;
                     }
                 }
             }
@@ -4471,43 +4502,69 @@ public class MSportWindow implements BettingWindow, Runnable {
 
     private boolean closeWinningPopup(Page page) {
         try {
-            // Direct selector for the winning popup
-            Locator winningPopup = page.locator(".pop-winning");
+            Locator winningPopup = withLocatorRetry(page, ".pop-winning",
+                    loc -> loc.count() > 0 && loc.first().isVisible() ? loc : null,
+                    2, 2000, 500);
 
-            if (winningPopup.count() > 0 && winningPopup.first().isVisible()) {
-                log.info("Winning popup detected! Closing it...");
+            if (winningPopup == null) {
+                return false;
+            }
 
-                // Method 1: Click the visible close div (this works 99.9% of the time)
-                Locator closeBtn = winningPopup.locator(".close");
-                if (closeBtn.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
-                    closeBtn.click(new Locator.ClickOptions()
-                            .setForce(true)
-                            .setTimeout(5000));
-                    log.info("Winning popup closed via .close div");
-                    page.waitForTimeout(800); // let animation finish
-                    return true;
-                }
+            log.info("Winning popup detected! Closing it...");
 
-                // Method 2: Fallback — click the SVG directly
-                Locator svgClose = winningPopup.locator("svg.icon-png-x, use[xlink\\:href='#icon-png-x']");
-                if (svgClose.isVisible()) {
-                    svgClose.click(new Locator.ClickOptions().setForce(true));
-                    log.info("Winning popup closed via SVG");
-                    page.waitForTimeout(800);
-                    return true;
-                }
+            Locator closeBtn = withLocatorRetry(page, ".pop-winning .close",
+                    loc -> loc.isVisible(new Locator.IsVisibleOptions().setTimeout(3000)) ? loc : null,
+                    2, 3000, 500);
 
-                // Method 3: Nuclear option — remove the entire popup from DOM
-                winningPopup.evaluate("el => el.remove()");
-                log.info("Winning popup FORCE REMOVED from DOM");
+            if (closeBtn != null) {
+                withLocatorRetry(page, ".pop-winning .close",
+                        loc -> {
+                            loc.click(new Locator.ClickOptions()
+                                    .setForce(true)
+                                    .setTimeout(5000));
+                            return true;
+                        },
+                        2, 5000, 500);
+                log.info("Winning popup closed via .close div");
+                page.waitForTimeout(800);
                 return true;
             }
 
-            return false;
+            Locator svgClose = withLocatorRetry(page,
+                    ".pop-winning svg.icon-png-x, .pop-winning use[xlink\\:href='#icon-png-x']",
+                    loc -> loc.isVisible() ? loc : null,
+                    2, 2000, 500);
+
+            if (svgClose != null) {
+                svgClose.click(new Locator.ClickOptions().setForce(true));
+                log.info("Winning popup closed via SVG");
+                page.waitForTimeout(800);
+                return true;
+            }
+
+            winningPopup.evaluate("el => el.remove()");
+            log.info("Winning popup FORCE REMOVED from DOM");
+            return true;
+
         } catch (Exception e) {
             log.warn("Failed to close winning popup: {}", e.getMessage());
             return false;
         }
+    }
+
+    private <T> T withLocatorRetry(Page page, String selector, java.util.function.Function<Locator, T> action,
+                                   int maxRetries, long timeoutPerAttemptMs, long delayMs) {
+        Locator locator = page.locator(selector);
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return action.apply(locator);  // e.g., locator::click, locator::textContent, etc.
+            } catch (TimeoutError te) {
+                log.warn("Timeout attempt {} on '{}'", attempt, selector);
+                if (attempt == maxRetries) throw te;
+                page.waitForTimeout(delayMs);
+            }
+        }
+        return null;  // Never reached
     }
 
 

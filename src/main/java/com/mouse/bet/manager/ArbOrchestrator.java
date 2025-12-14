@@ -42,7 +42,7 @@ public class ArbOrchestrator {
     private volatile Set<BookMaker> registeredWorkers = Set.of();
 
     private final ArbService arbService;
-    private final ArbPollingService arbPollingService;
+
 
     @Value("${sporty.poll.interval.ms:2000}")
     private long pollIntervalMs;
@@ -127,39 +127,18 @@ public class ArbOrchestrator {
 
         while (running.get()) {
             try {
-                // Try to take an Arb from the single-slot queue
+                // Poll with timeout — returns null if nothing in queue within 150ms
                 log.trace("Polling arb queue | QueueSize: {}", arbQueue.size());
-                Arb arb = arbQueue.poll(150, TimeUnit.MILLISECONDS);
+                Arb arb = arbQueue.peek();
 
+                // === NULL CHECK: Skip if no arb available (normal during idle) ===
                 if (arb == null) {
-                    log.debug("Arb queue empty, fetching next candidate from polling service");
-
-                    // Only fetch when queue is empty → prevents flooding
-                    arbPollingService.fetchNextArbCandidate()
-                            .ifPresent(candidate -> {
-                                log.info("Fetched new arb candidate | ArbId: {} | Status: {} | Profit: {} | LegsCount: {}",
-                                        candidate.getArbId(),
-                                        candidate.getStatus(),
-                                        candidate.getProfitPercentage(),
-                                        candidate.getLegs().size());
-
-                                if (tryLoadArb(candidate)) {
-                                    log.info("Successfully loaded fetched arb into orchestrator | ArbId: {}",
-                                            candidate.getArbId());
-                                } else {
-                                    log.warn("Failed to load fetched arb (queue full) | ArbId: {}",
-                                            candidate.getArbId());
-                                }
-                            });
-
-                    arb = arbQueue.poll(200, TimeUnit.MILLISECONDS);
-                    if (arb == null) {
-                        log.trace("No arb available after polling, sleeping for {}ms", pollIntervalMs);
-                        Thread.sleep(pollIntervalMs);
-                        continue;
-                    }
+                    // Optional: small sleep to reduce CPU usage during idle periods
+                    // page.waitForTimeout(100); // if you have a page, or Thread.sleep(100);
+                    continue;  // Go back to while loop — wait for next arb
                 }
 
+                // === ARB FOUND → PROCESS IT ===
                 log.info("=== Processing Arb | ArbId: {} | Status: {} | LegsCount: {} ===",
                         arb.getArbId(), arb.getStatus(), arb.getLegs().size());
 
@@ -167,21 +146,26 @@ public class ArbOrchestrator {
 
                 log.info("=== Completed Processing Arb | ArbId: {} | FinalStatus: {} ===",
                         arb.getArbId(), arb.getStatus());
+                log.info("Trying to clear arb queue");
+
+                arbQueue.clear();
 
             } catch (InterruptedException ie) {
                 log.warn("ArbOrchestrator loop interrupted", ie);
                 Thread.currentThread().interrupt();
                 break;
+
             } catch (Exception ex) {
-                log.error("Orchestrator loop error | ErrorType: {} | Message: {}",
+                log.error("Unexpected error in orchestrator loop | Type: {} | Message: {}",
                         ex.getClass().getSimpleName(), ex.getMessage(), ex);
+                // Continue loop — don't let one bad arb kill the whole orchestrator
             }
         }
 
         log.info("ArbOrchestrator loop stopped | FinalQueueSize: {}", arbQueue.size());
     }
 
-    private void processOneArb(Arb arb) throws InterruptedException {
+    public void processOneArb(Arb arb) throws InterruptedException {
         log.info("Starting arb processing | ArbId: {} | CurrentStatus: {}",
                 arb.getArbId(), arb.getStatus());
 

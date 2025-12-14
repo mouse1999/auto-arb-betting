@@ -441,83 +441,83 @@ public class ArbService {
     /**
      * Fetch top arbs by metrics (with continuity validation)
      */
-    public List<Arb> fetchTopArbsByMetrics(BigDecimal minProfit, int limit) {
-        log.info("{} {} Fetching top arbs | minProfit={}%, limit={}",
-                EMOJI_SEARCH, EMOJI_TROPHY, minProfit, limit);
-
-        Instant now = Instant.now();
-        Instant freshCutoff = now.minusSeconds(3); // Only very fresh arbs (updated in last 5s)
-
-        Page<Arb> page = arbRepository.findLiveArbsForBetting(
-                now,
-                minProfit,
-                freshCutoff,
-                PageRequest.of(0,
-                        Math.max(limit * 5, 100), // safety margin for scoring
-                        Sort.by(
-                                Sort.Order.desc("profitPercentage"),
-                                Sort.Order.desc("lastUpdatedAt")
-                        ))
-        );
-
-        List<Arb> candidates = page.getContent();
-        long totalMatching = page.getTotalElements();
-
-        log.info("{} Found {} candidates (total in DB: {})",
-                EMOJI_CHART, candidates.size(), totalMatching);
-
-        if (candidates.isEmpty()) {
-            log.warn("{} No fresh live arbs found (updated within last 5s)", EMOJI_WARNING);
-            return Collections.emptyList();
-        }
-
-        // Final business filters: shouldBet + reliable session duration
-        List<Arb> topArbs = candidates.stream()
-                .filter(arb -> {
-                    if (!arb.isShouldBet()) {
-                        log.debug("{} Skipped {} | shouldBet=false", EMOJI_WARNING, arb.getArbId());
-                        return false;
-                    }
-                    return true;
-                })
+//    public List<Arb> fetchTopArbsByMetrics(BigDecimal minProfit, int limit) {
+//        log.info("{} {} Fetching top arbs | minProfit={}%, limit={}",
+//                EMOJI_SEARCH, EMOJI_TROPHY, minProfit, limit);
+//
+//        Instant now = Instant.now();
+//        Instant freshCutoff = now.minusSeconds(3); // Only very fresh arbs (updated in last 5s)
+//
+//        Page<Arb> page = arbRepository.findLiveArbsForBetting(
+//                now,
+//                minProfit,
+//                freshCutoff,
+//                PageRequest.of(0,
+//                        Math.max(limit * 5, 100), // safety margin for scoring
+//                        Sort.by(
+//                                Sort.Order.desc("profitPercentage"),
+//                                Sort.Order.desc("lastUpdatedAt")
+//                        ))
+//        );
+//
+//        List<Arb> candidates = page.getContent();
+//        long totalMatching = page.getTotalElements();
+//
+//        log.info("{} Found {} candidates (total in DB: {})",
+//                EMOJI_CHART, candidates.size(), totalMatching);
+//
+//        if (candidates.isEmpty()) {
+//            log.warn("{} No fresh live arbs found (updated within last 5s)", EMOJI_WARNING);
+//            return Collections.emptyList();
+//        }
+//
+//        // Final business filters: shouldBet + reliable session duration
+//        List<Arb> topArbs = candidates.stream()
 //                .filter(arb -> {
-//                    long sessionSeconds = arb.getCurrentSessionDurationSeconds();
-//                    if (sessionSeconds < minReliableSessionSeconds) {
-//                        log.info("{} Skipped {} | session={}s (need >= {}s)",
-//                                EMOJI_WARNING, arb.getArbId(), sessionSeconds, minReliableSessionSeconds);
+//                    if (!arb.isShouldBet()) {
+//                        log.debug("{} Skipped {} | shouldBet=false", EMOJI_WARNING, arb.getArbId());
 //                        return false;
 //                    }
 //                    return true;
 //                })
-                .sorted(Comparator.comparingDouble(this::calculateScore).reversed())
-//                .filter(item -> {
-//                    Duration diff = Duration.between(item.getLastUpdatedAt(), item.getLastSeenAt());
-//                    return diff.getSeconds() > 5;
-//                })
-                .limit(limit)
-                .toList();
-
-        log.info("{} {} Selected {} top arbs (from {} candidates)",
-                EMOJI_SUCCESS, EMOJI_FIRE, topArbs.size(), candidates.size());
-
-        if (!topArbs.isEmpty()) {
-            Arb best = topArbs.get(0);
-            double score = calculateScore(best);
-
-            log.info("{} {} BEST ARB | ID={} | Profit={} | Score={} | Session={}s | Breaks={} | Sport={}",
-                    EMOJI_TROPHY, EMOJI_FIRE,
-                    best.getArbId(),
-                    best.getProfitPercentage(),
-                    score,
-                    best.getCurrentSessionDurationSeconds(),
-                    best.getContinuityBreakCount(),
-                    best.getSportEnum());
-        } else {
-            log.info("{} No arbs passed final filters (shouldBet + reliable session)", EMOJI_WARNING);
-        }
-
-        return topArbs;
-    }
+////                .filter(arb -> {
+////                    long sessionSeconds = arb.getCurrentSessionDurationSeconds();
+////                    if (sessionSeconds < minReliableSessionSeconds) {
+////                        log.info("{} Skipped {} | session={}s (need >= {}s)",
+////                                EMOJI_WARNING, arb.getArbId(), sessionSeconds, minReliableSessionSeconds);
+////                        return false;
+////                    }
+////                    return true;
+////                })
+//                .sorted(Comparator.comparingDouble(this::calculateScore).reversed())
+////                .filter(item -> {
+////                    Duration diff = Duration.between(item.getLastUpdatedAt(), item.getLastSeenAt());
+////                    return diff.getSeconds() > 5;
+////                })
+//                .limit(limit)
+//                .toList();
+//
+//        log.info("{} {} Selected {} top arbs (from {} candidates)",
+//                EMOJI_SUCCESS, EMOJI_FIRE, topArbs.size(), candidates.size());
+//
+//        if (!topArbs.isEmpty()) {
+//            Arb best = topArbs.get(0);
+//            double score = calculateScore(best);
+//
+//            log.info("{} {} BEST ARB | ID={} | Profit={} | Score={} | Session={}s | Breaks={} | Sport={}",
+//                    EMOJI_TROPHY, EMOJI_FIRE,
+//                    best.getArbId(),
+//                    best.getProfitPercentage(),
+//                    score,
+//                    best.getCurrentSessionDurationSeconds(),
+//                    best.getContinuityBreakCount(),
+//                    best.getSportEnum());
+//        } else {
+//            log.info("{} No arbs passed final filters (shouldBet + reliable session)", EMOJI_WARNING);
+//        }
+//
+//        return topArbs;
+//    }
 
 
 

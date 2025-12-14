@@ -2,9 +2,16 @@ package com.mouse.bet.utils;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.ScreenshotType;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import com.mouse.bet.enums.BookMaker;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -12,6 +19,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class MSportMarketSearchUtils {
+    private static final BookMaker BOOK_MAKER = BookMaker.M_SPORT;
 
     public static Locator findAndExpandMarket(Page page, String targetMarket) {
         String method = "findAndExpandMarket(\"" + targetMarket + "\")";
@@ -23,27 +31,30 @@ public class MSportMarketSearchUtils {
                     .setState(WaitForSelectorState.VISIBLE)
                     .setTimeout(12_000));
 
+            // Take screenshot of market content
+            takeMarketScreenshot(page, "market-content-before-search");
+
             // Get all market titles + visibility + index
             var markets = page.evaluate("""
-            () => {
-                const items = document.querySelectorAll('.m-market-item');
-                const result = [];
-                items.forEach((item, index) => {
-                    const span = item.querySelector('.m-market-item--name span');
-                    if (span) {
-                        const title = span.textContent.trim();
-                        if (title) {
-                            result.push({
-                                title: title,
-                                index: index,
-                                visible: item.offsetParent !== null && getComputedStyle(item).display !== 'none'
-                            });
-                        }
+        () => {
+            const items = document.querySelectorAll('.m-market-item');
+            const result = [];
+            items.forEach((item, index) => {
+                const span = item.querySelector('.m-market-item--name span');
+                if (span) {
+                    const title = span.textContent.trim();
+                    if (title) {
+                        result.push({
+                            title: title,
+                            index: index,
+                            visible: item.offsetParent !== null && getComputedStyle(item).display !== 'none'
+                        });
                     }
-                });
-                return result;
-            }
-            """);
+                }
+            });
+            return result;
+        }
+        """);
 
             // Log all markets (as before)
             String allMarkets = markets.toString()
@@ -95,35 +106,38 @@ public class MSportMarketSearchUtils {
             if (matchedTitle == null) {
                 log.error("Market containing '{}' NOT FOUND in available markets", targetMarket);
 
+                // Take screenshot when market not found
+                takeMarketScreenshot(page, "market-not-found-" + targetMarket.replaceAll("[^a-zA-Z0-9-]", "_"));
+
                 // === NEW: Log all available betting options inside visible markets ===
                 log.warn("Dumping all visible betting options for debugging...");
 
                 var allOptions = page.evaluate("""
-                () => {
-                    const options = [];
-                    document.querySelectorAll('.m-market-item').forEach(item => {
-                        const marketTitleSpan = item.querySelector('.m-market-item--name span');
-                        const marketTitle = marketTitleSpan ? marketTitleSpan.textContent.trim() : 'UNKNOWN MARKET';
-                        
-                        const isVisible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
-                        if (!isVisible) return;
+            () => {
+                const options = [];
+                document.querySelectorAll('.m-market-item').forEach(item => {
+                    const marketTitleSpan = item.querySelector('.m-market-item--name span');
+                    const marketTitle = marketTitleSpan ? marketTitleSpan.textContent.trim() : 'UNKNOWN MARKET';
+                    
+                    const isVisible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
+                    if (!isVisible) return;
 
-                        const optionElements = item.querySelectorAll('.m-outcome-item .m-outcome-item--name');
-                        if (optionElements.length > 0) {
-                            const optionTexts = Array.from(optionElements)
-                                .map(el => el.textContent.trim())
-                                .filter(text => text);
-                            if (optionTexts.length > 0) {
-                                options.push({
-                                    market: marketTitle,
-                                    selections: optionTexts
-                                });
-                            }
+                    const optionElements = item.querySelectorAll('.m-outcome-item .m-outcome-item--name');
+                    if (optionElements.length > 0) {
+                        const optionTexts = Array.from(optionElements)
+                            .map(el => el.textContent.trim())
+                            .filter(text => text);
+                        if (optionTexts.length > 0) {
+                            options.push({
+                                market: marketTitle,
+                                selections: optionTexts
+                            });
                         }
-                    });
-                    return options;
-                }
-                """);
+                    }
+                });
+                return options;
+            }
+            """);
 
                 if (((List<?>) allOptions).isEmpty()) {
                     log.warn("No betting options found in any visible market (page may still be loading or empty)");
@@ -165,6 +179,8 @@ public class MSportMarketSearchUtils {
                 page.waitForTimeout(300);
                 if (marketBlock.locator(".ms-icon-trangle.expanded").count() > 0) {
                     log.info("✅ Market '{}' expanded successfully", matchedTitle);
+                    // Take screenshot after successful expansion
+                    takeMarketScreenshot(page, "market-expanded-" + matchedTitle.replaceAll("[^a-zA-Z0-9-]", "_"));
                 } else {
                     log.warn("⚠️ Market '{}' may not have expanded", matchedTitle);
                 }
@@ -176,7 +192,40 @@ public class MSportMarketSearchUtils {
 
         } catch (Exception e) {
             log.error("Exception in {}: {}", method, e.getMessage(), e);
+            // Take screenshot on exception
+            takeMarketScreenshot(page, "market-error-exception");
             return null;
+        }
+    }
+
+    /**
+     * Takes a screenshot of the market list area
+     */
+    private static void takeMarketScreenshot(Page page, String filenameSuffix) {
+        try {
+            Path screenshotDir = Paths.get("screenshots", "markets");
+            Files.createDirectories(screenshotDir);
+
+            String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS").format(new Date());
+
+            String filename = String.format("%s-%s-%s.png", timestamp, BOOK_MAKER, filenameSuffix);
+            Path screenshotPath = screenshotDir.resolve(filename);
+
+            Locator marketList = page.locator(".m-market-list");
+            if (marketList.count() > 0) {
+                marketList.screenshot(new Locator.ScreenshotOptions()
+                        .setPath(screenshotPath)
+                        .setType(ScreenshotType.PNG));
+                log.info("📸 Market screenshot saved: {}", screenshotPath);
+            } else {
+                page.screenshot(new Page.ScreenshotOptions()
+                        .setPath(screenshotPath)
+                        .setFullPage(true)
+                        .setType(ScreenshotType.PNG));
+                log.info("📸 Full page screenshot saved: {}", screenshotPath);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to take screenshot: {}", e.getMessage());
         }
     }
 
@@ -188,7 +237,9 @@ public class MSportMarketSearchUtils {
         // Over/Under markets
         if (marketLower.contains("over/under") ||
                 marketLower.contains("o/u") ||
+                marketLower.contains("points o/u") ||
                 marketLower.contains("total") ||
+                marketLower.contains("total points") ||
                 outcomeLower.startsWith("over ") ||
                 outcomeLower.startsWith("under ")) {
             return MarketType.OVER_UNDER;
