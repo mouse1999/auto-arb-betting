@@ -305,6 +305,26 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             Phaser phaser = task.getBarrier();
             phaser.arriveAndAwaitAdvance();
+
+            //THIS IS FOR TEST
+
+            arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
+                // Skip bookmakers that don't match the current window
+                if (bookmaker.equals(BOOK_MAKER)) {
+                    log.debug("⏭️ Skipping {} queue (current window: {})", bookmaker, BOOK_MAKER);
+                    return;
+                }
+
+//                int clearedCount = queue.size();
+                LegTask legTask = queue.poll();
+
+                if (legTask != null) {
+                    Phaser phaserTest = legTask.getBarrier();
+                    phaserTest.arriveAndAwaitAdvance();
+                }
+
+            });
+
         }
     }
 
@@ -2247,8 +2267,22 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             Locator outcomeCell = marketBlock.locator("xpath=" + cellXPath).first();
 
+            try {
+                outcomeCell.waitFor(new Locator.WaitForOptions()
+                        .setTimeout(1500) // Wait up to 1.5 seconds
+                        .setState(WaitForSelectorState.VISIBLE));
 
-            // ✅ Final check - if still not found, fail
+                log.debug("Outcome cell found and visible: '{}'", outcome);
+            } catch (TimeoutError e) {
+                log.error("Outcome cell not found within timeout: '{}'", outcome);
+
+            } catch (Exception e) {
+                log.error("Error waiting for outcome cell: {}", e.getMessage());
+            }
+
+
+
+                // ✅ Final check - if still not found, fail
             if (outcomeCell.count() == 0) {
                 log.error("❌ Outcome '{}' not found in market '{}' (even after fuzzy match)", outcome, market);
                 log.error("Available outcomes were: {}", availableOutcomes);
@@ -2494,18 +2528,13 @@ public class SportyWindow implements BettingWindow, Runnable {
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")));
 
         try {
+            // ── 1. ENTER STAKE ─────────────────────────────────────
             log.info("[1/6] Entering stake...");
-            Locator stakeInput = withLocatorRetry(
-                    page, "#j_stake_0 input.m-input, .m-input[placeholder*='min']",
-                    loc -> loc.first(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
-
-            if (stakeInput == null || stakeInput.count() == 0) {
+            Locator stakeInput = page.locator("#j_stake_0 input.m-input, .m-input[placeholder*='min']").first();
+            if (stakeInput.count() == 0) {
                 log.error("Stake input missing");
                 return false;
             }
-
             jsScrollAndFocus(stakeInput, page);
             stakeInput.fill("");
             randomHumanDelay(150, 400);
@@ -2514,6 +2543,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             randomHumanDelay(200, 500);
             log.info("[OK] Stake entered");
 
+            // ── 2. WAIT FOR BET IN SLIP ─────────────────────────────────
             if (page.locator("div.m-item, .m-bet-item").count() == 0) {
                 page.waitForTimeout(3000);
                 if (page.locator("div.m-item").count() == 0) {
@@ -2523,6 +2553,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             }
             log.info("[OK] Bet in slip");
 
+            // ── 3. UNKILLABLE LOOP + FULL POPUP HANDLING ─────────────────────
             log.info("[3/6] Starting UNKILLABLE placement loop...");
 
             boolean betConfirmed = false;
@@ -2533,25 +2564,17 @@ public class SportyWindow implements BettingWindow, Runnable {
                 cycle++;
                 log.info("[Cycle {}/{}] Checking state...", cycle, MAX_CYCLES);
 
-                Locator finalConfirm = withLocatorRetry(
-                        page, "button:has-text('Confirm'), button:has-text('Yes'), button:has-text('OK')",
-                        loc -> loc.filter(new Locator.FilterOptions().setHas(page.locator(">> visible=true"))).first(),
-                        2, 5000, 800
-                );
-
-                if (finalConfirm != null && finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
+                // ── A. FINAL CONFIRM POPUP ──
+                Locator finalConfirm = page.locator("button:has-text('Confirm'), button:has-text('Yes'), button:has-text('OK') >> visible=true").first();
+                if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
                     log.warn("FINAL CONFIRM POPUP → Clicking 'Confirm'");
                     jsScrollAndClick(finalConfirm, page);
                     randomHumanDelay(1000, 1800);
                 }
 
-                Locator btn = withLocatorRetry(
-                        page, "button.af-button--primary >> visible=true",
-                        loc -> loc.first(),
-                        2, 5000, 500
-                );
-
-                if (btn == null || btn.count() == 0) {
+                // ── B. MAIN BUTTON LOGIC ──
+                Locator btn = page.locator("button.af-button--primary >> visible=true").first();
+                if (btn.count() == 0) {
                     log.info("Primary button gone → likely success");
                     betConfirmed = true;
                     break;
@@ -2560,6 +2583,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 String text = btn.innerText().trim();
                 log.info("Main button: \"{}\" | Disabled: {}", text, btn.isDisabled());
 
+                // 1. Accept Changes
                 if (text.matches(".*(Accept Changes|Accept|Confirm Changes).*")) {
                     log.warn("→ Clicking 'Accept Changes' (cycle {})", cycle);
                     jsScrollAndClick(btn, page);
@@ -2567,18 +2591,15 @@ public class SportyWindow implements BettingWindow, Runnable {
                     continue;
                 }
 
+                // 2. Place Bet + ENABLED → click
                 if (text.matches(".*(Place Bet|Bet Now|Confirm Bet|Place bet).*") && !btn.isDisabled()) {
                     log.info("→ Clicking 'Place Bet' (cycle {})", cycle);
                     jsScrollAndClick(btn, page);
                     randomHumanDelay(1000, 2000);
 
-                    Locator oddsRejected = withLocatorRetry(
-                            page, "div.m-dialog-wrapper p:has-text('Odds not acceptable')",
-                            loc -> loc.first(),
-                            2, 3000, 500
-                    );
-
-                    if (oddsRejected != null && oddsRejected.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
+                    // CHECK "ODDS NOT ACCEPTABLE" RIGHT AFTER CLICK
+                    Locator oddsRejected = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
+                    if (oddsRejected.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
                         log.warn("ODDS NOT ACCEPTABLE POPUP → Closing and retrying...");
                         Locator closeBtn = page.locator("div.m-dialog-wrapper button:has-text('OK'), img.close-icon[data-action='close']").first();
                         jsScrollAndClick(closeBtn, page);
@@ -2588,12 +2609,14 @@ public class SportyWindow implements BettingWindow, Runnable {
                     continue;
                 }
 
+                // 3. Place Bet disabled → wait
                 if (text.contains("Place Bet") && btn.isDisabled()) {
                     log.info("Place Bet disabled → waiting...");
                     randomHumanDelay(1000, 1500);
                     continue;
                 }
 
+                // ── 4. 100% RELIABLE SUCCESS DETECTION (MULTI-LAYER) ──
                 boolean successDetected = page.locator("div.m-dialog-wrapper.m-dialog-suc").count() > 0 ||
                         page.locator("text='Submission Successful'").count() > 0 ||
                         page.locator("i.m-icon-suc").count() > 0 ||
@@ -2602,6 +2625,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 if (successDetected) {
                     log.info("SUCCESS CONFIRMED — OFFICIAL 'Submission Successful' MODAL DETECTED!");
 
+                    // Extract booking code
                     try {
                         String code = page.locator("div.booking-code").textContent().trim();
                         log.info("BOOKING CODE: {}", code.isEmpty() ? "Hidden" : code);
@@ -2620,15 +2644,16 @@ public class SportyWindow implements BettingWindow, Runnable {
             }
             log.info("[OK] Bet placed after {} cycle(s)", cycle);
 
+            // ── 5. FINAL SUCCESS VERIFICATION (HARD CONFIRMATION) ─────────────
             boolean finalSuccess = false;
             try {
                 page.waitForFunction("""
-            () => {
-                return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
-                       document.querySelector('span[data-cms-key="submission_successful"]') ||
-                       document.querySelector('div.booking-code');
-            }
-            """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
+                () => {
+                    return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
+                           document.querySelector('span[data-cms-key="submission_successful"]') ||
+                           document.querySelector('div.booking-code');
+                }
+                """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
 
                 log.info("FINAL SUCCESS VERIFIED — Official modal confirmed");
 
@@ -2644,6 +2669,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 return false;
             }
 
+            // ── 6. CLOSE SUCCESS MODAL CLEANLY ─────────────────────────────
             try {
                 Locator closeSuccess = page.locator("div.m-dialog-suc button:has-text('OK'), " +
                         "div.m-dialog-suc i.m-icon-close, " +
@@ -2700,13 +2726,17 @@ public class SportyWindow implements BettingWindow, Runnable {
      */
     private void waitForBetConfirmation(Page page) {
         try {
-            Locator confirmation = page.locator(
-                    "xpath=//div[contains(text(), 'Bet placed') or contains(text(), 'Success')]"
-            );
-            confirmation.waitFor(new Locator.WaitForOptions().setTimeout(5000));
-            log.info("{} {} Bet confirmed", EMOJI_SUCCESS, EMOJI_BET);
+            Locator successDialog = page.locator("div.m-dialog-wrapper.m-dialog-suc").first();
+            successDialog.waitFor(new Locator.WaitForOptions()
+                    .setTimeout(5000)
+                    .setState(WaitForSelectorState.VISIBLE));
+
+            log.info("{} {} Bet confirmed - Success dialog detected", EMOJI_SUCCESS, EMOJI_BET);
+
+        } catch (TimeoutError e) {
+            log.warn("{} {} Confirmation dialog not detected within timeout", EMOJI_WARNING, EMOJI_BET);
         } catch (Exception e) {
-            log.warn("{} {} Confirmation not detected: {}", EMOJI_WARNING, EMOJI_BET, e.getMessage());
+            log.warn("{} {} Confirmation detection error: {}", EMOJI_WARNING, EMOJI_BET, e.getMessage());
         }
     }
 
@@ -2721,44 +2751,28 @@ public class SportyWindow implements BettingWindow, Runnable {
      */
     private boolean replayOddandBet(Page page, BetLeg leg) {
         BigDecimal expectedOdds = leg.getOdds();
-        String outcome = leg.getProviderMarketName();
-        String market = leg.getProviderMarketTitle();
+        String outcome = leg.getProviderMarketName();   // e.g. "Away"
+        String market = leg.getProviderMarketTitle();   // e.g. "Winner"
 
         try {
             log.info("🔍 Extracting odds from betslip for verification...");
 
-            Locator betslip = withLocatorRetry(
-                    page, "#j_betslip .m-betslips",
-                    loc -> {
-                        loc.waitFor(new Locator.WaitForOptions()
-                                .setState(WaitForSelectorState.VISIBLE)
-                                .setTimeout(8000));
-                        return loc;
-                    },
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            // Wait for betslip container to be visible
+            Locator betslip = page.locator("#j_betslip .m-betslips");
+            betslip.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(8000));
 
-            if (betslip == null) return false;
+            // Wait specifically for the bet item to appear
+            Locator betItem = betslip.locator(".m-list .m-item").first();
+            betItem.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(3000));
 
-            Locator betItem = withLocatorRetry(
-                    page, "#j_betslip .m-betslips .m-list .m-item",
-                    loc -> {
-                        loc.first().waitFor(new Locator.WaitForOptions()
-                                .setState(WaitForSelectorState.VISIBLE)
-                                .setTimeout(3000));
-                        return loc.first();
-                    },
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            // ── 1. EXTRACT ODDS FROM BETSLIP ──────────────────────────────────────
+            String displayedOddsText = betItem.locator(".m-item-odds .m-text-main").textContent().trim();
 
-            if (betItem == null) return false;
-
-            String displayedOddsText = withLocatorRetry(
-                    page, ".m-item-odds .m-text-main",
-                    loc -> betItem.locator(loc).textContent().trim(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
-
+            // Parse the odds string to BigDecimal
             BigDecimal currentOdds;
             try {
                 currentOdds = new BigDecimal(displayedOddsText);
@@ -2769,12 +2783,17 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             log.info("📊 Expected Odds: {} | Current Betslip Odds: {}", expectedOdds, currentOdds);
 
+            // ── 2. CALCULATE 2% TOLERANCE THRESHOLD ───────────────────────────────
+            // Acceptable if: currentOdds >= expectedOdds * 0.98 (2% lower tolerance)
             BigDecimal lowerThreshold = expectedOdds.multiply(new BigDecimal("0.98"));
+
             log.info("📉 Lower Threshold (2% tolerance): {}", lowerThreshold.setScale(2, RoundingMode.HALF_UP));
 
+            // ── 3. COMPARE ODDS ────────────────────────────────────────────────────
             int comparison = currentOdds.compareTo(lowerThreshold);
 
             if (comparison >= 0) {
+                // Current odds are equal, higher, or within 2% lower
                 String status;
                 if (currentOdds.compareTo(expectedOdds) > 0) {
                     status = "HIGHER ✅";
@@ -2789,6 +2808,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 log.info("✅ ODDS ACCEPTABLE: {} → Proceeding to place bet", status);
 
+                // ── 4. EXTRACT ADDITIONAL INFO FOR LOGGING ────────────────────────
                 String displayedOutcome = betItem.locator(".m-item-play span").first().textContent().trim();
                 String displayedMarket = betItem.locator(".m-item-market").textContent().trim();
                 String displayedTeam = betItem.locator(".m-item-team").textContent().trim();
@@ -2797,9 +2817,12 @@ public class SportyWindow implements BettingWindow, Runnable {
                 log.info("🎯 Bet Details: {} | Market: {} | Odds: {} | Match: {} | Live: {}",
                         displayedOutcome, displayedMarket, currentOdds, displayedTeam, isLive);
 
+                // ── 5. PLACE THE BET ───────────────────────────────────────────────
+                // Create a temporary Arb object if needed (or modify signature to not need it)
                 return placeBet(page, null, leg);
 
             } else {
+                // Current odds are more than 2% lower than expected
                 BigDecimal percentageDrop = expectedOdds.subtract(currentOdds)
                         .divide(expectedOdds, 4, RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100"));
@@ -2807,6 +2830,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 log.warn("⚠️ ODDS TOO LOW: Current {} vs Expected {} (%.2f%% drop) → SKIPPING BET",
                         currentOdds, expectedOdds, percentageDrop);
 
+                // Remove from betslip
                 safeRemoveFromSlip(page);
                 return false;
             }
@@ -2823,6 +2847,11 @@ public class SportyWindow implements BettingWindow, Runnable {
             return false;
         }
     }
+
+    /**
+     * Extract bet ID from confirmation
+     */
+
 
 
     /**
@@ -3607,10 +3636,11 @@ public class SportyWindow implements BettingWindow, Runnable {
                 return action.apply(locator);  // e.g., locator::click, locator::textContent, etc.
             } catch (TimeoutError te) {
                 log.warn("Timeout attempt {} on '{}'", attempt, selector);
-                if (attempt == maxRetries) throw te;
-                page.waitForTimeout(delayMs);
+//                if (attempt == maxRetries) throw te;
+//                page.waitForTimeout(delayMs);
             }
         }
+        log.info("returning null for selector {}", selector);
         return null;  // Never reached
     }
 
