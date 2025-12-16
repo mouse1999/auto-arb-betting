@@ -26,6 +26,38 @@ public class MSportMarketSearchUtils {
         log.info("Entering {} – searching for market...", method);
 
         try {
+            // === NEW: Check if target market contains "game" and switch tab ===
+            String targetLower = targetMarket.toLowerCase();
+            if (targetLower.contains("game")) {
+                log.info("Target market '{}' contains 'game' - checking for Game tab...", targetMarket);
+
+                try {
+                    // Find and click the "Game" tab if not already active
+                    Locator gameTab = page.locator("ul.snap-nav li.m-sub-nav-item")
+                            .locator("span.m-group", new Locator.LocatorOptions().setHasText("Game"))
+                            .locator("..");
+
+                    if (gameTab.count() > 0) {
+                        // Check if already active
+                        String classes = gameTab.getAttribute("class");
+                        if (classes != null && !classes.contains("active")) {
+                            log.info("Clicking 'Game' tab to switch market view...");
+                            gameTab.click();
+                            randomHumanDelay(500, 800);
+                            page.waitForTimeout(1000); // Wait for market content to reload
+                            log.info("✅ Switched to 'Game' tab successfully");
+                        } else {
+                            log.info("'Game' tab is already active");
+                        }
+                    } else {
+                        log.warn("'Game' tab not found in navigation, continuing with current view...");
+                    }
+                } catch (Exception tabEx) {
+                    log.warn("Failed to switch to Game tab: {} - continuing with current view", tabEx.getMessage());
+                }
+            }
+            // === End of new tab switching logic ===
+
             // Wait for market list
             page.locator(".m-market-list").waitFor(new Locator.WaitForOptions()
                     .setState(WaitForSelectorState.VISIBLE)
@@ -36,25 +68,25 @@ public class MSportMarketSearchUtils {
 
             // Get all market titles + visibility + index
             var markets = page.evaluate("""
-        () => {
-            const items = document.querySelectorAll('.m-market-item');
-            const result = [];
-            items.forEach((item, index) => {
-                const span = item.querySelector('.m-market-item--name span');
-                if (span) {
-                    const title = span.textContent.trim();
-                    if (title) {
-                        result.push({
-                            title: title,
-                            index: index,
-                            visible: item.offsetParent !== null && getComputedStyle(item).display !== 'none'
-                        });
-                    }
+    () => {
+        const items = document.querySelectorAll('.m-market-item');
+        const result = [];
+        items.forEach((item, index) => {
+            const span = item.querySelector('.m-market-item--name span');
+            if (span) {
+                const title = span.textContent.trim();
+                if (title) {
+                    result.push({
+                        title: title,
+                        index: index,
+                        visible: item.offsetParent !== null && getComputedStyle(item).display !== 'none'
+                    });
                 }
-            });
-            return result;
-        }
-        """);
+            }
+        });
+        return result;
+    }
+    """);
 
             // Log all markets (as before)
             String allMarkets = markets.toString()
@@ -63,8 +95,6 @@ public class MSportMarketSearchUtils {
             log.info("Available markets ({} found): [ {} ]",
                     ((List<?>) markets).size(),
                     allMarkets.isEmpty() ? "NONE" : allMarkets);
-
-            String targetLower = targetMarket.toLowerCase();
 
             // List of common "main" phrases that often get prefixed
             List<String> keyPhrases = List.of(
@@ -113,31 +143,31 @@ public class MSportMarketSearchUtils {
                 log.warn("Dumping all visible betting options for debugging...");
 
                 var allOptions = page.evaluate("""
-            () => {
-                const options = [];
-                document.querySelectorAll('.m-market-item').forEach(item => {
-                    const marketTitleSpan = item.querySelector('.m-market-item--name span');
-                    const marketTitle = marketTitleSpan ? marketTitleSpan.textContent.trim() : 'UNKNOWN MARKET';
-                    
-                    const isVisible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
-                    if (!isVisible) return;
+        () => {
+            const options = [];
+            document.querySelectorAll('.m-market-item').forEach(item => {
+                const marketTitleSpan = item.querySelector('.m-market-item--name span');
+                const marketTitle = marketTitleSpan ? marketTitleSpan.textContent.trim() : 'UNKNOWN MARKET';
+                
+                const isVisible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
+                if (!isVisible) return;
 
-                    const optionElements = item.querySelectorAll('.m-outcome-item .m-outcome-item--name');
-                    if (optionElements.length > 0) {
-                        const optionTexts = Array.from(optionElements)
-                            .map(el => el.textContent.trim())
-                            .filter(text => text);
-                        if (optionTexts.length > 0) {
-                            options.push({
-                                market: marketTitle,
-                                selections: optionTexts
-                            });
-                        }
+                const optionElements = item.querySelectorAll('.m-outcome-item .m-outcome-item--name');
+                if (optionElements.length > 0) {
+                    const optionTexts = Array.from(optionElements)
+                        .map(el => el.textContent.trim())
+                        .filter(text => text);
+                    if (optionTexts.length > 0) {
+                        options.push({
+                            market: marketTitle,
+                            selections: optionTexts
+                        });
                     }
-                });
-                return options;
-            }
-            """);
+                }
+            });
+            return options;
+        }
+        """);
 
                 if (((List<?>) allOptions).isEmpty()) {
                     log.warn("No betting options found in any visible market (page may still be loading or empty)");
