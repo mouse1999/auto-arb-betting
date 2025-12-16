@@ -1,6 +1,7 @@
 package com.mouse.bet.detector;
 
 import com.mouse.bet.entity.Arb;
+import com.mouse.bet.enums.BookMaker;
 import com.mouse.bet.enums.Status;
 import com.mouse.bet.finance.WalletService;
 import com.mouse.bet.model.NormalizedEvent;
@@ -14,10 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 /**
  * Detects arbitrage opportunities from incoming events and validates wallet balances.
@@ -41,7 +42,7 @@ public class ArbDetector {
     private final ArbFactory arbFactory;
     private final ArbService arbService;
 
-    private static final int EVENT_EXPIRY_SECONDS = 2;
+    private static final int EVENT_EXPIRY_SECONDS = 3;
     private static final int MAX_EVENTS_PER_GROUP = 50;
 
     @PostConstruct
@@ -63,7 +64,7 @@ public class ArbDetector {
 //        event.setLastUpdated(Instant.now());
         String eventId = event.getEventId();
 
-        log.debug("Adding event from {} for eventId={}", event.getBookie(), eventId);
+        log.info("Adding event from {} for eventId={}", event.getBookie(), eventId);
 
         // Add to cache with size limit
         eventCache.compute(eventId, (key, queue) -> {
@@ -77,12 +78,7 @@ public class ArbDetector {
             }
 
             queue.add(event);
-
-            // Immediate cleanup of old events from this queue
-            Instant cutoff = Instant.now().minusSeconds(EVENT_EXPIRY_SECONDS);
-            queue.removeIf(e -> e.getLastUpdated().isBefore(cutoff));
-
-            return queue.isEmpty() ? null : queue;
+            return queue;
         });
 
         detectArbitrage(eventId);
@@ -104,26 +100,106 @@ public class ArbDetector {
                     }
 
                     List<NormalizedEvent> eventList = new ArrayList<>(events);
-                    log.info("Analyzing {} events for arbitrage (eventId={})", eventList.size(), eventId);
 
-                    List<Arb> opportunities = arbFactory.findOpportunities(eventList);
+                    // Filter events to only include those within 2 seconds of the most recent event
+                    List<NormalizedEvent> filteredEvents = filterEventsWithinTimeWindow(eventList);
+
+                    if (filteredEvents.size() < 2) {
+                        log.info("Not enough events within {}-second time window for eventId={}, skipping arbitrage detection",EVENT_EXPIRY_SECONDS, eventId);
+                        return;
+                    }
+
+                    log.info("Analyzing {} events for arbitrage (eventId={}) after time filtering", filteredEvents.size(), eventId);
+
+                    List<Arb> opportunities = arbFactory.findOpportunities(filteredEvents);
 
                     if (!opportunities.isEmpty()) {
                         log.info("Found {} arbs for eventId={}", opportunities.size(), eventId);
                         opportunities.forEach(arbQueue::offer);
-
                         for (Arb opportunity : opportunities) {
                             arbitrageLogService.logArb(opportunity);
                         }
-
                     }
-
                 } catch (Exception e) {
                     log.error("Detection error for eventId={}", eventId, e);
                     arbitrageLogService.logError("Error detected while trying to detect arb for an event", e);
                 }
             }
         });
+    }
+
+    /**
+     * Filters events to only include those within the specified time window of the most recent event.
+     * This ensures we're only comparing odds that were seen at approximately the same time.
+     *
+     * @param events List of normalized events to filter
+     * @return Filtered list of events within the time window
+     */
+    private List<NormalizedEvent> filterEventsWithinTimeWindow(List<NormalizedEvent> events) {
+        if (events == null || events.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Instant now = Instant.now();
+        Instant cutoff = now.minusSeconds(ArbDetector.EVENT_EXPIRY_SECONDS);
+
+        // ✅ First: Log all incoming events and fix null seenAt
+        if (log.isDebugEnabled()) {
+            log.debug("Incoming {} events for time-window filtering (expiry={}s, cutoff={})",
+                    events.size(), ArbDetector.EVENT_EXPIRY_SECONDS, cutoff);
+        }
+
+        int nullSeenAtCount = 0;
+
+        for (NormalizedEvent event : events) {
+            if (event == null) {
+                continue; // skip null events entirely
+            }
+
+            Instant seenAt = event.getSeenAt();
+
+            if (log.isDebugEnabled()) {
+                String eventId = event.getEventId() != null ? event.getEventId() : "unknown";
+                BookMaker bookie = event.getBookie();
+                log.debug("Event before filter: eventId={}, bookie={}, seenAt={}",
+                        eventId, bookie, seenAt);
+            }
+
+            // ✅ Fix: If seenAt is null, set it to now
+            if (seenAt == null) {
+                event.setSeenAt(now);  // assuming there's a setter
+                seenAt = now;
+                nullSeenAtCount++;
+                if (log.isWarnEnabled()) {
+                    log.warn("seenAt was null for eventId={}, bookie={} — auto-set to now",
+                            event.getEventId(), event.getBookie());
+                }
+            }
+        }
+
+        if (nullSeenAtCount > 0 && log.isInfoEnabled()) {
+            log.info("Fixed {} events with null seenAt by setting to current time", nullSeenAtCount);
+        }
+
+        // ✅ Now filter: keep events seen within the last N seconds
+        List<NormalizedEvent> filtered = events.stream()
+                .filter(Objects::nonNull)
+                .filter(event -> {
+                    Instant seenAt = event.getSeenAt(); // now guaranteed non-null
+                    return !seenAt.isBefore(cutoff);
+                })
+                .collect(Collectors.toList());
+
+        // ✅ Summary
+        if (filtered.size() < events.size()) {
+            log.info("Time-window filtering: kept {}/{} events (seen within last {}s)",
+                    filtered.size(), events.size(), ArbDetector.EVENT_EXPIRY_SECONDS);
+        } else if (log.isDebugEnabled()) {
+            log.debug("Time-window filtering: all {} events are fresh (within {}s)",
+                    events.size(), ArbDetector.EVENT_EXPIRY_SECONDS);
+        }
+
+        return filtered;
     }
 
     /**
@@ -192,7 +268,7 @@ public class ArbDetector {
                 Map.Entry<String, ConcurrentLinkedQueue<NormalizedEvent>> entry = iterator.next();
                 ConcurrentLinkedQueue<NormalizedEvent> queue = entry.getValue();
 
-                queue.removeIf(event -> event.getLastUpdated().isBefore(cutoff));
+                queue.removeIf(event -> event.getSeenAt().isBefore(cutoff));
 
                 if (queue.isEmpty()) {
                     iterator.remove();

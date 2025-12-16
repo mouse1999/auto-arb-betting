@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -31,6 +32,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ArbOrchestrator {
     /** Single active Arb slot. */
+
+    private static final String EMOJI_CLEANUP = "🧹";
+    private static final String EMOJI_QUEUE = "📋";
+    private static final String EMOJI_REMOVED = "🗑️";
+    private static final String EMOJI_EMPTY = "📭";
+    private static final String EMOJI_INFO = "ℹ️";
+    private static final String EMOJI_SKIP = "⏭️";
+
     @Getter
     private final BlockingQueue<Arb> arbQueue = new ArrayBlockingQueue<>(1);
 
@@ -165,6 +174,138 @@ public class ArbOrchestrator {
         log.info("ArbOrchestrator loop stopped | FinalQueueSize: {}", arbQueue.size());
     }
 
+    @Scheduled(fixedDelay = 5000, initialDelay = 5000)
+    public void cleanupQueues() {
+        log.debug("{} Starting scheduled queue cleanup", EMOJI_CLEANUP);
+
+        int totalRemoved = 0;
+
+        // Clean arbQueue only if not empty
+        int arbsRemoved = cleanArbQueueIfNotEmpty();
+        totalRemoved += arbsRemoved;
+
+        // Clean worker queues only if they have items
+        int legTasksRemoved = cleanNonEmptyWorkerQueues();
+        totalRemoved += legTasksRemoved;
+
+        if (totalRemoved > 0) {
+            log.info("{} {} Cleanup completed | Removed: {} arbs, {} leg tasks (Total: {})",
+                    EMOJI_CLEANUP, EMOJI_REMOVED, arbsRemoved, legTasksRemoved, totalRemoved);
+        } else {
+            log.trace("{} {} Cleanup skipped | All queues empty", EMOJI_CLEANUP, EMOJI_EMPTY);
+        }
+    }
+
+    /**
+     * Clean arbQueue only if it has items
+     * @return number of Arbs removed
+     */
+    private int cleanArbQueueIfNotEmpty() {
+        // Check if queue is empty before attempting cleanup
+        if (arbQueue.isEmpty()) {
+            log.trace("{} {} arbQueue is empty, skipping cleanup", EMOJI_SKIP, EMOJI_EMPTY);
+            return 0;
+        }
+
+        int removed = 0;
+        Arb arb;
+
+        log.debug("{} {} arbQueue has items, starting cleanup", EMOJI_CLEANUP, EMOJI_QUEUE);
+
+        while ((arb = arbQueue.poll()) != null) {
+            removed++;
+            log.debug("{} Removed Arb from queue | ArbId: {} | Profit: {}%",
+                    EMOJI_REMOVED, arb.getArbId(), arb.getProfitPercentage());
+        }
+
+        log.info("{} {} Cleared arbQueue | Removed {} arb(s)",
+                EMOJI_CLEANUP, EMOJI_QUEUE, removed);
+
+        return removed;
+    }
+
+    /**
+     * Clean worker queues only if they have items
+     * Skips empty queues entirely
+     * @return total number of LegTasks removed
+     */
+    private int cleanNonEmptyWorkerQueues() {
+        int totalRemoved = 0;
+        int skippedQueues = 0;
+        int cleanedQueues = 0;
+
+        for (var entry : workerQueues.entrySet()) {
+            BookMaker bookMaker = entry.getKey();
+            BlockingQueue<LegTask> queue = entry.getValue();
+
+            // Check if queue is empty before attempting cleanup
+            if (queue.isEmpty()) {
+                log.trace("{} {} {} queue is empty, skipping cleanup",
+                        EMOJI_SKIP, EMOJI_EMPTY, bookMaker);
+                skippedQueues++;
+                continue;
+            }
+
+            log.debug("{} {} {} queue has items, starting cleanup",
+                    EMOJI_CLEANUP, EMOJI_QUEUE, bookMaker);
+
+            int removed = 0;
+            LegTask task;
+
+            while ((task = queue.poll()) != null) {
+                removed++;
+                log.trace("{} Removed LegTask from {} queue | LegId: {}",
+                        EMOJI_REMOVED, bookMaker, task.getLeg().getId());
+            }
+
+            if (removed > 0) {
+                log.debug("{} {} Cleared {} queue | Removed {} task(s)",
+                        EMOJI_CLEANUP, EMOJI_QUEUE, bookMaker, removed);
+                totalRemoved += removed;
+                cleanedQueues++;
+            }
+        }
+
+        if (skippedQueues > 0 || cleanedQueues > 0) {
+            log.debug("{} Worker queues summary | Cleaned: {}, Skipped (empty): {}, Total: {}",
+                    EMOJI_INFO, cleanedQueues, skippedQueues, workerQueues.size());
+        }
+
+        return totalRemoved;
+    }
+
+    /**
+     * Get current queue sizes for monitoring
+     */
+    public QueueStats getQueueStats() {
+        int arbQueueSize = arbQueue.size();
+        int totalLegTasks = workerQueues.values().stream()
+                .mapToInt(BlockingQueue::size)
+                .sum();
+
+        return new QueueStats(arbQueueSize, totalLegTasks, workerQueues.size());
+    }
+
+    /**
+     * Record class for queue statistics
+     */
+    public record QueueStats(int arbQueueSize, int totalLegTasks, int workerQueueCount) {
+        @Override
+        public String toString() {
+            return String.format("QueueStats[arbs=%d, legTasks=%d, workers=%d]",
+                    arbQueueSize, totalLegTasks, workerQueueCount);
+        }
+    }
+
+    /**
+     * Manual cleanup trigger (for testing or emergency use)
+     */
+    public void forceCleanup() {
+        log.warn("{} Force cleanup triggered manually", EMOJI_CLEANUP);
+        cleanupQueues();
+    }
+
+
     public void processOneArb(Arb arb) throws InterruptedException {
         log.info("Starting arb processing | ArbId: {} | CurrentStatus: {}",
                 arb.getArbId(), arb.getStatus());
@@ -255,6 +396,7 @@ public class ArbOrchestrator {
                 arb.getArbId(), targets.size(), barrier.getPhase());
 
         // BLOCK until ALL leg tasks finish
+        log.info(("======================BLOCKED untill all the legs finish========================="));
         int phase = barrier.getPhase();
         barrier.awaitAdvance(phase);
 

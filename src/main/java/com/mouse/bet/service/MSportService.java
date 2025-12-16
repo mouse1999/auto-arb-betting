@@ -378,7 +378,9 @@ public class MSportService implements OddService<MSportEvent> {
                 MarketCategory.MATCH_RESULT,
                 MarketCategory.BASKETBALL_MATCH_WINNER,
 
-                MarketCategory.GAME_POINT_HANDICAP
+                MarketCategory.GAME_POINT_HANDICAP,
+                MarketCategory.POINT_HANDICAP,
+                MarketCategory.TABLE_TENNIS_GAME_POINT
         ).contains(category);
 
         log.debug("Should group market '{}': {}", category, shouldGroup);

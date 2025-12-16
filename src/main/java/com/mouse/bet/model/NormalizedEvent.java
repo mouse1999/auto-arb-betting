@@ -26,8 +26,7 @@ public class NormalizedEvent {
     private SportEnum sportEnum;
     private long estimateStartTime;
 
-    @Builder.Default
-    private Instant lastUpdated = Instant.now();
+    private Instant seenAt = Instant.now();
 
     private BookMaker bookie;
     private List<NormalizedMarket> markets;

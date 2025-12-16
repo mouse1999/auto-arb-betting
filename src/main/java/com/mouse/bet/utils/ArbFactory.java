@@ -63,7 +63,7 @@ public class ArbFactory {
                         NormalizedEvent::getBookie,
                         Function.identity(),
                         (existing, replacement) -> {
-                            boolean replaced = replacement.getLastUpdated().isAfter(existing.getLastUpdated());
+                            boolean replaced = replacement.getSeenAt().isAfter(existing.getSeenAt());
                             log.trace("{} Comparing events for bookmaker {}: keeping {}, replaced={}",
                                     EMOJI_TIMER, existing.getBookie(), (replaced ? "newer replacement" : "existing"), replaced);
                             return replaced ? replacement : existing;

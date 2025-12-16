@@ -26,6 +26,40 @@
     </appender>
 
     <!-- ============================================= -->
+    <!-- ARB DETECTION LOGS -->
+    <!-- ============================================= -->
+
+    <!-- ArbDetector Logs -->
+    <appender name="ARB_DETECTOR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/detection/arb-detector.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/detection/arb-detector-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ArbFactory Logs -->
+    <appender name="ARB_FACTORY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/detection/arb-factory.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/detection/arb-factory-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================= -->
     <!-- BETTING FLOW LOGS - Per Bookmaker -->
     <!-- ============================================= -->
 
@@ -106,6 +140,36 @@
         </encoder>
     </appender>
 
+
+    <appender name="SPORTY_FETCHER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/fetch/sportyfetcher.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/fetch/sportyfetcher-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+
+    <appender name="MSPORT_FETCHER" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/fetch/msportfetcher.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/fetch/msportfetcher-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
     <!-- ============================================= -->
     <!-- LOGGER CONFIGURATIONS -->
     <!-- ============================================= -->
@@ -113,6 +177,29 @@
     <!-- Orchestrator Logger -->
     <logger name="com.mouse.bet.manager.ArbOrchestrator" level="INFO" additivity="false">
         <appender-ref ref="ORCHESTRATOR_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- ArbDetector Logger -->
+    <logger name="com.mouse.bet.detector.ArbDetector" level="INFO" additivity="false">
+        <appender-ref ref="ARB_DETECTOR_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- ArbFactory Logger -->
+    <logger name="com.mouse.bet.utils.ArbFactory" level="INFO" additivity="false">
+        <appender-ref ref="ARB_FACTORY_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- SportyBetOddsFetcher Logger -->
+    <logger name="com.mouse.bet.tasks.SportyBetOddsFetcher" level="INFO" additivity="false">
+        <appender-ref ref="SPORTY_FETCHER"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="com.mouse.bet.tasks.MSportOddsFetcher" level="INFO" additivity="false">
+        <appender-ref ref="MSPORT_FETCHER"/>
         <appender-ref ref="CONSOLE"/>
     </logger>
 

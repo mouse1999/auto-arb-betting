@@ -25,17 +25,17 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
 
     private final ScraperConfig scraperConfig;
     private final SportyBetOddsFetcher sportyBetOddsFetcher;
-    private final Bet9jaOddsFetcher bet9jaOddsFetcher;
+//    private final Bet9jaOddsFetcher bet9jaOddsFetcher;
     private final MSportOddsFetcher mSportOddsFetcher;
 
 
     public Player(ScraperConfig scraperConfig,
                   SportyBetOddsFetcher sportyBetOddsFetcher,
-                  Bet9jaOddsFetcher bet9jaOddsFetcher,
+//                  Bet9jaOddsFetcher bet9jaOddsFetcher,
                   MSportOddsFetcher mSportOddsFetcher) {
         this.scraperConfig = scraperConfig;
         this.sportyBetOddsFetcher = sportyBetOddsFetcher;
-        this.bet9jaOddsFetcher = bet9jaOddsFetcher;
+//        this.bet9jaOddsFetcher = bet9jaOddsFetcher;
         this.mSportOddsFetcher = mSportOddsFetcher;
     }
 
@@ -121,7 +121,7 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         if (isRunning.compareAndSet(false, true)) {
             log.info("wait for some minute");
             try {
-                Thread.sleep(100_000);
+                Thread.sleep(150_000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -158,21 +158,21 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
             throw new RuntimeException(e);
         }
 
-        // ✅ Bet9ja Scraper
-        if (scraperConfig.isBet9jaEnabled()) {
-            log.info("✅ Bet9ja scraper is ENABLED");
-            Future<?> future = orchestratorExecutor.submit(() -> {
-                try {
-                    bet9jaOddsFetcher.run();
-                } catch (Exception e) {
-                    log.error("Bet9ja scraper crashed: {}", e.getMessage(), e);
-                    throw e;
-                }
-            });
-            activeTasks.add(new ScraperTask("Bet9ja", bet9jaOddsFetcher, true, future));
-        } else {
-            log.warn("⚠️ Bet9ja scraper is DISABLED in configuration");
-        }
+//        // ✅ Bet9ja Scraper
+//        if (scraperConfig.isBet9jaEnabled()) {
+//            log.info("✅ Bet9ja scraper is ENABLED");
+//            Future<?> future = orchestratorExecutor.submit(() -> {
+//                try {
+//                    bet9jaOddsFetcher.run();
+//                } catch (Exception e) {
+//                    log.error("Bet9ja scraper crashed: {}", e.getMessage(), e);
+//                    throw e;
+//                }
+//            });
+//            activeTasks.add(new ScraperTask("Bet9ja", bet9jaOddsFetcher, true, future));
+//        } else {
+//            log.warn("⚠️ Bet9ja scraper is DISABLED in configuration");
+//        }
 
         // ✅ Add more scrapers here
          if (scraperConfig.isBetKingEnabled()) {

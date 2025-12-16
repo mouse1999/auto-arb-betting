@@ -355,8 +355,9 @@ public class SportyBetService implements OddService<SportyEvent> {
                 MarketCategory.OVER_UNDER_2NDHALF,
                 MarketCategory.ODD_EVEN,
                 MarketCategory.MATCH_RESULT,
-                MarketCategory.GAME_POINT_HANDICAP
-//                MarketCategory.BASKETBALL_HANDICAP
+                MarketCategory.GAME_POINT_HANDICAP,
+                MarketCategory.POINT_HANDICAP,
+                MarketCategory.TABLE_TENNIS_GAME_POINT
         ).contains(category);
 
         log.debug("Should group market '{}': {}", category, shouldGroup);

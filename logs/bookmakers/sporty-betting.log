@@ -1,0 +1,560 @@
+2025-12-16 00:48:54.106 [restartedMain] INFO  com.mouse.bet.window.SportyWindow - 🚀 🎯 Initializing SportyWindow with Playwright...
+2025-12-16 00:48:58.637 [restartedMain] INFO  com.mouse.bet.window.SportyWindow - ✅ 🚀 Playwright initialized successfully
+2025-12-16 00:48:58.637 [restartedMain] INFO  com.mouse.bet.window.SportyWindow - Registering SportyBet Window for Bet placing
+2025-12-16 00:49:00.766 [restartedMain] INFO  com.mouse.bet.window.SportyWindow - safe starting arb orchestrator in SPORTY_BET window
+2025-12-16 00:49:05.389 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🚀 🎯 Starting SportyWindow attempt 1/3
+2025-12-16 00:49:05.468 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Loading existing browser context from: .\playwright-context\sporty-context.json
+2025-12-16 00:49:07.222 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Existing context loaded successfully
+2025-12-16 00:49:07.778 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ 💚 Page created and health monitor started
+2025-12-16 00:49:07.779 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🚀 🎯 Navigating to SportyBet...
+2025-12-16 00:49:16.524 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ 🎯 Successfully navigated to SportyBet
+2025-12-16 00:49:19.067 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Login status: LOGGED IN
+2025-12-16 00:49:19.067 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ 🔐 Already logged in (page verification)
+2025-12-16 00:49:19.067 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Checking for pop-ups...
+2025-12-16 00:49:20.017 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - No pop-ups found
+2025-12-16 00:49:20.486 [BettingWindow-1] WARN  com.mouse.bet.window.SportyWindow - {} balance was not saved due to not been able to locate the amount element
+2025-12-16 00:49:20.486 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Mimicking human behavior...
+2025-12-16 00:49:27.655 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Clicked 'Live Betting' using ID selector
+2025-12-16 00:49:47.162 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Successfully navigated to Live Betting page: https://www.sportybet.com/ng/sport/live/
+2025-12-16 00:49:47.162 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ 🔐 Already logged in (cached state)
+2025-12-16 00:49:47.162 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Checking for pop-ups...
+2025-12-16 00:49:47.447 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - No pop-ups found
+2025-12-16 00:49:47.447 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Attempting to click Multi View...
+2025-12-16 00:49:48.559 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Clicked Multi View
+2025-12-16 00:49:48.560 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Multi View loaded: https://www.sportybet.com/ng/sport/football/live_list
+2025-12-16 00:49:50.824 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Switching to live sport: Table Tennis → tableTennis
+2025-12-16 00:49:50.824 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Opening 'More Sports' dropdown to select: Table Tennis
+2025-12-16 00:49:50.842 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Found dropdown using: .select-title
+2025-12-16 00:49:51.325 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Opened 'More Sports' dropdown
+2025-12-16 00:49:52.426 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Dropdown list is now visible
+2025-12-16 00:49:52.430 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Found 21 sports in dropdown
+2025-12-16 00:49:52.437 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Found sport: 'Table Tennis'
+2025-12-16 00:49:53.096 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Clicked on: Table Tennis
+2025-12-16 00:49:53.100 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Navigated to Table Tennis Multi View: https://www.sportybet.com/ng/sport/tableTennis/live_list
+2025-12-16 00:49:57.691 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Table Tennis Multi View ready! URL: https://www.sportybet.com/ng/sport/tableTennis/live_list
+2025-12-16 00:49:57.691 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Checking for pop-ups...
+2025-12-16 00:49:57.725 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - No pop-ups found
+2025-12-16 00:49:57.725 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🤖 Mimicking human behavior on sport page...
+2025-12-16 00:50:00.675 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Slow scrolling down 497 pixels in 5 steps
+2025-12-16 00:50:02.622 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Simulating 3 natural mouse movements
+2025-12-16 00:50:06.094 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Hovering over random match (index: 0)
+2025-12-16 00:50:08.494 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Quick scrolling down 439 pixels
+2025-12-16 00:50:09.554 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Scrolling up 235 pixels
+2025-12-16 00:50:10.776 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Simulating 2 natural mouse movements
+2025-12-16 00:50:13.237 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Attempting optional page interaction...
+2025-12-16 00:50:15.102 [BettingWindow-1] DEBUG com.mouse.bet.window.SportyWindow - Scrolling to comfortable position: 272px
+2025-12-16 00:50:16.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Human behavior simulation complete
+2025-12-16 00:50:16.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ 🔄 Window registered with sync manager: SPORTY_BET
+2025-12-16 00:50:16.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🚀 📊 Starting betting loop for SPORTY_BET
+2025-12-16 00:50:16.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:16.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:16.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:17.335 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:17.336 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:17.336 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:18.128 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:18.128 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:18.128 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:18.740 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:18.740 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:18.740 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:19.482 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:19.482 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:19.482 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:20.020 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:20.020 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:20.020 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:20.591 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:20.591 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:20.591 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:21.438 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:21.439 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:21.439 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:21.990 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:21.990 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:21.990 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:22.579 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:22.579 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:22.579 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:23.472 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:23.472 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:23.472 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:24.177 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:24.177 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:24.177 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:24.897 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:24.897 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:24.897 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:25.740 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:25.740 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:25.740 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:26.269 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:26.269 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:26.269 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:26.922 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:26.922 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:26.922 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:27.833 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:27.833 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:27.833 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:28.570 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:28.570 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:28.570 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:29.309 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:29.309 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:29.309 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:30.200 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:30.200 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:30.200 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:30.846 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:30.846 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:30.846 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:31.636 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:31.636 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:31.636 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:32.550 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:32.550 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:32.550 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:33.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:33.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:33.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:33.833 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:33.833 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:33.833 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:34.648 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:34.648 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:34.648 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:35.398 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:35.398 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:35.398 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:36.066 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:36.066 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:36.067 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:36.807 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:36.807 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:36.807 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:37.770 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:37.770 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:37.770 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:38.757 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:38.757 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:38.757 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:39.636 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:39.636 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:39.637 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:40.176 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:40.176 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:40.176 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:41.143 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:41.143 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:41.143 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:41.709 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:41.709 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:41.709 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:42.483 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:42.483 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:42.483 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:43.019 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:43.019 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:43.019 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:44.015 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:44.015 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:44.015 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:44.752 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:44.752 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:44.752 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:45.466 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:45.466 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:45.466 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:46.187 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:46.187 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:46.187 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:46.939 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:46.939 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:46.939 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:47.865 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:47.865 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:47.865 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:48.737 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:48.737 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:48.737 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:49.283 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:49.283 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:49.283 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:50.204 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:50.206 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:50.206 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:51.035 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:51.035 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:51.035 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:52.028 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:52.028 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:52.028 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:53.018 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:53.018 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:53.018 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:53.580 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:53.580 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:53.580 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:54.129 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:54.129 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:54.129 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:54.737 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:54.737 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:54.737 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:55.441 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:55.441 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:55.441 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:56.289 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:56.289 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:56.289 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:56.976 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:56.976 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:56.976 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:57.490 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:57.490 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:57.490 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:58.336 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:58.336 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:58.336 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:58.860 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:58.860 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:58.860 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:50:59.705 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:50:59.705 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:50:59.705 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:00.598 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:00.598 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:00.598 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:01.313 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:01.313 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:01.313 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:02.121 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:02.121 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:02.121 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:03.198 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:03.198 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:03.198 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:04.175 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:04.175 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:04.175 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:05.012 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:05.012 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:05.013 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:05.674 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:05.674 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:05.675 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:06.229 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:06.229 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:06.229 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:06.960 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:06.960 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:06.960 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:07.874 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:07.874 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:07.874 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:08.458 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:08.460 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:08.460 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:09.145 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:09.145 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:09.146 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:09.673 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:09.673 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:09.673 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:10.533 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:10.533 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:10.533 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:11.093 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:11.093 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:11.093 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:11.995 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:11.995 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:11.995 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:12.516 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:12.516 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:12.516 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:13.335 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:13.335 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:13.335 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:13.920 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:13.920 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:13.920 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:14.432 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:14.432 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:14.432 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:15.031 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:15.031 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:15.031 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:15.824 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:15.824 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:15.825 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:16.343 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:16.343 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:16.343 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:16.902 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:16.902 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:16.902 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:17.612 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:17.612 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:17.612 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:18.425 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:18.425 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:18.425 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:19.341 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:19.341 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:19.341 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:20.089 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:20.089 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:20.089 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:20.795 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:20.795 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:20.795 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:21.533 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:21.537 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:21.538 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:22.488 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:22.488 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:22.488 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:23.107 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:23.108 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:23.108 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:24.081 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:24.376 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:24.376 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:24.883 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:24.883 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:24.883 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:25.868 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:25.868 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:25.868 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:26.531 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:26.531 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:26.531 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:27.171 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:27.171 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:27.171 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:27.855 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:27.855 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:27.855 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:28.373 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:28.373 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:28.373 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:29.030 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:29.030 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:29.030 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:29.610 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:29.610 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:29.610 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:30.211 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:30.211 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:30.211 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:30.768 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:30.768 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:30.768 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:31.535 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:31.535 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:31.535 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:32.170 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:32.170 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:32.170 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:32.682 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:32.682 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:32.682 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:33.524 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:33.524 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:33.524 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:34.378 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:34.378 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:34.378 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:35.194 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:35.194 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:35.194 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:35.841 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:35.841 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:35.841 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:36.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:36.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:36.583 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:37.181 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:37.181 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:37.181 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:38.157 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:38.157 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:38.157 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:38.940 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:38.940 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:38.940 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:39.535 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:39.535 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:39.535 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:40.071 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:40.071 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:40.071 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:40.686 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:40.686 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:40.686 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:41.464 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:41.464 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:41.464 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:41.970 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:41.970 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:41.970 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:42.484 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:42.484 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:42.484 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:43.181 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:43.181 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:43.181 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:43.837 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:43.837 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:43.837 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:44.811 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:44.811 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:44.811 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:45.746 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:45.746 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:45.746 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:46.655 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:46.655 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:46.655 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:47.382 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:47.382 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:47.382 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:48.016 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:48.016 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:48.016 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:48.846 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:48.846 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:48.846 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:49.388 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:49.388 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:49.388 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:50.128 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:50.128 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:50.128 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:50.675 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:50.675 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:50.675 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:51.438 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:51.438 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:51.438 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:52.267 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:52.267 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:52.267 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:52.978 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:52.978 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:52.978 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:53.610 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:53.610 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:53.610 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:54.257 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:54.257 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:54.257 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:54.978 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:54.979 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:54.979 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:55.921 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:55.921 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:55.921 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:56.770 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:56.770 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:56.770 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:57.342 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:57.343 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:57.351 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:58.057 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:58.057 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:58.057 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:58.687 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:58.687 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:58.687 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:51:59.397 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:51:59.398 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:51:59.398 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:00.119 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:00.119 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:00.119 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:00.709 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:00.711 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:00.714 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:01.602 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:01.602 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:01.602 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:02.351 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:02.351 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:02.351 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:03.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:03.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:03.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:03.988 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:03.988 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:03.988 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:04.652 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:04.652 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:04.652 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:05.461 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:05.464 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:05.465 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:06.308 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:06.308 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:06.308 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - the polled task is null for SPORTY_BET
+2025-12-16 00:52:06.973 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📊 Ready to poll task for betting | Bookmaker: SPORTY_BET
+2025-12-16 00:52:06.973 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - task polled by SPORTY_BET
+2025-12-16 00:52:06.973 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🎯 Arb opportunity retrieved | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Profit: 7.59% | Bookmaker: SPORTY_BET 
+2025-12-16 00:52:06.973 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Arb(arbId=Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY, version=1, sportEnum=TABLE_TENNIS, league=TT Elite Series, period=Set 3, selectionKey=null, eventStartTime=1970-01-01T00:00:00Z, setScore=1:1, gameScore=[11:13, 18:16, 9:10], matchStatus=Set 3, playedSeconds=null, createdAt=2025-12-15T23:52:05.624050Z, firstSeenAt=2025-12-15T23:52:05.735049Z, lastSeenAt=2025-12-15T23:52:05.735049Z, lastUpdatedAt=2025-12-15T23:52:05.624050Z, expiresAt=null, predictedHoldUpMs=null, status=IN_PROGRESS, active=true, shouldBet=true, confidenceScore=0.9656054162575665, volatilitySigma=0.0, velocityPctPerSec=0.0, meanOddsLegA=2.4, meanOddsLegB=1.95, stakeA=44.83, stakeB=55.17, profitPercentage=7.59, oddsHistory={1765842725805=com.mouse.bet.model.OddsChange@5bc9804f}, oddsChangeCount=1, maxOddsLegA=2.40, minOddsLegA=2.40, maxOddsLegB=1.95, minOddsLegB=1.95, peakProfitPercentage=7.59, peakProfitAt=2025-12-15T23:52:05.806579Z, lastContinuousUpdateAt=2025-12-15T23:52:05.735049Z, continuityBreakCount=0, currentSessionStartedAt=2025-12-15T23:52:05.735049Z)
+2025-12-16 00:52:07.008 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - 🎯 💰 Starting bet placement | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET | Odds: 1.9500
+2025-12-16 00:52:07.010 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - 🧭 💰 Navigating to game | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:52:07.010 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🎯 Navigating to: Zochniak, JakubvsBrud, Szymon | EventId: sr:match:66772246
+2025-12-16 00:52:08.164 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 🎯 Searching for match: Zochniak, Jakub vs Brud, Szymon
+2025-12-16 00:52:08.165 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Strategy 1: Searching by title attribute
+2025-12-16 00:52:08.184 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Found by exact title: 'Zochniak, Jakub vs Brud, Szymon'
+2025-12-16 00:52:09.082 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Clicking match: Zochniak, Jakub Brud, Szymon
+2025-12-16 00:52:11.324 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Navigation successful: https://www.sportybet.com/ng/sport/tableTennis/live/International/TT_Elite_Series/Zochniak,_Jakub_vs_Brud,_Szymon/sr:match:66772246
+2025-12-16 00:52:13.510 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Match content loaded - .m-detail-wrapper detected
+2025-12-16 00:52:13.511 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - ✅ 🔄 Marked ready, waiting for partner | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:52:13.608 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - ✅ 🔄 ✓ Both partners ready, proceeding | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:52:13.608 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - 🚀 🥇 I am PRIMARY bookmaker | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:52:13.608 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - ⚡ PRIMARY: Starting bet placement | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:52:13.608 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow -   Starting bet deployment for: Point handicap
+2025-12-16 00:52:14.427 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ Betslip already empty
+2025-12-16 00:52:14.475 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅  Market found: Point handicap
+2025-12-16 00:52:14.475 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Selecting: Point handicap → Home (+4.5)
+2025-12-16 00:52:15.651 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - 📸 Full page screenshot saved: screenshots\markets\20251216-005214-783-SPORTY_BET-Point_handicap.png
+2025-12-16 00:52:15.651 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Searching for outcome: 'Home (+4.5)' in market: 'Point handicap'
+2025-12-16 00:52:15.671 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - Available outcomes in market: [Home (+4.5), 1.65, Away (-4.5), 2.10]
+2025-12-16 00:52:15.687 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ FOUND: Point handicap → Home (+4.5) @ 1.65
+2025-12-16 00:52:15.687 [BettingWindow-1] WARN  com.mouse.bet.window.SportyWindow - ⚠️ Odds drifted: expected 1.9500 → got 1.65
+2025-12-16 00:52:16.215 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ CLICKED: Point handicap → Home (+4.5) @ 1.65
+2025-12-16 00:52:16.422 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅ BET VERIFIED IN SLIP: Home (+4.5) | Market: Point handicap | Odds: 1.65 | Match: Live
+        Zochniak, Jakub v Brud, Szymon | Live: true
+2025-12-16 00:52:16.422 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ✅  Bet deployment successful
+2025-12-16 00:52:16.422 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - Bet deployment check | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET | Deployed: true
+2025-12-16 00:52:16.422 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - ─────────────────────────────────────────────────────────────
+2025-12-16 00:52:16.422 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - START placeBet() → Point handicap → Home (+4.5) @ 1.9500 | Stake: 50.00 | 00:52:16.422
+2025-12-16 00:52:16.422 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - [1/6] Entering stake...
+2025-12-16 00:52:17.275 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - [OK] Stake entered
+2025-12-16 00:52:17.279 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - [OK] Bet in slip
+2025-12-16 00:52:17.279 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - [3/6] Starting UNKILLABLE placement loop...
+2025-12-16 00:52:17.279 [BettingWindow-1] INFO  com.mouse.bet.window.SportyWindow - [Cycle 1/10] Checking state...
+2025-12-16 00:52:17.283 [BettingWindow-1] ERROR com.mouse.bet.window.SportyWindow - FATAL in placeBet(): com.microsoft.playwright.PlaywrightException: Error {
+  message='Unexpected token "" while parsing css selector "". Did you mean to CSS.escape it?
+  name='Error
+  stack='Error: Unexpected token "" while parsing css selector "". Did you mean to CSS.escape it?
+    at unexpected (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\cssParser.js:69:12)
+    at consumeSimpleSelector (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\cssParser.js:200:13)
+    at consumeComplexSelector (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\cssParser.js:133:40)
+    at consumeArgument (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\cssParser.js:125:12)
+    at consumeFunctionArguments (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\cssParser.js:109:22)
+    at parseCSS (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\cssParser.js:217:18)
+    at parseSelector (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\selectorParser.js:43:55)
+    at parseSelector (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\selectorParser.js:67:76)
+    at splitSelectorByFrame (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\utils\isomorphic\selectorParser.js:85:20)
+    at FrameSelectors.resolveFrameForSelector (C:\Users\USER\AppData\Local\Temp\playwright-java-14445876134392525892\package\lib\server\frameSelectors.js:102:72)
+}
+Call log:
+-     - checking visibility of button:has-text('Confirm'), button:has-text('Yes'), button:has-text('OK') >> internal:has=">> visible=true" >> nth=0
+
+2025-12-16 00:52:17.298 [BettingWindow-1] ERROR c.m.bet.logservice.BettingFlowLogger - ❌ 💰 PRIMARY: Bet placement failed | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:52:17.312 [BettingWindow-1] INFO  c.m.bet.logservice.BettingFlowLogger - PRIMARY ready to move on to next LegTask | ArbId: Table Tennis|Zochniak, Jakub|Brud, SzymonTT_POINT_HCP_MINUS_4_5_AWAY | Bookmaker: SPORTY_BET
+2025-12-16 00:53:46.702 [SpringApplicationShutdownHook] INFO  com.mouse.bet.window.SportyWindow - 🛑 🎯 Stopping SPORTY_BET betting loop...

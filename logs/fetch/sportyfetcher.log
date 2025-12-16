@@ -1,0 +1,373 @@
+2025-12-16 00:49:16.586 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - === Initializing SportyBetOddsFetcher (Pure OkHttp) ===
+2025-12-16 00:49:16.586 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Creating HTTP client pool with 10 clients
+2025-12-16 00:49:16.589 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 1/10
+2025-12-16 00:49:16.590 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 2/10
+2025-12-16 00:49:16.604 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 3/10
+2025-12-16 00:49:16.606 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 4/10
+2025-12-16 00:49:16.607 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 5/10
+2025-12-16 00:49:16.608 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 6/10
+2025-12-16 00:49:16.609 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 7/10
+2025-12-16 00:49:16.610 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 8/10
+2025-12-16 00:49:16.614 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 9/10
+2025-12-16 00:49:16.616 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Created HTTP client 10/10
+2025-12-16 00:49:16.616 [restartedMain] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ HTTP client pool initialized with 10 clients
+2025-12-16 00:51:51.183 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - === SportyBetOddsFetcher - Pure OkHttp Mode ===
+2025-12-16 00:51:51.183 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - InitialCadence=2s, Dedup=800ms, StaleThreshold=5000ms, DetailThreads=100, ProcessingThreads=50
+2025-12-16 00:51:51.183 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Starting ADAPTIVE schedulers with initial cadence 2s (live arbing mode)
+2025-12-16 00:51:53.213 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 26ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:51:53.217 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:51:53.247 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:51:55.188 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:51:56.195 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:51:57.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:51:58.141 [pool-10-thread-1] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ WARNING: TableTennis response took 4921ms - approaching threshold
+2025-12-16 00:51:58.174 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:51:58.178 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 4958ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:51:58.848 [pool-12-thread-1] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772252 is 5627ms old (threshold: 5000ms)
+2025-12-16 00:51:58.851 [pool-12-thread-2] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66820142 is 5631ms old (threshold: 5000ms)
+2025-12-16 00:51:58.860 [pool-12-thread-3] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772248 is 5640ms old (threshold: 5000ms)
+2025-12-16 00:51:58.885 [pool-12-thread-4] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66820108 is 5664ms old (threshold: 5000ms)
+2025-12-16 00:51:58.910 [pool-12-thread-5] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772246 is 5690ms old (threshold: 5000ms)
+2025-12-16 00:51:58.951 [pool-12-thread-6] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772250 is 5731ms old (threshold: 5000ms)
+2025-12-16 00:51:59.022 [pool-12-thread-7] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:Br5YpUd1FT-Wi4NoQObyIuA is 5802ms old (threshold: 5000ms)
+2025-12-16 00:51:59.104 [pool-12-thread-8] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:B38QJp7erTzSu50u9RXjOLg is 5884ms old (threshold: 5000ms)
+2025-12-16 00:51:59.189 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:51:59.190 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:51:59.959 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 769ms
+2025-12-16 00:51:59.960 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:51:59.961 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 771ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:01.208 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:01.209 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:01.220 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:01.725 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 505ms
+2025-12-16 00:52:01.726 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:01.726 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 506ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:03.189 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=1] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:03.190 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:03.541 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 352ms
+2025-12-16 00:52:03.542 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:03.542 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 353ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:05.187 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:05.187 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:05.451 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 264ms
+2025-12-16 00:52:05.452 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:05.452 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 265ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:06.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:07.187 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:07.187 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:07.474 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 287ms
+2025-12-16 00:52:07.475 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:07.477 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 290ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:09.189 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:09.190 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:09.458 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 269ms
+2025-12-16 00:52:09.459 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:09.459 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 270ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:11.188 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:11.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:11.196 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:11.469 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 281ms
+2025-12-16 00:52:11.471 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:11.471 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 283ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:13.201 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:13.203 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:13.482 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 279ms
+2025-12-16 00:52:13.485 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:13.485 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 282ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:15.187 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:15.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:15.471 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 284ms
+2025-12-16 00:52:15.473 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:15.473 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 286ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:16.195 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:17.188 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:17.188 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:17.462 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 274ms
+2025-12-16 00:52:17.463 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:17.466 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 278ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:19.189 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:19.189 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:19.500 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 311ms
+2025-12-16 00:52:19.501 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:19.502 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 313ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:21.189 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:21.189 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:21.194 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:21.196 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Health — Active: 0, Queued: 0, NetErrors: 0, RateLimit: 0, Timeouts: 0, Requests: 101, TimeSinceReset: 184s, AvgResponse: 284ms, Cadence: 2s, TotalConnections: 9/10 idle, ClientPoolSize: 10
+2025-12-16 00:52:21.493 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 304ms
+2025-12-16 00:52:21.494 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:21.495 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 306ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:23.189 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:23.190 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:23.586 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 396ms
+2025-12-16 00:52:23.588 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:23.592 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 403ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:25.187 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:25.187 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:25.502 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 314ms
+2025-12-16 00:52:25.503 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:25.503 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 316ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:26.194 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:27.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:27.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:27.470 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 282ms
+2025-12-16 00:52:27.472 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 7 live events for TableTennis
+2025-12-16 00:52:27.472 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 284ms - queued 7/7 events (skipped: 0)
+2025-12-16 00:52:29.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:29.188 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:29.466 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 278ms
+2025-12-16 00:52:29.467 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:29.468 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 280ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:31.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:31.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:31.195 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:31.552 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 364ms
+2025-12-16 00:52:31.553 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:31.554 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 366ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:33.189 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:33.190 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:33.444 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 255ms
+2025-12-16 00:52:33.445 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:33.445 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 256ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:35.187 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:35.187 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:35.747 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 560ms
+2025-12-16 00:52:35.750 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:35.750 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 563ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:36.194 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:37.189 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:37.189 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:37.469 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 280ms
+2025-12-16 00:52:37.470 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:37.472 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 283ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:39.188 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:39.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:39.452 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 264ms
+2025-12-16 00:52:39.453 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:39.453 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 265ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:41.188 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:41.188 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:41.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:41.549 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 361ms
+2025-12-16 00:52:41.550 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:41.550 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 362ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:43.189 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:43.189 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:43.454 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 265ms
+2025-12-16 00:52:43.455 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:43.455 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 266ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:45.188 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:45.188 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:45.596 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 408ms
+2025-12-16 00:52:45.597 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:45.597 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 409ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:46.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:47.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:47.188 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:47.475 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 287ms
+2025-12-16 00:52:47.477 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:47.477 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 289ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:49.188 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:49.188 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:49.465 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 277ms
+2025-12-16 00:52:49.466 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:49.472 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 284ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:51.188 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:51.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:51.195 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:51.197 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Health — Active: 0, Queued: 0, NetErrors: 0, RateLimit: 0, Timeouts: 0, Requests: 234, TimeSinceReset: 214s, AvgResponse: 361ms, Cadence: 2s, TotalConnections: 9/10 idle, ClientPoolSize: 10
+2025-12-16 00:52:51.464 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 276ms
+2025-12-16 00:52:51.465 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:51.466 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 278ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:53.189 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:53.189 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:53.505 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 316ms
+2025-12-16 00:52:53.506 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:53.507 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 318ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:55.188 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:55.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:55.466 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 278ms
+2025-12-16 00:52:55.469 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:55.469 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 281ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:56.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:52:57.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:57.188 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:57.464 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 276ms
+2025-12-16 00:52:57.465 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:57.466 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 278ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:52:59.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:52:59.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:52:59.532 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 344ms
+2025-12-16 00:52:59.533 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:52:59.533 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 345ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:01.188 [pool-9-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:01.188 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:01.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:01.474 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 286ms
+2025-12-16 00:53:01.475 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:01.477 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 289ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:03.187 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:03.187 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:03.494 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 307ms
+2025-12-16 00:53:03.495 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:03.495 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 308ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:05.189 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:05.189 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 1ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:05.910 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 722ms
+2025-12-16 00:53:05.911 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:05.911 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 723ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:06.195 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=2, setupOK=true
+2025-12-16 00:53:07.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:07.188 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:07.464 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 276ms
+2025-12-16 00:53:07.465 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:07.465 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 277ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:09.189 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:09.189 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:09.477 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 288ms
+2025-12-16 00:53:09.478 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:09.478 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 289ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:11.188 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:11.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:11.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:11.475 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 287ms
+2025-12-16 00:53:11.477 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:11.477 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 289ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:13.188 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:13.188 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:13.476 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 288ms
+2025-12-16 00:53:13.477 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:13.478 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 290ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:15.188 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:15.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:15.461 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 273ms
+2025-12-16 00:53:15.462 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:15.463 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 275ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:16.194 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:17.188 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:17.188 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:17.548 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 360ms
+2025-12-16 00:53:17.549 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:17.549 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 361ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:19.189 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:19.189 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:19.484 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 295ms
+2025-12-16 00:53:19.485 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:19.485 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 296ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:21.189 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:21.189 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 1ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:21.194 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:21.198 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Health — Active: 0, Queued: 0, NetErrors: 0, RateLimit: 0, Timeouts: 0, Requests: 369, TimeSinceReset: 244s, AvgResponse: 310ms, Cadence: 2s, TotalConnections: 9/10 idle, ClientPoolSize: 10
+2025-12-16 00:53:21.707 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 518ms
+2025-12-16 00:53:21.708 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:21.708 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 520ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:23.188 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:23.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:23.467 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 279ms
+2025-12-16 00:53:23.467 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:23.468 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 280ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:25.187 [pool-9-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:25.187 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:25.474 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 287ms
+2025-12-16 00:53:25.475 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:25.477 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 290ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:26.194 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:27.188 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:27.188 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:27.449 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 261ms
+2025-12-16 00:53:27.450 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:27.450 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 262ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:29.189 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:29.189 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:29.500 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 311ms
+2025-12-16 00:53:29.501 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:29.502 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 313ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:31.188 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:31.188 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:31.194 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:31.444 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 256ms
+2025-12-16 00:53:31.445 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:31.445 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 257ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:33.189 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:33.189 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:33.572 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 383ms
+2025-12-16 00:53:33.573 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:33.574 [pool-10-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 385ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:35.189 [pool-9-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:35.189 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:35.454 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 265ms
+2025-12-16 00:53:35.460 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:35.460 [pool-10-thread-2] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 271ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:36.197 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=8, setupOK=true
+2025-12-16 00:53:40.493 [pool-11-thread-99] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 5032ms (threshold: 5000ms) - possible throttling, count: 1
+2025-12-16 00:53:40.493 [pool-11-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 5033ms (threshold: 5000ms) - possible throttling, count: 2
+2025-12-16 00:53:43.679 [pool-11-thread-77] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 8218ms (threshold: 5000ms) - possible throttling, count: 3
+2025-12-16 00:53:43.680 [pool-11-thread-21] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 8220ms (threshold: 5000ms) - possible throttling, count: 1
+2025-12-16 00:53:43.680 [pool-11-thread-18] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 8219ms (threshold: 5000ms) - possible throttling, count: 2
+2025-12-16 00:53:43.680 [pool-12-thread-36] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772246 is 8491ms old (threshold: 5000ms)
+2025-12-16 00:53:43.680 [pool-11-thread-6] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 8219ms (threshold: 5000ms) - possible throttling, count: 1
+2025-12-16 00:53:43.680 [pool-11-thread-55] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 8220ms (threshold: 5000ms) - possible throttling, count: 2
+2025-12-16 00:53:43.681 [pool-11-thread-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Suspiciously slow request detected: 8221ms (threshold: 5000ms) - possible throttling, count: 1
+2025-12-16 00:53:43.681 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=7, setupOK=true
+2025-12-16 00:53:43.681 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=7] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:43.682 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:43.682 [pool-12-thread-35] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772248 is 8493ms old (threshold: 5000ms)
+2025-12-16 00:53:43.683 [pool-12-thread-38] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772252 is 8494ms old (threshold: 5000ms)
+2025-12-16 00:53:43.684 [pool-12-thread-33] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66820108 is 8495ms old (threshold: 5000ms)
+2025-12-16 00:53:43.684 [pool-12-thread-37] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:Br5YpUd1FT-Wi4NoQObyIuA is 8495ms old (threshold: 5000ms)
+2025-12-16 00:53:43.684 [pool-12-thread-37] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66772250 is 8495ms old (threshold: 5000ms)
+2025-12-16 00:53:43.684 [pool-12-thread-37] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:B38QJp7erTzSu50u9RXjOLg is 8495ms old (threshold: 5000ms)
+2025-12-16 00:53:43.684 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=1] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:43.684 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=1] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:43.685 [pool-12-thread-46] WARN  c.m.bet.tasks.SportyBetOddsFetcher - ⚠️ REJECTING STALE DATA: Event sr:match:66820142 is 8496ms old (threshold: 5000ms)
+2025-12-16 00:53:43.685 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=0] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:43.988 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 307ms
+2025-12-16 00:53:43.990 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:43.990 [pool-10-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 309ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:45.775 [pool-9-thread-3] INFO  c.m.bet.tasks.SportyBetOddsFetcher - All sports fetch cycle triggered in 0ms [queue=0, active=2] | FB=OFF | BB=OFF | TT=ON
+2025-12-16 00:53:45.775 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Fetching events list from API...
+2025-12-16 00:53:46.194 [pool-9-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Tick — queued=0, activeFetches=0, setupOK=true
+2025-12-16 00:53:46.293 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - ✅ TableTennis: Response received in 518ms
+2025-12-16 00:53:46.294 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Extracted 8 live events for TableTennis
+2025-12-16 00:53:46.294 [pool-10-thread-4] INFO  c.m.bet.tasks.SportyBetOddsFetcher - TableTennis: Completed in 519ms - queued 8/8 events (skipped: 0)
+2025-12-16 00:53:46.346 [SpringApplicationShutdownHook] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Shutdown requested
+2025-12-16 00:53:46.347 [scraper-orchestrator-1] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Fatal error in main loop
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep0(Native Method)
+	at java.base/java.lang.Thread.sleep(Thread.java:509)
+	at com.mouse.bet.tasks.SportyBetOddsFetcher.runHealthMonitor(SportyBetOddsFetcher.java:256)
+	at com.mouse.bet.tasks.SportyBetOddsFetcher.run(SportyBetOddsFetcher.java:159)
+	at com.mouse.bet.tasks.Player.lambda$startAllScrapers$1(Player.java:144)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-12-16 00:53:46.347 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - === Shutting down (Pure OkHttp Mode) ===
+2025-12-16 00:53:46.347 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Shutting down executors...
+2025-12-16 00:53:46.383 [pool-11-thread-12] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 88ms: 
+2025-12-16 00:53:46.383 [pool-11-thread-12] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.383 [pool-11-thread-12] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:66820142: Interrupted during retry backoff
+2025-12-16 00:53:46.385 [pool-11-thread-27] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 90ms: 
+2025-12-16 00:53:46.385 [pool-11-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 90ms: 
+2025-12-16 00:53:46.385 [pool-11-thread-5] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.385 [pool-11-thread-27] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.385 [pool-11-thread-5] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:66772252: Interrupted during retry backoff
+2025-12-16 00:53:46.385 [pool-11-thread-27] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:B38QJp7erTzSu50u9RXjOLg: Interrupted during retry backoff
+2025-12-16 00:53:46.385 [pool-11-thread-98] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 90ms: 
+2025-12-16 00:53:46.385 [pool-11-thread-98] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.385 [pool-11-thread-98] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:66772246: Interrupted during retry backoff
+2025-12-16 00:53:46.386 [pool-11-thread-29] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 90ms: 
+2025-12-16 00:53:46.386 [pool-11-thread-29] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.386 [pool-11-thread-14] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 91ms: 
+2025-12-16 00:53:46.386 [pool-11-thread-29] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:66820108: Interrupted during retry backoff
+2025-12-16 00:53:46.386 [pool-11-thread-14] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.386 [pool-11-thread-14] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:66772250: Interrupted during retry backoff
+2025-12-16 00:53:46.386 [pool-11-thread-13] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 91ms: 
+2025-12-16 00:53:46.386 [pool-11-thread-13] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.386 [pool-11-thread-13] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:66772248: Interrupted during retry backoff
+2025-12-16 00:53:46.386 [pool-11-thread-28] INFO  c.m.bet.tasks.SportyBetOddsFetcher - IO error after 92ms: 
+2025-12-16 00:53:46.386 [pool-11-thread-28] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Retrying request (attempt 1/2)
+2025-12-16 00:53:46.386 [pool-11-thread-28] ERROR c.m.bet.tasks.SportyBetOddsFetcher - Detail fetch failed for sr:match:Br5YpUd1FT-Wi4NoQObyIuA: Interrupted during retry backoff
+2025-12-16 00:53:46.386 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - Cleaning up HTTP client pool...
+2025-12-16 00:53:46.633 [scraper-orchestrator-1] INFO  c.m.bet.tasks.SportyBetOddsFetcher - === Shutdown complete ===

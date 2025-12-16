@@ -372,7 +372,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private void fetchAllSportsParallel() {
         if (!setupCompleted.get()) {
-            log.debug("Skipping fetch - setup not completed");
+            log.info("Skipping fetch - setup not completed");
             return;
         }
 
@@ -446,7 +446,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
         try {
             if (shouldSkipRequest(clientKey)) {
-                log.debug("{}: Skipping - too soon after last request", sportName);
+                log.info("{}: Skipping - too soon after last request", sportName);
                 return;
             }
 
@@ -559,7 +559,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
                 if (isTaskStale(task)) {
                     long age = System.currentTimeMillis() - task.getTimestamp();
-                    log.debug("Dropping stale task: eventId={}, age={}ms", task.getEventId(), age);
+                    log.warn("Dropping stale task: eventId={}, age={}ms", task.getEventId(), age);
                     continue;
                 }
 
@@ -611,11 +611,11 @@ public class SportyBetOddsFetcher implements Runnable {
                         processParsedEvent(domainEvent, dataAge);
                     }
                 } catch (Exception ex) {
-                    log.debug("Process failed for {}: {}", task.getEventId(), ex.getMessage());
+                    log.error("Process failed for {}: {}", task.getEventId(), ex.getMessage());
                 }
             });
         } catch (Exception e) {
-            log.debug("Detail fetch failed for {}: {}", task.getEventId(), e.getMessage());
+            log.error("Detail fetch failed for {}: {}", task.getEventId(), e.getMessage());
         }
     }
 
@@ -631,7 +631,7 @@ public class SportyBetOddsFetcher implements Runnable {
             if (normalized == null) return;
 
             if (dataAge > 3000) {
-                log.debug("Processing event {} with data age: {}ms", event.getEventId(), dataAge);
+                log.info("Processing event {} with data age: {}ms", event.getEventId(), dataAge);
             }
 
             CompletableFuture.runAsync(() -> processBetRetryInfo(normalized), retryExecutor)
@@ -641,7 +641,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 arbDetector.addEventToPool(normalized);
             }
         } catch (Exception e) {
-            log.debug("processParsedEvent failed for {}: {}", event.getEventId(), e.getMessage());
+            log.info("processParsedEvent failed for {}: {}", event.getEventId(), e.getMessage());
         }
     }
 
@@ -649,14 +649,14 @@ public class SportyBetOddsFetcher implements Runnable {
         try {
             betLegRetryService.updateFailedBetLeg(normalizedEvent, SCRAPER_BOOKMAKER);
         } catch (Exception e) {
-            log.debug("BetLegRetry failed for {}: {}", normalizedEvent.getEventId(), e.getMessage());
+            log.info("BetLegRetry failed for {}: {}", normalizedEvent.getEventId(), e.getMessage());
         }
     }
 
     // ==================== HTTP LAYER (OKHTTP) ====================
     private String safeApiGet(String url, String clientKey, int retry, Integer perRequestTimeoutMs) {
         if (retry > API_MAX_RETRIES) {
-            log.debug("HTTP max retries exceeded for: {}", url);
+            log.info("HTTP max retries exceeded for: {}", url);
             consecutiveRateLimitErrors.incrementAndGet();
             throw new RuntimeException("HTTP retried too many times: " + url);
         }
@@ -689,7 +689,7 @@ public class SportyBetOddsFetcher implements Runnable {
             return handleIOException(url, clientKey, retry, requestStart, e, perRequestTimeoutMs);
         } catch (Exception e) {
             long requestDuration = System.currentTimeMillis() - requestStart;
-            log.debug("API request failed after {}ms: {}", requestDuration, e.getMessage());
+            log.info("API request failed after {}ms: {}", requestDuration, e.getMessage());
             throw new RuntimeException("API request failed: " + e.getMessage(), e);
         }
     }
@@ -711,7 +711,7 @@ public class SportyBetOddsFetcher implements Runnable {
             }
 
             if (status < 200 || status >= 300) {
-                log.debug("HTTP {} for {} (took {}ms)", status, url, requestDuration);
+                log.info("HTTP {} for {} (took {}ms)", status, url, requestDuration);
                 throw new RuntimeException("HTTP " + status + " on " + url);
             }
 
@@ -750,7 +750,7 @@ public class SportyBetOddsFetcher implements Runnable {
                                            int status, long requestDuration,
                                            Integer perRequestTimeoutMs) {
         int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
-        log.debug("Auth/Forbidden error ({}) - possible rate limit, count: {}, duration: {}ms",
+        log.info("Auth/Forbidden error ({}) - possible rate limit, count: {}, duration: {}ms",
                 status, rateLimitCount, requestDuration);
 
         try {
@@ -765,7 +765,7 @@ public class SportyBetOddsFetcher implements Runnable {
 
     private void detectSlowRequest(long requestDuration) {
         int rateLimitCount = consecutiveRateLimitErrors.incrementAndGet();
-        log.debug("Suspiciously slow request detected: {}ms (threshold: {}ms) - possible throttling, count: {}",
+        log.info("Suspiciously slow request detected: {}ms (threshold: {}ms) - possible throttling, count: {}",
                 requestDuration, SLOW_REQUEST_THRESHOLD_MS, rateLimitCount);
     }
 
@@ -777,16 +777,16 @@ public class SportyBetOddsFetcher implements Runnable {
 
         if (msg.toLowerCase().contains("timeout")) {
             consecutiveTimeouts.incrementAndGet();
-            log.debug("Request timeout after {}ms: {}", requestDuration, msg);
+            log.info("Request timeout after {}ms: {}", requestDuration, msg);
         } else if (msg.toLowerCase().contains("connection")) {
             consecutiveNetworkErrors.incrementAndGet();
-            log.debug("Connection error after {}ms: {}", requestDuration, msg);
+            log.info("Connection error after {}ms: {}", requestDuration, msg);
         } else {
-            log.debug("IO error after {}ms: {}", requestDuration, msg);
+            log.info("IO error after {}ms: {}", requestDuration, msg);
         }
 
         if (retry < API_MAX_RETRIES) {
-            log.debug("Retrying request (attempt {}/{})", retry + 1, API_MAX_RETRIES);
+            log.info("Retrying request (attempt {}/{})", retry + 1, API_MAX_RETRIES);
 
             try {
                 Thread.sleep(200L * (retry + 1));
@@ -807,12 +807,12 @@ public class SportyBetOddsFetcher implements Runnable {
 
         if (msg.contains("429") || msg.contains("Too Many Requests")) {
             consecutiveRateLimitErrors.incrementAndGet();
-            log.debug("{} rate limit error (#{}): {}", context, n, msg);
+            log.info("{} rate limit error (#{}): {}", context, n, msg);
         } else if (msg.toLowerCase().contains("timeout")) {
             consecutiveTimeouts.incrementAndGet();
-            log.debug("{} timeout error (#{}): {}", context, n, msg);
+            log.info("{} timeout error (#{}): {}", context, n, msg);
         } else {
-            log.debug("{} network error (#{}): {}", context, n, msg);
+            log.info("{} network error (#{}): {}", context, n, msg);
         }
     }
 
@@ -919,7 +919,7 @@ public class SportyBetOddsFetcher implements Runnable {
                 client.cache().close();
             }
         } catch (Exception e) {
-            log.debug("Error shutting down OkHttp client: {}", e.getMessage());
+            log.info("Error shutting down OkHttp client: {}", e.getMessage());
         }
     }
 }

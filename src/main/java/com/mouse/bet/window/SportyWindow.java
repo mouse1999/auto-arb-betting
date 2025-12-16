@@ -152,8 +152,8 @@ public class SportyWindow implements BettingWindow, Runnable {
             playwright = Playwright.create();
             browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                     .setHeadless(false)
-                    .setArgs(scraperConfig.getBROWSER_FlAGS())
-                    .setSlowMo(50));
+//                    .setArgs(scraperConfig.getBROWSER_FlAGS())
+                    .setSlowMo(0));
 
             log.info("{} {} Playwright initialized successfully", EMOJI_SUCCESS, EMOJI_INIT);
             log.info("Registering SportyBet Window for Bet placing");
@@ -185,11 +185,20 @@ public class SportyWindow implements BettingWindow, Runnable {
                 return;
             }
 
+            boolean intentRegisteredTEST = syncManager.registerIntent(arbId, BOOK_MAKER, myOdds.doubleValue());
+            if (!intentRegisteredTEST) {
+                flowLogger.logArbCancelledDuringIntent(arbId, BookMaker.M_SPORT);
+                return;
+            }
+
             // ========================================
             // STEP 2: NAVIGATE TO BET PAGE (slow operation)
             // ========================================
             flowLogger.logNavigationStart(arbId, BOOK_MAKER);
             boolean gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);
+
+//            takeScreenshot(page, BOOK_MAKER + arbId);
+
 
             if (!gameAvailable) {
                 flowLogger.logGameNotAvailable(arbId, BOOK_MAKER);
@@ -202,7 +211,20 @@ public class SportyWindow implements BettingWindow, Runnable {
             // ========================================
             // STEP 3: MARK READY
             // ========================================
+            Thread worker = new Thread(() -> {
+                boolean markedReadyTEST = syncManager.markReady(arbId, BookMaker.M_SPORT);
+                if (!markedReadyTEST) {
+                    flowLogger.logPartnerTimeout(arbId, BOOK_MAKER);
+                    arbPollingService.killArb(task.getArb());
+
+                }
+            });
+
+            worker.start();
+
+
             boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
+
             if (!markedReady) {
                 flowLogger.logPartnerTimeout(arbId, BOOK_MAKER);
                 arbPollingService.killArb(task.getArb());
@@ -226,21 +248,23 @@ public class SportyWindow implements BettingWindow, Runnable {
                 //if one partner is not ready then remove the arb for another window so  it wont navigate
 
                 arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
-                    int clearedCount = queue.size();
-                    if (!bookmaker.equals(BOOK_MAKER)) {
-                        LegTask legTask = queue.poll();
-
-                        assert legTask != null;
-                        Phaser phaser = legTask.getBarrier();
-                        phaser.arriveAndAwaitAdvance();
-
+                    // Skip bookmakers that don't match the current window
+                    if (bookmaker.equals(BOOK_MAKER)) {
+                        log.debug("⏭️ Skipping {} queue (current window: {})", bookmaker, BOOK_MAKER);
+                        return;
                     }
 
+                    int clearedCount = queue.size();
+                    LegTask legTask = queue.peek();
 
-                    log.info("Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
+                    if (legTask != null) {
+                        Phaser phaser = legTask.getBarrier();
+                        phaser.arriveAndAwaitAdvance();
+                    }
+
+                    log.info("✅ Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
                             bookmaker, clearedCount, BOOK_MAKER);
                 });
-                log.info("All worker queues cleared ");
                 return;
             }
 
@@ -343,7 +367,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         }
 
         arbPollingService.killArb(task.getArb());
-
+//
         Phaser phaser = task.getBarrier();
         flowLogger.logPrimaryReadyForNext(arbId, BOOK_MAKER);
         phaser.arriveAndAwaitAdvance();
@@ -618,6 +642,24 @@ public class SportyWindow implements BettingWindow, Runnable {
         }
     }
 
+
+
+    public static void takeScreenshot(Page page, String filename) {
+        // We use Paths.get() to create the target path
+        Path outputPath = Paths.get(filename);
+
+        try {
+            page.screenshot(new Page.ScreenshotOptions()
+                    .setPath(outputPath)        // Sets the output path and filename
+                    .setFullPage(true)          // Captures the entire page (including scrolling)
+                    .setType(ScreenshotType.PNG) // Use PNG for lossless quality
+            );
+            System.out.println("✅ Screenshot saved successfully to: " + outputPath.toAbsolutePath());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to take screenshot: " + e.getMessage());
+        }
+    }
+
     /**
      * Main window entry point - handles login, monitoring, and betting loop
      * OPTIMIZED: Better page lifecycle management, prevents multiple pages
@@ -770,8 +812,8 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 // Navigate with more lenient options
                 page.navigate(SPORTY_BET_URL, new Page.NavigateOptions()
-                        .setTimeout(60000)
-                        .setWaitUntil(WaitUntilState.DOMCONTENTLOADED));// More lenient than LOAD
+                        .setTimeout(120000)
+                        .setWaitUntil(WaitUntilState.NETWORKIDLE));// More lenient than LOAD
 
 //                // Wait for network to be idle (more stable)
 //                page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions()
@@ -977,7 +1019,6 @@ public class SportyWindow implements BettingWindow, Runnable {
                     processBetPlacement(page, task, myLeg);
                     randomHumanDelay(1000, 2300);
 
-                    navigateBack(page);
 //                    mockTaskSupplier.consume();
                     consecutiveErrors = 0; // Reset on success
 
@@ -1145,7 +1186,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             Locator liveBettingLink = withLocatorRetry(
                     page, "#header_nav_liveBetting",
                     loc -> {
-                        if (loc.isVisible(new Locator.IsVisibleOptions().setTimeout(5000))) {
+                        if (loc.isVisible(new Locator.IsVisibleOptions().setTimeout(120000))) {
                             return loc;
                         }
                         throw new RuntimeException("ID locator not visible");
@@ -1154,7 +1195,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             );
 
             if (liveBettingLink != null) {
-                liveBettingLink.click(new Locator.ClickOptions().setTimeout(10000));
+                liveBettingLink.click(new Locator.ClickOptions().setTimeout(50000));
                 log.info("Clicked 'Live Betting' using ID selector");
             } else {
                 throw new Exception("ID locator not visible");
@@ -1170,7 +1211,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 );
 
                 if (liveBettingLink != null) {
-                    liveBettingLink.click(new Locator.ClickOptions().setTimeout(10000));
+                    liveBettingLink.click(new Locator.ClickOptions().setTimeout(50000));
                     log.info("Clicked 'Live Betting' using text selector");
                 } else {
                     throw new Exception("Text selector failed");
@@ -1181,7 +1222,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 try {
                     page.getByRole(AriaRole.LINK,
                                     new Page.GetByRoleOptions().setName("Live Betting").setExact(true))
-                            .click(new Locator.ClickOptions().setTimeout(10000));
+                            .click(new Locator.ClickOptions().setTimeout(50000));
                     log.info("Clicked 'Live Betting' using getByRole (accessibility)");
                 } catch (Exception e3) {
                     throw new NavigationException("Failed to click 'Live Betting' tab using all fallback strategies", e3);
@@ -1193,8 +1234,8 @@ public class SportyWindow implements BettingWindow, Runnable {
             page.waitForURL(url -> url.toString().contains("/sport/live/"),
                     new Page.WaitForURLOptions().setTimeout(timeout));
 
-            page.waitForLoadState(LoadState.LOAD,
-                    new Page.WaitForLoadStateOptions().setTimeout(15000));
+            page.waitForLoadState(LoadState.DOMCONTENTLOADED,
+                    new Page.WaitForLoadStateOptions().setTimeout(50000));
 
             log.info("Successfully navigated to Live Betting page: " + page.url());
         } catch (Exception e) {
@@ -1232,7 +1273,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 if (element != null && element.count() > 0 && element.first().isVisible()) {
                     element.first().scrollIntoViewIfNeeded();
                     randomHumanDelay(500, 1000);
-                    element.first().click(new Locator.ClickOptions().setTimeout(10_000));
+                    element.first().click(new Locator.ClickOptions().setTimeout(120_000));
                     clicked = true;
                     log.info("✅ Clicked Multi View");
                     break;
@@ -1329,7 +1370,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 loc -> {
                     loc.first().waitFor(new Locator.WaitForOptions()
                             .setState(WaitForSelectorState.VISIBLE)
-                            .setTimeout(15000));
+                            .setTimeout(120000));
                     return loc.first();
                 },
                 RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
@@ -2191,53 +2232,70 @@ public class SportyWindow implements BettingWindow, Runnable {
             // Take screenshot after finding the market
             takeMarketScreenshot(page, market.replaceAll("[^a-zA-Z0-9]", "_"));
 
+            // ✅ Get all available outcomes for matching
+            log.info("Searching for outcome: '{}' in market: '{}'", outcome, market);
+            List<String> availableOutcomes = marketBlock.locator("span.m-table-cell-item").allTextContents();
+            log.info("Available outcomes in market: {}", availableOutcomes);
+
+            // ✅ Try to find exact match first, then closest match
+            String targetOutcome = outcome;
             String cellXPath = String.format(
                     ".//div[contains(@class,'m-table-cell--responsive') and not(contains(@class,'m-table-cell--disable'))]" +
-                            "//span[contains(@class,'m-table-cell-item') and normalize-space()=%s]",
-                    escapeXPath(outcome)
+                            "[.//span[contains(@class,'m-table-cell-item') and contains(normalize-space(), %s)]]",
+                    escapeXPath(targetOutcome)
             );
 
-            Locator outcomeCell = withLocatorRetry(
-                    page, "xpath=" + cellXPath,
-                    loc -> marketBlock.locator(loc.toString()).first()
-                            .locator("xpath=parent::div[contains(@class,'m-table-cell--responsive')]").first(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            Locator outcomeCell = marketBlock.locator("xpath=" + cellXPath).first();
 
-            if (outcomeCell == null || outcomeCell.count() == 0) {
-                log.warn("Outcome '{}' not found in market '{}'", outcome, market);
-                List<String> available = marketBlock.locator("span.m-table-cell-item").allTextContents();
-                log.warn("Available outcomes: {}", available);
+
+            // ✅ Final check - if still not found, fail
+            if (outcomeCell.count() == 0) {
+                log.error("❌ Outcome '{}' not found in market '{}' (even after fuzzy match)", outcome, market);
+                log.error("Available outcomes were: {}", availableOutcomes);
+                takeMarketScreenshot(page, "outcome-not-found-" + market.replaceAll("[^a-zA-Z0-9]", "_"));
                 return false;
             }
 
-            String displayedOdds = withLocatorRetry(
-                    page, "span.m-table-cell-item",
-                    loc -> outcomeCell.locator(loc.toString()).nth(1).textContent().trim(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            // ✅ Get the odds span (second span in the cell)
+            Locator oddsSpan = outcomeCell.locator("span.m-table-cell-item").nth(1);
+            String displayedOdds = oddsSpan.textContent().trim();
 
-            log.info("FOUND: {} → {} @ {}", market, outcome, displayedOdds);
+            if (targetOutcome.equals(outcome)) {
+                log.info("✅ FOUND: {} → {} @ {}", market, outcome, displayedOdds);
+            } else {
+                log.info("✅ FOUND (fuzzy): {} → {} (matched as '{}') @ {}",
+                        market, outcome, targetOutcome, displayedOdds);
+            }
 
             if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
-                log.warn("Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
+                log.warn("⚠️ Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
             }
 
             outcomeCell.scrollIntoViewIfNeeded();
             randomHumanDelay(100, 200);
 
+            // ✅ Highlight the cell before clicking (for debugging)
             try {
-                outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
+                outcomeCell.evaluate("el => el.style.border = '3px solid red'");
+                randomHumanDelay(50, 100);
             } catch (Exception e) {
-                outcomeCell.evaluate("el => el.click()");
+                log.debug("Could not highlight cell: {}", e.getMessage());
             }
 
-            log.info("CLICKED: {} → {} @ {}", market, outcome, displayedOdds);
+            try {
+                outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
+                log.info("✅ CLICKED: {} → {} @ {}", market, targetOutcome, displayedOdds);
+            } catch (Exception e) {
+                log.warn("Standard click failed, trying JS click: {}", e.getMessage());
+                outcomeCell.evaluate("el => el.click()");
+                log.info("✅ JS CLICKED: {} → {} @ {}", market, targetOutcome, displayedOdds);
+            }
+
             randomHumanDelay(100, 200);
             return true;
 
         } catch (Exception e) {
-            log.error("FATAL: Failed to select {} → {}", market, outcome, e);
+            log.error("❌ FATAL: Failed to select {} → {}", market, outcome, e);
             takeMarketScreenshot(page, "error-" + market.replaceAll("[^a-zA-Z0-9]", "_"));
             return false;
         }
@@ -2327,25 +2385,26 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             String displayedOutcome = withLocatorRetry(
                     page, ".m-item-play span",
-                    loc -> betItem.locator(loc.toString()).first().textContent().trim(),
+                    loc -> betItem.locator(loc).first().textContent().trim(),
                     RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
             );
 
             String displayedMarket = withLocatorRetry(
                     page, ".m-item-market",
-                    loc -> betItem.locator(loc.toString()).textContent().trim(),
+                    loc -> betItem.locator(loc).textContent().trim(),
                     RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
             );
 
             String displayedOdds = withLocatorRetry(
                     page, ".m-item-odds .m-text-main",
-                    loc -> betItem.locator(loc.toString()).textContent().trim(),
+
+                    loc -> betItem.locator(loc).textContent().trim(),
                     RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
             );
 
             String displayedTeam = withLocatorRetry(
                     page, ".m-item-team",
-                    loc -> betItem.locator(loc.toString()).textContent().trim(),
+                    loc -> betItem.locator(loc).textContent().trim(),
                     RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
             );
 
@@ -2696,7 +2755,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             String displayedOddsText = withLocatorRetry(
                     page, ".m-item-odds .m-text-main",
-                    loc -> betItem.locator(loc.toString()).textContent().trim(),
+                    loc -> betItem.locator(loc).textContent().trim(),
                     RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
             );
 
@@ -2822,7 +2881,8 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                         .setUserAgent(profile.getUserAgent())
-                        .setViewportSize(viewportSize)
+                        .setLocale("en-US")
+//                        .setViewportSize(viewportSize)
 //                        .setExtraHTTPHeaders(getAllHeaders(profile))
                         .setStorageStatePath(contextFilePath));
 
@@ -2860,7 +2920,8 @@ public class SportyWindow implements BettingWindow, Runnable {
 
         return browser.newContext(new Browser.NewContextOptions()
                 .setUserAgent(profile.getUserAgent())
-                .setViewportSize(profile.getViewport().getWidth(), profile.getViewport().getHeight())
+                        .setLocale("en-US")
+//                .setViewportSize(profile.getViewport().getWidth(), profile.getViewport().getHeight())
 //                .setExtraHTTPHeaders(getAllHeaders(profile))
         );
     }

@@ -1,12 +1,5 @@
 package com.mouse.bet;
 
-import com.google.gson.Gson;
-import com.microsoft.playwright.BrowserContext;
-import com.mouse.bet.model.profile.UserAgentProfile;
-import com.mouse.bet.tasks.Bet9jaOddsFetcher;
-import com.mouse.bet.tasks.SportyBetOddsFetcher;
-import com.mouse.bet.window.MSportWindow;
-import com.mouse.bet.window.SportyWindow;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;

@@ -181,6 +181,8 @@ public class MSportWindow implements BettingWindow, Runnable {
             // ========================================
             flowLogger.logNavigationStart(arbId, BOOK_MAKER);
             boolean gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
+            takeScreenshot(page, BOOK_MAKER + arbId);
+
 
             if (!gameAvailable) {
                 flowLogger.logGameNotAvailable(arbId, BOOK_MAKER);
@@ -217,20 +219,23 @@ public class MSportWindow implements BettingWindow, Runnable {
                 arbPollingService.killArb(task.getArb());
 
                 arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
-                    int clearedCount = queue.size();
-                    if (!bookmaker.equals(BOOK_MAKER)) {
-                        LegTask legTask = queue.poll();
-
-                        assert legTask != null;
-                        Phaser phaser = legTask.getBarrier();
-                        phaser.arriveAndAwaitAdvance();
-
+                    // Skip bookmakers that do match the current window
+                    if (bookmaker.equals(BOOK_MAKER)) {
+                        log.debug("⏭️ Skipping {} queue (current window: {})", bookmaker, BOOK_MAKER);
+                        return;
                     }
 
-                    log.info("Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
+                    int clearedCount = queue.size();
+                    LegTask legTask = queue.poll();
+
+                    if (legTask != null) {
+                        Phaser phaser = legTask.getBarrier();
+                        phaser.arriveAndAwaitAdvance();
+                    }
+
+                    log.info("✅ Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
                             bookmaker, clearedCount, BOOK_MAKER);
                 });
-                log.info("All worker queues cleared ");
                 return;
             }
 
@@ -724,6 +729,24 @@ public class MSportWindow implements BettingWindow, Runnable {
             }
 
             log.info("{} {} Window entry completed", EMOJI_SUCCESS, EMOJI_INIT);
+        }
+    }
+
+
+
+    public static void takeScreenshot(Page page, String filename) {
+        // We use Paths.get() to create the target path
+        Path outputPath = Paths.get(filename);
+
+        try {
+            page.screenshot(new Page.ScreenshotOptions()
+                    .setPath(outputPath)        // Sets the output path and filename
+                    .setFullPage(true)          // Captures the entire page (including scrolling)
+                    .setType(ScreenshotType.PNG) // Use PNG for lossless quality
+            );
+            log.info("✅ Screenshot saved successfully to: " + outputPath.toAbsolutePath());
+        } catch (Exception e) {
+            log.error("❌ Failed to take screenshot: " + e.getMessage());
         }
     }
 

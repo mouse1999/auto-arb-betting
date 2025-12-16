@@ -98,23 +98,23 @@ public class WindowPlayer {
 
         try {
 
-            // Submit MSport window
-            Future<?> mSportFuture = executorService.submit(() -> {
-                try {
-                    log.info("{} {} window thread started", EMOJI_SUCCESS, BookMaker.M_SPORT);
-                    mSportWindow.run();
-                    log.info("{} {} window thread completed", EMOJI_SUCCESS, BookMaker.M_SPORT);
-                } catch (Exception e) {
-                    log.error("{} {} window crashed: {}",
-                            EMOJI_ERROR, BookMaker.M_SPORT, e.getMessage(), e);
-                    throw new RuntimeException("MSport window failed", e);
-                }
-            });
-            runningTasks.add(mSportFuture);
-            log.info("{} window submitted to executor", BookMaker.M_SPORT);
-
-            // Small delay to stagger startup
-            Thread.sleep(2000);
+//            // Submit MSport window
+//            Future<?> mSportFuture = executorService.submit(() -> {
+//                try {
+//                    log.info("{} {} window thread started", EMOJI_SUCCESS, BookMaker.M_SPORT);
+//                    mSportWindow.run();
+//                    log.info("{} {} window thread completed", EMOJI_SUCCESS, BookMaker.M_SPORT);
+//                } catch (Exception e) {
+//                    log.error("{} {} window crashed: {}",
+//                            EMOJI_ERROR, BookMaker.M_SPORT, e.getMessage(), e);
+//                    throw new RuntimeException("MSport window failed", e);
+//                }
+//            });
+//            runningTasks.add(mSportFuture);
+//            log.info("{} window submitted to executor", BookMaker.M_SPORT);
+//
+//            // Small delay to stagger startup
+//            Thread.sleep(2000);
 
             // Submit Sporty window
             Future<?> sportyFuture = executorService.submit(() -> {
