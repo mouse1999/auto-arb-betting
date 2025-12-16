@@ -141,7 +141,7 @@ public class MSportWindow implements BettingWindow, Runnable {
         try {
             playwright = Playwright.create();
             browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(false)
+                    .setHeadless(true)
                     .setArgs(scraperConfig.getBROWSER_FlAGS())
                     .setSlowMo(50));
 
@@ -159,6 +159,12 @@ public class MSportWindow implements BettingWindow, Runnable {
 
 
 
+
+    // ===================================================================
+// USE THIS METHOD IN BOTH SportyWindow AND MSportWindow
+// Replace your existing processBetPlacement method with this one
+// ===================================================================
+
     private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
         String arbId = task.getArbId();
         BigDecimal myOdds = myLeg.getOdds();
@@ -172,7 +178,6 @@ public class MSportWindow implements BettingWindow, Runnable {
             boolean intentRegistered = syncManager.registerIntent(arbId, BOOK_MAKER, myOdds.doubleValue());
             if (!intentRegistered) {
                 flowLogger.logArbCancelledDuringIntent(arbId, BOOK_MAKER);
-                arbPollingService.killArb(task.getArb());
                 return;
             }
 
@@ -180,16 +185,20 @@ public class MSportWindow implements BettingWindow, Runnable {
             // STEP 2: NAVIGATE TO BET PAGE (slow operation)
             // ========================================
             flowLogger.logNavigationStart(arbId, BOOK_MAKER);
-            boolean gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
-            takeScreenshot(page, BOOK_MAKER + arbId);
 
+            // Use the appropriate navigation method based on BOOK_MAKER
+            boolean gameAvailable;
+            if (BOOK_MAKER == BookMaker.SPORTY_BET) {
+                gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
+            } else {
+                gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
+            }
 
             if (!gameAvailable) {
                 flowLogger.logGameNotAvailable(arbId, BOOK_MAKER);
                 syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Game not available");
                 syncManager.skipArbAndSync(arbId);
                 bettingMetricsService.recordArbFailure();
-                arbPollingService.killArb(task.getArb());
                 return;
             }
 
@@ -197,6 +206,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             // STEP 3: MARK READY
             // ========================================
             boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
+
             if (!markedReady) {
                 flowLogger.logPartnerTimeout(arbId, BOOK_MAKER);
                 arbPollingService.killArb(task.getArb());
@@ -218,15 +228,15 @@ public class MSportWindow implements BettingWindow, Runnable {
                 flowLogger.logPartnersNotReady(arbId, BOOK_MAKER);
                 arbPollingService.killArb(task.getArb());
 
+                // Clear partner's task queue
                 arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
-                    // Skip bookmakers that do match the current window
                     if (bookmaker.equals(BOOK_MAKER)) {
                         log.debug("⏭️ Skipping {} queue (current window: {})", bookmaker, BOOK_MAKER);
                         return;
                     }
 
                     int clearedCount = queue.size();
-                    LegTask legTask = queue.poll();
+                    LegTask legTask = queue.peek();
 
                     if (legTask != null) {
                         Phaser phaser = legTask.getBarrier();
@@ -242,234 +252,180 @@ public class MSportWindow implements BettingWindow, Runnable {
             flowLogger.logBothPartnersReady(arbId, BOOK_MAKER);
 
             // ========================================
-            // STEP 5: DETERMINE ROLE (PRIMARY vs SECONDARY)
+            // STEP 5: SIMULTANEOUS BETTING (NO WAITING)
             // ========================================
-            boolean isPrimary = syncManager.isPrimaryBookmaker(arbId, BOOK_MAKER);
-            BookMaker primaryBookmaker = syncManager.getPrimaryBookmaker(arbId);
+            log.info("🚀 SIMULTANEOUS BETTING | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
 
-            if (isPrimary) {
-                flowLogger.logPrimaryRole(arbId, BOOK_MAKER);
-                handlePrimaryBetting(page, task, myLeg, arbId);
-            } else {
-                flowLogger.logSecondaryRole(arbId, BOOK_MAKER, primaryBookmaker);
-                handleSecondaryBetting(page, task, myLeg, arbId);
+            // Verify bet deployment
+            boolean deployedBet = deployBet(page, task.getLeg());
+            flowLogger.logBetDeploymentCheck(arbId, BOOK_MAKER, deployedBet);
+
+            if (!deployedBet) {
+                log.warn("❌ Odds not available | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
+                arbPollingService.killArb(task.getArb());
+
+                Phaser phaser = task.getBarrier();
+                phaser.arriveAndAwaitAdvance();
+                return;
             }
 
-            bettingMetricsService.recordArbSuccess();
+            // Place the bet (BOTH WINDOWS DO THIS SIMULTANEOUSLY)
+            boolean betPlaced = placeBet(page, task.getArb(), myLeg);
+
+            if (betPlaced) {
+                log.info("✅ Bet PLACED | ArbId: {} | Bookmaker: {} | Stake: {} | Odds: {}",
+                        arbId, BOOK_MAKER, myLeg.getStake(), myLeg.getOdds());
+
+                // Notify success immediately
+                syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
+
+                waitForBetConfirmation(page);
+                flowLogger.logBetConfirmationWait(arbId, BOOK_MAKER);
+
+                randomHumanDelay(2000, 3000);
+
+                // Spend amount based on bookmaker
+                if (BOOK_MAKER == BookMaker.SPORTY_BET) {
+                    mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+                    closeSuccessModal(page);
+                } else {
+                    mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+                    closeSuccessModal(page);
+                }
+
+                flowLogger.logStakeSpent(arbId, BOOK_MAKER, myLeg.getStake());
+
+                String betId = extractBetId(page);
+                flowLogger.logBetIdExtracted(arbId, BOOK_MAKER, betId);
+                myLeg.markAsPlaced(betId, myLeg.getOdds());
+
+                // ========================================
+                // STEP 6: WAIT FOR PARTNER & HANDLE ROLLBACK IF NEEDED
+                // ========================================
+                handlePartnerResultAndRollback(page, arbId, betId, myLeg);
+
+                bettingMetricsService.recordArbSuccess();
+
+            } else {
+                log.error("❌ Bet placement FAILED | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+
+                // Notify failure immediately
+                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
+
+                // ========================================
+                // STEP 6: WAIT FOR PARTNER TO SEE IF THEY SUCCEEDED
+                // ========================================
+                log.info("⏳ Waiting to check if partner succeeded | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+
+                WindowSyncManager.PartnerBetResult partnerResult = syncManager.waitForPartnerBetCompletion(
+                        arbId,
+                        BOOK_MAKER,
+                        Duration.ofSeconds(betTimeoutSeconds + 5)
+                );
+
+                if (partnerResult.isSuccess()) {
+                    log.warn("⚠️ Partner SUCCEEDED but I FAILED - partner will rollback | ArbId: {} | Bookmaker: {}",
+                            arbId, BOOK_MAKER);
+                    flowLogger.logPartnerWillRollback(arbId, BOOK_MAKER);
+                } else {
+                    log.info("ℹ️ Both failed - no rollback needed | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                }
+            }
+
+            arbPollingService.killArb(task.getArb());
 
         } catch (Exception e) {
             flowLogger.logBetPlacementException(arbId, BOOK_MAKER, e);
             syncManager.skipArbAndSync(arbId);
-//            arbPollingService.killArb(task.getArb());
+
         } finally {
             clearBetSlip(page);
-
             arbPollingService.killArb(task.getArb());
             syncManager.unRegisterIntent(arbId, BOOK_MAKER);
             randomHumanDelay(500, 1500);
+
             try {
                 navigateBack(page);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
+
             randomHumanDelay(2000, 3000);
 
             Phaser phaser = task.getBarrier();
             phaser.arriveAndAwaitAdvance();
-
         }
     }
 
     /**
-     * Handle betting as PRIMARY bookmaker (bet first)
+     * Wait for partner's result and handle rollback if needed
+     * Called by the window that SUCCEEDED in placing their bet
      */
-    private void handlePrimaryBetting(Page page, LegTask task, BetLeg myLeg, String arbId) {
-        flowLogger.logPrimaryBettingStart(arbId, BOOK_MAKER);
-
-        // Verify bet deployment
-        boolean deployedBet = deployBet(page, task.getLeg());
-        flowLogger.logBetDeploymentCheck(arbId, BOOK_MAKER, deployedBet);
-
-        if (!deployedBet) {
-            flowLogger.logPrimaryOddsNotAvailable(arbId, BOOK_MAKER);
-
-            // Notify failure - secondary will NOT proceed
-            syncManager.notifyPrimaryCompleted(arbId, BOOK_MAKER, false, "Odds changed");
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
-            arbPollingService.killArb(task.getArb());
-
-            Phaser phaser = task.getBarrier();
-            phaser.arriveAndAwaitAdvance();
-            return;
-        }
-
-        // Place the bet
-        boolean betPlaced = placeBet(page, task.getArb(), myLeg);
-
-        if (betPlaced) {
-            flowLogger.logPrimaryBetPlaced(arbId, BOOK_MAKER, myLeg.getStake(), myLeg.getOdds());
-
-            // Notify PRIMARY success - releases secondary to proceed
-            syncManager.notifyPrimaryCompleted(arbId, BOOK_MAKER, true, null);
-            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
-
-            waitForBetConfirmation(page);
-            flowLogger.logBetConfirmationWait(arbId, BOOK_MAKER);
-
-            randomHumanDelay(2000, 3000);
-
-            mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-            flowLogger.logStakeSpent(arbId, BOOK_MAKER, myLeg.getStake());
-
-            closeSuccessModal(page);
-
-            String betId = extractBetId(page);
-            flowLogger.logBetIdExtracted(arbId, BOOK_MAKER, betId);
-            myLeg.markAsPlaced(betId, myLeg.getOdds());
-
-            // Wait to see if secondary needs rollback
-            waitForSecondaryAndHandleRollback(page, arbId, betId, myLeg);
-
-        } else {
-            flowLogger.logPrimaryBetFailed(arbId, BOOK_MAKER);
-
-            // Notify failure - secondary will NOT proceed
-            syncManager.notifyPrimaryCompleted(arbId, BOOK_MAKER, false, "Placement failed");
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
-        }
-
-    }
-
-    /**
-     * Handle betting as SECONDARY bookmaker (wait for primary, then bet)
-     */
-    private void handleSecondaryBetting(Page page, LegTask task, BetLeg myLeg, String arbId) throws InterruptedException {
-        flowLogger.logSecondaryWaitingForPrimary(arbId, BOOK_MAKER);
-
-        // Wait for primary to complete with timeout
-        WindowSyncManager.BetResult primaryResult = syncManager.waitForPrimaryBetResult(
-                arbId,
-                BOOK_MAKER,
-                Duration.ofSeconds(betTimeoutSeconds + 5)
-        );
-
-        if (!primaryResult.shouldProceed()) {
-            flowLogger.logSecondaryPrimaryFailed(arbId, BOOK_MAKER, primaryResult.getMessage());
-            arbPollingService.killArb(task.getArb());
-
-            Phaser phaser = task.getBarrier();
-            phaser.arriveAndAwaitAdvance();
-            return;
-        }
-
-        flowLogger.logSecondaryPrimarySucceeded(arbId, BOOK_MAKER);
-
-        // Verify bet deployment
-        boolean deployedBet = deployBet(page, task.getLeg());
-        flowLogger.logBetDeploymentCheck(arbId, BOOK_MAKER, deployedBet);
-
-        if (!deployedBet) {
-            flowLogger.logSecondaryOddsNotAvailableAfterPrimary(arbId, BOOK_MAKER);
-
-            // Critical: Primary succeeded but we can't place - request rollback
-            syncManager.requestRollback(arbId, BOOK_MAKER, "Secondary: Odds not available after primary success");
-            syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
-            flowLogger.logRollbackRequest(arbId, BOOK_MAKER, "Odds not available after primary success");
-
-            return;
-        }
-
-        // Place the bet
-        boolean betPlaced = placeBet(page, task.getArb(), myLeg);
-
-        if (betPlaced) {
-            flowLogger.logSecondaryBetPlaced(arbId, BOOK_MAKER, myLeg.getStake(), myLeg.getOdds());
-
-            syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
-            waitForBetConfirmation(page);
-            flowLogger.logBetConfirmationWait(arbId, BOOK_MAKER);
-
-            randomHumanDelay(2000, 3000);
-
-            mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-            flowLogger.logStakeSpent(arbId, BOOK_MAKER, myLeg.getStake());
-
-            closeSuccessModal(page);
-
-            String betId = extractBetId(page);
-            flowLogger.logBetIdExtracted(arbId, BOOK_MAKER, betId);
-            myLeg.markAsPlaced(betId, myLeg.getOdds());
-
-        } else {
-            flowLogger.logSecondaryBetFailedAfterPrimary(arbId, BOOK_MAKER);
-
-            // Retry once more since primary has bet
-            flowLogger.logSecondaryRetryAttempt(arbId, BOOK_MAKER);
-
-            boolean retrySuccess = monitorAndPlace(page, task.getLeg());
-            if (retrySuccess) {
-                flowLogger.logSecondaryRetrySuccess(arbId, BOOK_MAKER);
-                randomHumanDelay(3000, 5000);
-                mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-                flowLogger.logStakeSpent(arbId, BOOK_MAKER, myLeg.getStake());
-                closeSuccessModal(page);
-                syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
-            } else {
-                flowLogger.logSecondaryRetryFailedRollback(arbId, BOOK_MAKER);
-
-                // Critical: Primary succeeded but we failed - request rollback
-                syncManager.requestRollback(arbId, BOOK_MAKER, "Secondary: Bet placement failed");
-                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Placement failed");
-                flowLogger.logRollbackRequest(arbId, BOOK_MAKER, "Bet placement failed");
-                bettingMetricsService.recordRollbackTriggered();
-            }
-        }
-
-        ;
-        flowLogger.logSecondaryReadyForNext(arbId, BOOK_MAKER);
-
-    }
-
-    /**
-     * PRIMARY: Wait to see if SECONDARY needs rollback
-     */
-    private void waitForSecondaryAndHandleRollback(Page page, String arbId, String betId, BetLeg myLeg) {
+    private void handlePartnerResultAndRollback(Page page, String arbId, String betId, BetLeg myLeg) {
         try {
-            // Give secondary time to attempt their bet
-            flowLogger.logPrimaryWaitingForSecondary(arbId, BOOK_MAKER, betId);
-            Thread.sleep(5000); // Wait 5 seconds
+            log.info("⏳ Waiting for partner to complete | ArbId: {} | Bookmaker: {} | MyBetId: {}",
+                    arbId, BOOK_MAKER, betId);
 
-            if (syncManager.needsRollback(arbId, BOOK_MAKER)) {
-                String rollbackReason = syncManager.getRollbackReason(arbId);
-                flowLogger.logPrimaryRollbackNeeded(arbId, BOOK_MAKER, betId, rollbackReason);
+            // Wait for partner to finish betting
+            WindowSyncManager.PartnerBetResult partnerResult = syncManager.waitForPartnerBetCompletion(
+                    arbId,
+                    BOOK_MAKER,
+                    Duration.ofSeconds(betTimeoutSeconds + 5)
+            );
+
+            if (partnerResult.isSuccess()) {
+                log.info("✅ BOTH BETS PLACED SUCCESSFULLY | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                flowLogger.logBothBetsSucceeded(arbId, BOOK_MAKER);
+                bettingMetricsService.recordArbSuccess();
+
+            } else if (partnerResult.isFailed()) {
+                // Partner failed - need to rollback my successful bet
+                log.warn("⚠️ PARTNER FAILED - ROLLBACK NEEDED | ArbId: {} | Bookmaker: {} | MyBetId: {} | PartnerReason: {}",
+                        arbId, BOOK_MAKER, betId, partnerResult.getMessage());
+
+                flowLogger.logRollbackNeeded(arbId, BOOK_MAKER, betId, partnerResult.getMessage());
+
+                // Initiate rollback
+                syncManager.requestRollback(arbId, BOOK_MAKER, "Partner failed: " + partnerResult.getMessage());
 
                 boolean rollbackSuccess = performRollback(page, arbId, betId, myLeg);
                 syncManager.notifyRollbackCompleted(arbId, BOOK_MAKER, rollbackSuccess);
 
                 if (rollbackSuccess) {
-                    flowLogger.logPrimaryRollbackSuccess(arbId, BOOK_MAKER, betId);
+                    log.info("✅ ROLLBACK SUCCESSFUL | ArbId: {} | Bookmaker: {} | BetId: {}", arbId, BOOK_MAKER, betId);
+                    flowLogger.logRollbackSuccess(arbId, BOOK_MAKER, betId);
+                    bettingMetricsService.recordRollbackResult(true);
                 } else {
-                    flowLogger.logPrimaryRollbackFailed(arbId, BOOK_MAKER, betId);
+                    log.error("❌ ROLLBACK FAILED | ArbId: {} | Bookmaker: {} | BetId: {} | MANUAL INTERVENTION REQUIRED",
+                            arbId, BOOK_MAKER, betId);
+                    flowLogger.logRollbackFailed(arbId, BOOK_MAKER, betId);
+                    bettingMetricsService.recordRollbackResult(false);
                     // TODO: Send alert to operator
                 }
+
             } else {
-                flowLogger.logPrimarySecondarySucceeded(arbId, BOOK_MAKER);
+                log.warn("⏱️ Partner timed out or error | ArbId: {} | Bookmaker: {} | Result: {}",
+                        arbId, BOOK_MAKER, partnerResult.getType());
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            flowLogger.logPrimaryInterruptedWaitingForRollback(arbId, BOOK_MAKER);
+
+        } catch (Exception e) {
+            log.error("❌ Exception during partner result handling | ArbId: {} | Bookmaker: {} | Error: {}",
+                    arbId, BOOK_MAKER, e.getMessage(), e);
         }
     }
 
     /**
      * Perform rollback - cancel/cash out the bet
+     * SAME IMPLEMENTATION FOR BOTH WINDOWS
      */
     private boolean performRollback(Page page, String arbId, String betId, BetLeg myLeg) {
         flowLogger.logRollbackAttemptStart(arbId, BOOK_MAKER, betId);
 
         try {
-            // Option 1: Navigate to bet slip history and try to cash out
-            page.navigate(M_SPORT_BET_URL + "/mybets");
+            // Navigate to bet history
+            String baseUrl = BOOK_MAKER == BookMaker.SPORTY_BET ? "https://www.sportybet.com/ng" : "https://www.msport.com/ng/web";
+            page.navigate(baseUrl + "/mybets");
             page.waitForTimeout(2000);
 
             // Look for the specific bet
@@ -495,19 +451,18 @@ public class MSportWindow implements BettingWindow, Runnable {
                         flowLogger.logRollbackCashOutExecuted(betId, BOOK_MAKER);
 
                         // Credit back the stake
-                        mSportLoginUtils.creditAmount(BOOK_MAKER, myLeg.getStake().doubleValue(), arbId);
-                        flowLogger.logStakeCredited(arbId, BOOK_MAKER, myLeg.getStake().doubleValue());
-                        bettingMetricsService.recordRollbackResult(true);
+                        if (BOOK_MAKER == BookMaker.SPORTY_BET) {
+                            mSportLoginUtils.creditAmount(BOOK_MAKER, myLeg.getStake().doubleValue(), arbId);
+                        } else {
+                            mSportLoginUtils.creditAmount(BOOK_MAKER, myLeg.getStake().doubleValue(), arbId);
+                        }
 
+                        flowLogger.logStakeCredited(arbId, BOOK_MAKER, myLeg.getStake().doubleValue());
                         return true;
                     }
                 } else {
                     flowLogger.logRollbackCashOutNotAvailable(betId, BOOK_MAKER);
-
-                    // Option 2: Try to place opposite bet for hedging
-                    flowLogger.logRollbackHedgeAttempt(betId, BOOK_MAKER);
                     // TODO: Implement hedge betting logic
-
                     return false;
                 }
             } else {
