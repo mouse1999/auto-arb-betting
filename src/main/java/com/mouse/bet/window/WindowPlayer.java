@@ -98,25 +98,25 @@ public class WindowPlayer {
 
         try {
 
-//            // Submit MSport window
-//            Future<?> mSportFuture = executorService.submit(() -> {
-//                try {
-//                    log.info("{} {} window thread started", EMOJI_SUCCESS, BookMaker.M_SPORT);
-//                    mSportWindow.run();
-//                    log.info("{} {} window thread completed", EMOJI_SUCCESS, BookMaker.M_SPORT);
-//                } catch (Exception e) {
-//                    log.error("{} {} window crashed: {}",
-//                            EMOJI_ERROR, BookMaker.M_SPORT, e.getMessage(), e);
-//                    throw new RuntimeException("MSport window failed", e);
-//                }
-//            });
-//            runningTasks.add(mSportFuture);
-//            log.info("{} window submitted to executor", BookMaker.M_SPORT);
-//
-//            // Small delay to stagger startup
-//            Thread.sleep(2000);
+            // Submit MSport window
+            Future<?> mSportFuture = executorService.submit(() -> {
+                try {
+                    log.info("{} {} window thread started", EMOJI_SUCCESS, BookMaker.M_SPORT);
+                    mSportWindow.run();
+                    log.info("{} {} window thread completed", EMOJI_SUCCESS, BookMaker.M_SPORT);
+                } catch (Exception e) {
+                    log.error("{} {} window crashed: {}",
+                            EMOJI_ERROR, BookMaker.M_SPORT, e.getMessage(), e);
+                    throw new RuntimeException("MSport window failed", e);
+                }
+            });
+            runningTasks.add(mSportFuture);
+            log.info("{} window submitted to executor", BookMaker.M_SPORT);
 
-            // Submit Sporty window
+            // Small delay to stagger startup
+            Thread.sleep(7000);
+
+//             Submit Sporty window
             Future<?> sportyFuture = executorService.submit(() -> {
                 try {
                     log.info("{} {} window thread started", EMOJI_SUCCESS, BookMaker.SPORTY_BET);
@@ -155,34 +155,38 @@ public class WindowPlayer {
                 try {
                     Thread.sleep(5000); // Check every 5 seconds
 
-                    int completedCount = 0;
-                    int failedCount = 0;
-
-                    for (Future<?> task : runningTasks) {
-                        if (task.isDone()) {
-                            completedCount++;
-                            try {
-                                task.get(); // Check if it completed successfully
-                            } catch (ExecutionException e) {
-                                failedCount++;
-                                log.error("{} Window task failed: {}",
-                                        EMOJI_ERROR, e.getCause().getMessage());
-                            } catch (Exception e) {
-                                log.debug("Task check error: {}", e.getMessage());
-                            }
-                        }
+                    // Check if MSport window is up and running
+                    boolean mSportRunning = mSportWindow.isWindowUpAndRunning();
+                    if (!mSportRunning) {
+                        log.error("{} {} {} window is NOT running!",
+                                EMOJI_ERROR, EMOJI_WARNING, BookMaker.M_SPORT);
+                    } else {
+                        log.debug("✅ {} window is running", BookMaker.M_SPORT);
                     }
 
-                    if (completedCount > 0) {
-                        log.info("📊 Window status: {} completed, {} failed, {} running",
-                                completedCount, failedCount, runningTasks.size() - completedCount);
+                    // Check if Sporty window is up and running
+                    boolean sportyRunning = sportyWindow.isWindowUpAndRunning();
+                    if (!sportyRunning) {
+                        log.error("{} {} {} window is NOT running!",
+                                EMOJI_ERROR, EMOJI_WARNING, BookMaker.SPORTY_BET);
+                    } else {
+                        log.debug("✅ {} window is running", BookMaker.SPORTY_BET);
                     }
 
-                    // If both windows are done, stop monitoring
-                    if (completedCount == runningTasks.size()) {
-                        log.info("✅ All windows completed - stopping monitor");
-                        isRunning.set(false);
+                    // Log status summary
+                    if (mSportRunning && sportyRunning) {
+                        log.info("📊 Window status: Both windows are UP and RUNNING");
+                    } else if (!mSportRunning && !sportyRunning) {
+                        log.error("{} {} CRITICAL: Both windows are DOWN - stopping player",
+                                EMOJI_ERROR, EMOJI_SHUTDOWN);
+                        stopWindows();
                         break;
+                    } else if (!mSportRunning) {
+                        log.warn("{} {} {} window is DOWN, {} window is running",
+                                EMOJI_WARNING, EMOJI_WINDOW, BookMaker.M_SPORT, BookMaker.SPORTY_BET);
+                    } else {
+                        log.warn("{} {} {} window is DOWN, {} window is running",
+                                EMOJI_WARNING, EMOJI_WINDOW, BookMaker.SPORTY_BET, BookMaker.M_SPORT);
                     }
 
                 } catch (InterruptedException e) {

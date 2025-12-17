@@ -11,6 +11,8 @@ import com.mouse.bet.service.ScraperCycleSyncService;
 import com.mouse.bet.service.SportyBetService;
 import com.mouse.bet.utils.DecompressionUtil;
 import com.mouse.bet.utils.JsonParser;
+import com.mouse.bet.window.MSportWindow;
+import com.mouse.bet.window.SportyWindow;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,8 @@ public class SportyBetOddsFetcher implements Runnable {
     private final BetLegRetryService betLegRetryService;
     private final ArbDetector arbDetector;
     private final ObjectMapper objectMapper;
+    private final SportyWindow sportyWindow;
+    private final MSportWindow mSportWindow;
     private final ScraperCycleSyncService cycleSync;
 
     private final String scraperId = "SportyBet-" + (Math.random() < 0.5 ? "A" : "B");
@@ -242,8 +246,14 @@ public class SportyBetOddsFetcher implements Runnable {
     private void runHealthMonitor() throws InterruptedException {
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                log.info("Tick — queued={}, activeFetches={}, setupOK={}",
-                        eventQueue.size(), activeDetailFetches.get(), setupCompleted.get());
+                boolean windowRunning = sportyWindow.isWindowUpAndRunning() && mSportWindow.isWindowUpAndRunning();
+                log.info("Tick — queued={}, activeFetches={}, setupOK={}, windowStatus={}",
+                        eventQueue.size(), activeDetailFetches.get(), setupCompleted.get(),
+                        windowRunning ? "UP" : "DOWN");
+
+                if (!windowRunning) {
+                    log.error("❌ Sporty window is DOWN - scraper will pause fetching");
+                }
             } catch (Throwable t) {
                 log.error("Heartbeat error: {}", t.getMessage());
             }
@@ -320,8 +330,8 @@ public class SportyBetOddsFetcher implements Runnable {
         long timeSinceReset = System.currentTimeMillis() - lastMetricsReset.get();
         long avgResponseTime = calculateAverageResponseTime();
         long currentCadence = dynamicCadenceSec.get();
+        boolean windowRunning = sportyWindow.isWindowUpAndRunning(); // ✅ Added window status
 
-        // ✅ Connection pool stats across all clients
         int totalIdle = 0;
         int totalConn = 0;
         for (OkHttpClient client : httpClientPool) {
@@ -333,10 +343,15 @@ public class SportyBetOddsFetcher implements Runnable {
 
         log.info("Health — Active: {}, Queued: {}, NetErrors: {}, RateLimit: {}, Timeouts: {}, " +
                         "Requests: {}, TimeSinceReset: {}s, AvgResponse: {}ms, " +
-                        "Cadence: {}s, TotalConnections: {}/{} idle, ClientPoolSize: {}",
+                        "Cadence: {}s, TotalConnections: {}/{} idle, ClientPoolSize: {}, WindowStatus: {}",
                 active, queued, netErrors, rateLimitErrors, timeouts, requests,
                 timeSinceReset / 1000, avgResponseTime, currentCadence,
-                totalIdle, totalConn, httpClientPool.size());
+                totalIdle, totalConn, httpClientPool.size(), windowRunning ? "UP" : "DOWN");
+
+        // ✅ Alert if window is down
+        if (!windowRunning) {
+            log.error("❌❌❌ CRITICAL: Sporty window is DOWN - scraper cannot fetch events! ❌❌❌");
+        }
 
         if (avgResponseTime > 5000) {
             log.error("❌❌❌ CRITICAL: Average response time {}ms - LIVE ARB INEFFECTIVE! ❌❌❌",
@@ -373,6 +388,11 @@ public class SportyBetOddsFetcher implements Runnable {
     private void fetchAllSportsParallel() {
         if (!setupCompleted.get()) {
             log.info("Skipping fetch - setup not completed");
+            return;
+        }
+
+        if (!(sportyWindow.isWindowUpAndRunning() && mSportWindow.isWindowUpAndRunning())) {
+            log.warn("⚠️ Sporty window is NOT running - skipping fetch cycle");
             return;
         }
 
@@ -445,6 +465,12 @@ public class SportyBetOddsFetcher implements Runnable {
         long fetchStart = System.currentTimeMillis();
 
         try {
+
+            if (!(sportyWindow.isWindowUpAndRunning() && mSportWindow.isWindowUpAndRunning())) {
+                log.warn("⚠️ MSport window went down - aborting {} fetch", sportName);
+                return;
+            }
+
             if (shouldSkipRequest(clientKey)) {
                 log.info("{}: Skipping - too soon after last request", sportName);
                 return;

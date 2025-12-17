@@ -98,6 +98,9 @@ public class MSportWindow implements BettingWindow, Runnable {
     private PageHealthMonitor healthMonitor;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isWindowUpAndRunning = new AtomicBoolean(false);
+
+
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isLoggedIn = new AtomicBoolean(false);
     @Getter
@@ -864,12 +867,14 @@ public class MSportWindow implements BettingWindow, Runnable {
     private void runBettingLoop(Page page, BookMaker bookmaker) throws Exception {
         log.info("{} {} Starting betting loop for {}", EMOJI_INIT, EMOJI_POLL, bookmaker);
 
-        MockTaskSupplier mockTaskSupplier = new MockTaskSupplier();
+//        MockTaskSupplier mockTaskSupplier = new MockTaskSupplier();
         int consecutiveErrors = 0;
         int maxConsecutiveErrors = 5;
 
         while (isRunning.get()) {
             try {
+                //assert that window is up and running
+                isWindowUpAndRunning.set(true);
                 // Check if paused
                 if (isPaused.get()) {
                     log.info("⏸️ Window paused, waiting... | Bookmaker: {}", bookmaker);
@@ -964,6 +969,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                     log.error("🚨 Too many consecutive errors ({}) - pausing window | Bookmaker: {}",
                             consecutiveErrors, BOOK_MAKER);
                     isPaused.set(true);
+                    isWindowUpAndRunning.set(false);
                     // Optionally: trigger alert or notification
                     consecutiveErrors = 0;
                 }
@@ -982,6 +988,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                 // Pause this window until re-login
                 isPaused.set(true);
+                isWindowUpAndRunning.set(false);
 
                 // Optionally: trigger re-login attempt
                 mSportLoginUtils.performLogin(page, msportUsername, msportPassword);
@@ -1000,6 +1007,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 if (consecutiveErrors >= maxConsecutiveErrors) {
                     log.error("🚨 Critical: Too many errors - stopping loop | Bookmaker: {}",
                             BOOK_MAKER);
+                    isWindowUpAndRunning.set(false);
                     break;
                 }
 
@@ -4145,6 +4153,7 @@ public class MSportWindow implements BettingWindow, Runnable {
         }
 
         isPaused.set(false);
+
         recreateContext();
     }
 
@@ -4596,6 +4605,10 @@ public class MSportWindow implements BettingWindow, Runnable {
      */
     public boolean isPaused() {
         return isPaused.get();
+    }
+
+    public boolean isWindowUpAndRunning() {
+        return !isPaused.get() && isWindowUpAndRunning.get();
     }
 
     /**

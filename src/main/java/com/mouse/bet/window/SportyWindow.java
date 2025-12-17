@@ -23,6 +23,8 @@ import com.mouse.bet.service.BettingMetricsService;
 import com.mouse.bet.tasks.LegTask;
 import com.mouse.bet.utils.SportyLoginUtils;
 import jakarta.annotation.PostConstruct;
+import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import static com.mouse.bet.utils.WindowUtils.attachAntiDetection;
 
@@ -109,6 +112,8 @@ public class SportyWindow implements BettingWindow, Runnable {
     private PageHealthMonitor healthMonitor;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isWindowUpAndRunning = new AtomicBoolean(false);
+
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isLoggedIn = new AtomicBoolean(false);
     @Getter
@@ -885,6 +890,8 @@ public class SportyWindow implements BettingWindow, Runnable {
 
         while (isRunning.get()) {
             try {
+
+                isWindowUpAndRunning.set(true);
                 // Check if paused
                 if (isPaused.get()) {
                     log.info("⏸️ Window paused, waiting... | Bookmaker: {}", bookmaker);
@@ -980,6 +987,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                     log.error("🚨 Too many consecutive errors ({}) - pausing window | Bookmaker: {}",
                             consecutiveErrors, BOOK_MAKER);
                     isPaused.set(true);
+                    isWindowUpAndRunning.set(false);
                     // Optionally: trigger alert or notification
                     consecutiveErrors = 0;
                 }
@@ -998,6 +1006,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 // Pause this window until re-login
                 isPaused.set(true);
+                isWindowUpAndRunning.set(false);
 
                 // Optionally: trigger re-login attempt
                 sportyLoginUtils.performLogin(page, sportyUsername, sportyPassword);
@@ -2498,8 +2507,9 @@ public class SportyWindow implements BettingWindow, Runnable {
                 Locator btn = page.locator("button.af-button--primary >> visible=true").first();
                 if (btn.count() == 0) {
                     log.info("Primary button gone → likely success");
-                    betConfirmed = true;
-                    break;
+//                    betConfirmed = true;
+//                    break;
+                    continue; //todo: placing continue here will still make the game to be monitored
                 }
 
                 String text = btn.innerText().trim();
@@ -3569,7 +3579,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         }
     }
 
-    private <T> T withLocatorRetry(Page page, String selector, java.util.function.Function<Locator, T> action,
+    private <T> T withLocatorRetry(Page page, String selector, Function<Locator, T> action,
                                    int maxRetries, long timeoutPerAttemptMs, long delayMs) {
         Locator locator = page.locator(selector);
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
@@ -3710,11 +3720,19 @@ public class SportyWindow implements BettingWindow, Runnable {
                 .build();
     }
 
+    public boolean isWindowUpAndRunning() {
+        return !isPaused.get() && isWindowUpAndRunning.get();
+    }
+
+//    public void setWindowUpAndRunning(boolean windowUpAndRunning) {
+//        this.windowUpAndRunning = windowUpAndRunning;
+//    }
+
     /**
      * Window status data class
      */
-    @lombok.Builder
-    @lombok.Data
+    @Builder
+    @Data
     public static class WindowStatus {
         private BookMaker bookmaker;
         private boolean isRunning;

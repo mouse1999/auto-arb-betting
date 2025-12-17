@@ -1,6 +1,8 @@
 package com.mouse.bet.tasks;
 
 import com.mouse.bet.config.ScraperConfig;
+import com.mouse.bet.window.MSportWindow;
+import com.mouse.bet.window.SportyWindow;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -27,16 +29,20 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
     private final SportyBetOddsFetcher sportyBetOddsFetcher;
 //    private final Bet9jaOddsFetcher bet9jaOddsFetcher;
     private final MSportOddsFetcher mSportOddsFetcher;
+    private final SportyWindow sportyWindow;
+    private final MSportWindow mSportWindow;
 
 
     public Player(ScraperConfig scraperConfig,
                   SportyBetOddsFetcher sportyBetOddsFetcher,
 //                  Bet9jaOddsFetcher bet9jaOddsFetcher,
-                  MSportOddsFetcher mSportOddsFetcher) {
+                  MSportOddsFetcher mSportOddsFetcher, SportyWindow sportyWindow, MSportWindow mSportWindow) {
         this.scraperConfig = scraperConfig;
         this.sportyBetOddsFetcher = sportyBetOddsFetcher;
 //        this.bet9jaOddsFetcher = bet9jaOddsFetcher;
         this.mSportOddsFetcher = mSportOddsFetcher;
+        this.sportyWindow = sportyWindow;
+        this.mSportWindow = mSportWindow;
     }
 
 
@@ -121,7 +127,7 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         if (isRunning.compareAndSet(false, true)) {
             log.info("wait for some minute");
             try {
-                Thread.sleep(150_000);
+                Thread.sleep(70_000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -133,66 +139,115 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
     }
 
     // ==================== START ALL SCRAPERS ====================
+    // ==================== START ALL SCRAPERS ====================
     private void startAllScrapers() {
         log.info("Starting all enabled scrapers...");
+        log.info("Checking if betting windows are up and running...");
+
+        // ✅ Wait for windows to be up and running before starting scrapers
+        if (!waitForWindowsToBeReady()) {
+            log.error("❌ Windows failed to start - aborting scraper startup");
+            return;
+        }
+
+        log.info("✅ Both windows are UP - proceeding with scraper startup");
 
         // ✅ SportyBet Scraper
         if (scraperConfig.isSportyBetEnabled()) {
             log.info("✅ SportyBet scraper is ENABLED");
-            Future<?> future = orchestratorExecutor.submit(() -> {
-                try {
-                    sportyBetOddsFetcher.run();
-                } catch (Exception e) {
-                    log.error("SportyBet scraper crashed: {}", e.getMessage(), e);
-                    throw e;
-                }
-            });
-            activeTasks.add(new ScraperTask("SportyBet", sportyBetOddsFetcher, true, future));
+
+            // Verify Sporty window is running before starting scraper
+            if (sportyWindow.isWindowUpAndRunning()) {
+                Future<?> future = orchestratorExecutor.submit(() -> {
+                    try {
+                        log.info("🚀 Starting SportyBet scraper...");
+                        sportyBetOddsFetcher.run();
+                    } catch (Exception e) {
+                        log.error("SportyBet scraper crashed: {}", e.getMessage(), e);
+                        throw e;
+                    }
+                });
+                activeTasks.add(new ScraperTask("SportyBet", sportyBetOddsFetcher, true, future));
+                log.info("✅ SportyBet scraper started successfully");
+            } else {
+                log.error("❌ Sporty window is NOT running - skipping SportyBet scraper");
+            }
         } else {
             log.warn("⚠️ SportyBet scraper is DISABLED in configuration");
         }
 
+        // Add delay between scraper starts
         try {
-            Thread.sleep(2000);
+            Thread.sleep(15000);
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting between scraper starts");
         }
 
-//        // ✅ Bet9ja Scraper
-//        if (scraperConfig.isBet9jaEnabled()) {
-//            log.info("✅ Bet9ja scraper is ENABLED");
-//            Future<?> future = orchestratorExecutor.submit(() -> {
-//                try {
-//                    bet9jaOddsFetcher.run();
-//                } catch (Exception e) {
-//                    log.error("Bet9ja scraper crashed: {}", e.getMessage(), e);
-//                    throw e;
-//                }
-//            });
-//            activeTasks.add(new ScraperTask("Bet9ja", bet9jaOddsFetcher, true, future));
-//        } else {
-//            log.warn("⚠️ Bet9ja scraper is DISABLED in configuration");
-//        }
+        // ✅ MSport Scraper
+        if (scraperConfig.isBetKingEnabled()) {
+            log.info("✅ MSport scraper is ENABLED");
 
-        // ✅ Add more scrapers here
-         if (scraperConfig.isBetKingEnabled()) {
-             log.info("✅ MSport scraper is ENABLED");
-             Future<?> future = orchestratorExecutor.submit(() -> {
-                 try {
-                     mSportOddsFetcher.run();
-                 } catch (Exception e) {
-                     log.error("Msport scraper crashed: {}", e.getMessage(), e);
-                     throw e;
-                 }
-             });
-             activeTasks.add(new ScraperTask("MSport", mSportOddsFetcher, true, future));
-         } else {
-             log.warn("⚠️ MSport scraper is DISABLED in configuration");
-         }
+            // Verify MSport window is running before starting scraper
+            if (mSportWindow.isWindowUpAndRunning()) {
+                Future<?> future = orchestratorExecutor.submit(() -> {
+                    try {
+                        log.info("🚀 Starting MSport scraper...");
+                        mSportOddsFetcher.run();
+                    } catch (Exception e) {
+                        log.error("MSport scraper crashed: {}", e.getMessage(), e);
+                        throw e;
+                    }
+                });
+                activeTasks.add(new ScraperTask("MSport", mSportOddsFetcher, true, future));
+                log.info("✅ MSport scraper started successfully");
+            } else {
+                log.error("❌ MSport window is NOT running - skipping MSport scraper");
+            }
+        } else {
+            log.warn("⚠️ MSport scraper is DISABLED in configuration");
+        }
 
         log.info("═══════════════════════════════════════════════════════════");
         log.info("   {} SCRAPERS STARTED SUCCESSFULLY", activeTasks.size());
         log.info("═══════════════════════════════════════════════════════════");
+    }
+
+    /**
+     * Wait for both windows to be up and running before starting scrapers
+     * @return true if windows are ready, false if timeout or failure
+     */
+    private boolean waitForWindowsToBeReady() {
+        int maxAttempts = 60; // 5 minutes max wait (60 * 5 seconds)
+        int attempt = 0;
+
+        while (attempt < maxAttempts) {
+            attempt++;
+
+            boolean mSportReady = mSportWindow.isWindowUpAndRunning();
+            boolean sportyReady = sportyWindow.isWindowUpAndRunning();
+
+            if (mSportReady && sportyReady) {
+                log.info("✅ Both windows are UP and RUNNING (attempt {}/{})", attempt, maxAttempts);
+                return true;
+            }
+
+            log.info("⏳ Waiting for windows... MSport: {}, Sporty: {} (attempt {}/{})",
+                    mSportReady ? "UP" : "DOWN",
+                    sportyReady ? "UP" : "DOWN",
+                    attempt, maxAttempts);
+
+            try {
+                Thread.sleep(5000); // Wait 5 seconds before next check
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("❌ Interrupted while waiting for windows to be ready");
+                return false;
+            }
+        }
+
+        log.error("❌ Timeout waiting for windows to be ready after {} attempts", maxAttempts);
+        return false;
     }
 
     // ==================== HEALTH MONITORING ====================
