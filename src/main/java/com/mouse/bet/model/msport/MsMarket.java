@@ -63,8 +63,8 @@ public class MsMarket {
     @JsonProperty("guidance")
     private String guidance;
 
-    @JsonProperty("marketLabels")
-    private String marketLabels;
+//    @JsonProperty("marketLabels")
+//    private List<String> marketLabels;
 
     @JsonProperty("relatedMarketId")
     private String relatedMarketId;

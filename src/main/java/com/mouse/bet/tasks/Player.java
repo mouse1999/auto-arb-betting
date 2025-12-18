@@ -125,12 +125,6 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         log.info("═══════════════════════════════════════════════════════════");
 
         if (isRunning.compareAndSet(false, true)) {
-            log.info("wait for some minute");
-            try {
-                Thread.sleep(70_000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
             startAllScrapers();
             startHealthMonitoring();
         } else {
@@ -156,8 +150,8 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         if (scraperConfig.isSportyBetEnabled()) {
             log.info("✅ SportyBet scraper is ENABLED");
 
-            // Verify Sporty window is running before starting scraper
-            if (sportyWindow.isWindowUpAndRunning()) {
+            // Verify Sporty and msport window is running before starting scraper
+            if (sportyWindow.isWindowUpAndRunning() && mSportWindow.isWindowUpAndRunning()) {
                 Future<?> future = orchestratorExecutor.submit(() -> {
                     try {
                         log.info("🚀 Starting SportyBet scraper...");
@@ -178,7 +172,7 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
 
         // Add delay between scraper starts
         try {
-            Thread.sleep(15000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted while waiting between scraper starts");
@@ -188,8 +182,8 @@ public class Player implements ApplicationListener<ApplicationReadyEvent> {
         if (scraperConfig.isBetKingEnabled()) {
             log.info("✅ MSport scraper is ENABLED");
 
-            // Verify MSport window is running before starting scraper
-            if (mSportWindow.isWindowUpAndRunning()) {
+            // Verify MSport and sporty window is running before starting scraper
+            if (mSportWindow.isWindowUpAndRunning() && mSportWindow.isWindowUpAndRunning()) {
                 Future<?> future = orchestratorExecutor.submit(() -> {
                     try {
                         log.info("🚀 Starting MSport scraper...");

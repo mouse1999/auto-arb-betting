@@ -9,6 +9,7 @@ import com.mouse.bet.service.ArbPollingService;
 import com.mouse.bet.service.ArbService;
 
 import com.mouse.bet.tasks.LegTask;
+import com.mouse.bet.utils.ArbitrageUtil;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -158,6 +159,9 @@ public class ArbOrchestrator {
                 log.info("Trying to clear arb queue");
 
                 arbQueue.clear();
+
+                ArbitrageUtil.randomHumanDelay(60000, 150000);
+
 
             } catch (InterruptedException ie) {
                 log.warn("ArbOrchestrator loop interrupted", ie);

@@ -99,8 +99,8 @@ public class MSportMarketSearchUtils {
             // List of common "main" phrases that often get prefixed
             List<String> keyPhrases = List.of(
                     "point handicap", "game handicap", "total games", "total points",
-                    "game winner", "set winner", "correct score", "total sets",
-                    "total maps", "handicap", "over/under", "match winner", "1x2"
+                    "game winner", "set winner", "correct score", "total sets", "gg/ng",
+                    "total maps", "handicap", "over/under", "match winner", "1x2", "Asian Handicap"
             );
 
             String matchedKeyPhrase = null;

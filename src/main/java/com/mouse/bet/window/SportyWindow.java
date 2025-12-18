@@ -134,8 +134,14 @@ public class SportyWindow implements BettingWindow, Runnable {
     @Value("${sporty.poll.interval.ms:2000}")
     private long pollIntervalMs;
 
-    @Value("${sporty.bet.timeout.seconds:10}")
+    @Value("${bet.timeout.seconds:30}")
     private int betTimeoutSeconds;
+
+    @Value("${partner.timeout.seconds:10}")
+    private int partnerTimeout;
+
+    @Value("${deploy.timeout.seconds:3}")
+    private int deployTimeout;
 
     @Value("${fetch.enabled.football:false}")
     private boolean fetchFootballEnabled;
@@ -195,18 +201,11 @@ public class SportyWindow implements BettingWindow, Runnable {
                 return;
             }
 
-            // ========================================
-            // STEP 2: NAVIGATE TO BET PAGE (slow operation)
-            // ========================================
             flowLogger.logNavigationStart(arbId, BOOK_MAKER);
 
             // Use the appropriate navigation method based on BOOK_MAKER
-            boolean gameAvailable;
-            if (BOOK_MAKER == BookMaker.SPORTY_BET) {
-                gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);
-            } else {
-                gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);
-            }
+            boolean gameAvailable = navigateToGameOnSporty(page, task.getArb(), myLeg);;
+
 
             if (!gameAvailable) {
                 flowLogger.logGameNotAvailable(arbId, BOOK_MAKER);
@@ -216,9 +215,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 return;
             }
 
-            // ========================================
-            // STEP 3: MARK READY
-            // ========================================
+
             boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
 
             if (!markedReady) {
@@ -235,7 +232,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
                     arbId,
                     BOOK_MAKER,
-                    Duration.ofSeconds(betTimeoutSeconds)
+                    Duration.ofSeconds(partnerTimeout)
             );
 
             if (!partnersReady) {
@@ -265,24 +262,38 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             flowLogger.logBothPartnersReady(arbId, BOOK_MAKER);
 
-            // ========================================
-            // STEP 5: SIMULTANEOUS BETTING (NO WAITING)
-            // ========================================
             log.info("🚀 SIMULTANEOUS BETTING | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
 
             // Verify bet deployment
             boolean deployedBet = deployBet(page, task.getLeg());
-            flowLogger.logBetDeploymentCheck(arbId, BOOK_MAKER, deployedBet);
 
             if (!deployedBet) {
-                log.warn("❌ Odds not available | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
-                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
-                arbPollingService.killArb(task.getArb());
-
-                Phaser phaser = task.getBarrier();
-                phaser.arriveAndAwaitAdvance();
+                log.warn("❌ Bet deployment failed | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Deployment failed");
+                syncManager.skipArbAndSync(arbId);
                 return;
             }
+
+            boolean markedDeployed = syncManager.markDeploymentSuccess(arbId, BOOK_MAKER);
+            if (!markedDeployed) {
+                flowLogger.logArbCancelled(arbId, BOOK_MAKER);
+                return;
+            }
+
+            boolean partnerDeployed = syncManager.waitForPartnerDeploymentOrTimeout(
+                    arbId,
+                    BOOK_MAKER,
+                    Duration.ofSeconds(deployTimeout)
+            );
+
+            if (!partnerDeployed) {
+                log.warn("❌ Partner deployment failed or timeout | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                arbPollingService.killArb(task.getArb());
+                return;
+            }
+
+            log.info("✅ Both windows DEPLOYED - proceeding to mark ready | ArbId: {}", arbId);
+
 
             // Place the bet (BOTH WINDOWS DO THIS SIMULTANEOUSLY)
             boolean betPlaced = placeBet(page, task.getArb(), myLeg);
@@ -294,19 +305,15 @@ public class SportyWindow implements BettingWindow, Runnable {
                 // Notify success immediately
                 syncManager.notifyBetPlaced(arbId, BOOK_MAKER);
 
-                waitForBetConfirmation(page);
+//                waitForBetConfirmation(page);
                 flowLogger.logBetConfirmationWait(arbId, BOOK_MAKER);
 
                 randomHumanDelay(2000, 3000);
 
                 // Spend amount based on bookmaker
-                if (BOOK_MAKER == BookMaker.SPORTY_BET) {
-                    sportyLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-                    checkAndClosePopups(page);
-                } else {
-                    sportyLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-                    checkAndClosePopups(page);
-                }
+
+//                sportyLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+                checkAndClosePopups(page);
 
                 flowLogger.logStakeSpent(arbId, BOOK_MAKER, myLeg.getStake());
 
@@ -362,10 +369,13 @@ public class SportyWindow implements BettingWindow, Runnable {
             try {
                 navigateBack(page);
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+//                throw new RuntimeException(e);
+                log.error("Error during navigating back to sport page", e.getMessage());
             }
 
             randomHumanDelay(2000, 3000);
+
+            log.info("Getting ready to welcome another arb by {}", BOOK_MAKER);
 
             Phaser phaser = task.getBarrier();
             phaser.arriveAndAwaitAdvance();
@@ -899,17 +909,12 @@ public class SportyWindow implements BettingWindow, Runnable {
                     continue;
                 }
 
-                // Health check
-                // healthMonitor.checkHealth();
-                log.info("📊 Ready to poll task for betting | Bookmaker: {}", bookmaker);
-
                 // Poll for available Leg task
                  LegTask task = arbOrchestrator.getWorkerQueues().get(BOOK_MAKER).poll();
-                 log.info("task polled by {}", BOOK_MAKER);
+
 //                LegTask task = mockTaskSupplier.poll();
 
                 if (task == null) {
-                    log.info("the polled task is null for {}",BOOK_MAKER);
                     randomHumanDelay(500, 1000); // Small delay to prevent busy waiting
                     consecutiveErrors = 0; // Reset error counter on successful poll
                     continue;
@@ -957,27 +962,27 @@ public class SportyWindow implements BettingWindow, Runnable {
                             task.getArbId(), BOOK_MAKER);
 
                 } catch (PlaywrightException pe) {
-                    log.error("🎭 Playwright error during bet placement | ArbId: {} | Error: {}",
+                    log.error("🎭 Playwright error during bet deployment and placement | ArbId: {} | Error: {}",
                             task.getArbId(), pe.getMessage());
 
-                    // Notify failure and skip
-                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
-                            "Playwright error: " + pe.getMessage());
-                    syncManager.skipArbAndSync(task.getArbId());
-                    arbPollingService.killArb(task.getArb());
+//                    // Notify failure and skip
+//                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
+//                            "Playwright error: " + pe.getMessage());
+//                    syncManager.skipArbAndSync(task.getArbId());
+//                    arbPollingService.killArb(task.getArb());
 
                     consecutiveErrors++;
 
 
                 } catch (Exception ex) {
-                    log.error("❌ Unexpected error during bet placement | ArbId: {} | Error: {}",
+                    log.error("❌ Unexpected error during bet depployment and placement | ArbId: {} | Error: {}",
                             task.getArbId(), ex.getMessage(), ex);
 
-                    // Notify failure and skip
-                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
-                            "Error: " + ex.getMessage());
-                    syncManager.skipArbAndSync(task.getArbId());
-                    arbPollingService.killArb(task.getArb());
+//                    // Notify failure and skip
+//                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
+//                            "Error: " + ex.getMessage());
+//                    syncManager.skipArbAndSync(task.getArbId());
+//                    arbPollingService.killArb(task.getArb());
 
                     consecutiveErrors++;
                 }
@@ -987,7 +992,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                     log.error("🚨 Too many consecutive errors ({}) - pausing window | Bookmaker: {}",
                             consecutiveErrors, BOOK_MAKER);
                     isPaused.set(true);
-                    isWindowUpAndRunning.set(false);
+//                    isWindowUpAndRunning.set(false);
                     // Optionally: trigger alert or notification
                     consecutiveErrors = 0;
                 }
@@ -1009,12 +1014,13 @@ public class SportyWindow implements BettingWindow, Runnable {
                 isWindowUpAndRunning.set(false);
 
                 // Optionally: trigger re-login attempt
-                sportyLoginUtils.performLogin(page, sportyUsername, sportyPassword);
+                //todo: throw login exc
+                sportyLoginUtils.performLogin(page, sportyPassword, sportyUsername);
                 if (sportyLoginUtils.isLoggedIn(page)) {
                     isPaused.getAndSet(false);
                 }
 
-                randomHumanDelay(80000, 10000); // Wait before retry
+                randomHumanDelay(8000, 10000); // Wait before retry
 
             } catch (Exception e) {
                 log.error("❌ Unexpected error in betting loop | Bookmaker: {} | Error: {}",
@@ -1025,6 +1031,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 if (consecutiveErrors >= maxConsecutiveErrors) {
                     log.error("🚨 Critical: Too many errors - stopping loop | Bookmaker: {}",
                             BOOK_MAKER);
+                    isWindowUpAndRunning.set(false);
                     break;
                 }
 
@@ -2217,7 +2224,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             Locator oddsSpan = outcomeCell.locator("span.m-table-cell-item").nth(1);
             String displayedOdds = oddsSpan.textContent().trim();
 
-            if (targetOutcome.equals(outcome)) {
+            if(targetOutcome.equals(outcome)) {
                 log.info("✅ FOUND: {} → {} @ {}", market, outcome, displayedOdds);
             } else {
                 log.info("✅ FOUND (fuzzy): {} → {} (matched as '{}') @ {}",
@@ -2226,6 +2233,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
                 log.warn("⚠️ Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
+//                return false;//todo
             }
 
             outcomeCell.scrollIntoViewIfNeeded();
@@ -2481,7 +2489,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             boolean betConfirmed = false;
             boolean oddsChangedFailure = false;
             int cycle = 0;
-            final int MAX_CYCLES = 10;
+            final int MAX_CYCLES = 30;
 
             while (!betConfirmed && !oddsChangedFailure && cycle < MAX_CYCLES) {
                 cycle++;
@@ -2500,7 +2508,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
                     log.warn("FINAL CONFIRM POPUP → Clicking 'Confirm'");
                     jsScrollAndClick(finalConfirm, page);
-                    randomHumanDelay(1000, 1800);
+                    randomHumanDelay(100, 200);
                 }
 
                 // ── C. MAIN BUTTON LOGIC ──
@@ -2519,7 +2527,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 if (text.matches(".*(Accept Changes|Accept|Confirm Changes).*")) {
                     log.warn("→ Clicking 'Accept Changes' (cycle {})", cycle);
                     jsScrollAndClick(btn, page);
-                    randomHumanDelay(300, 900);
+                    randomHumanDelay(100, 200);
                     continue;
                 }
 
@@ -2527,7 +2535,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 if (text.matches(".*(Place Bet|Bet Now|Confirm Bet|Place bet).*") && !btn.isDisabled()) {
                     log.info("→ Clicking 'Place Bet' (cycle {})", cycle);
                     jsScrollAndClick(btn, page);
-                    randomHumanDelay(1000, 2000);
+                    randomHumanDelay(100, 200);
 
                     // CHECK "ODDS NOT ACCEPTABLE" RIGHT AFTER CLICK
                     Locator oddsRejected = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
@@ -2542,7 +2550,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 // 3. Place Bet disabled → wait
                 if (text.contains("Place Bet") && btn.isDisabled()) {
                     log.info("Place Bet disabled → waiting...");
-                    randomHumanDelay(1000, 1500);
+                    randomHumanDelay(100, 200);
                     continue;
                 }
 
@@ -2565,7 +2573,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                     break;
                 }
 
-                randomHumanDelay(700, 1100);
+                randomHumanDelay(100, 200);
             }
 
             // ── HANDLE ODDS CHANGE FAILURE (CLOSE POPUP OUTSIDE LOOP) ──
@@ -2577,7 +2585,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                     if (closeBtn.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
                         log.info("Closing 'Odds not acceptable' popup...");
                         jsScrollAndClick(closeBtn, page);
-                        randomHumanDelay(800, 1500);
+                        randomHumanDelay(100, 200);
                         log.info("Popup closed");
                     }
                 } catch (Exception e) {
@@ -2627,7 +2635,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                         "div.m-dialog-suc i.m-icon-close, " +
                         "div.m-dialog-suc [data-action='close']").first();
                 jsScrollAndClick(closeSuccess, page);
-                randomHumanDelay(600, 1200);
+                randomHumanDelay(100, 200);
                 log.info("Success modal closed");
             } catch (Exception e) {
                 log.debug("Success modal already closed");
@@ -2679,7 +2687,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         try {
             Locator successDialog = page.locator("div.m-dialog-wrapper.m-dialog-suc").first();
             successDialog.waitFor(new Locator.WaitForOptions()
-                    .setTimeout(5000)
+                    .setTimeout(20000)
                     .setState(WaitForSelectorState.VISIBLE));
 
             log.info("{} {} Bet confirmed - Success dialog detected", EMOJI_SUCCESS, EMOJI_BET);
@@ -2901,8 +2909,8 @@ public class SportyWindow implements BettingWindow, Runnable {
         return browser.newContext(new Browser.NewContextOptions()
                 .setUserAgent(profile.getUserAgent())
                         .setLocale("en-US")
-//                .setViewportSize(profile.getViewport().getWidth(), profile.getViewport().getHeight())
-//                .setExtraHTTPHeaders(getAllHeaders(profile))
+                .setViewportSize(profile.getViewport().getWidth(), profile.getViewport().getHeight())
+                .setExtraHTTPHeaders(getAllHeaders(profile))
         );
     }
 

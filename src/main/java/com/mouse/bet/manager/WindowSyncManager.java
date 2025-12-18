@@ -57,6 +57,99 @@ public class WindowSyncManager {
     }
 
     /**
+     * Mark that bet deployment succeeded for this bookmaker
+     * Returns false if arb is already cancelled
+     */
+    public boolean markDeploymentSuccess(String arbId, BookMaker bookmaker) {
+        ArbSyncState state = syncMap.computeIfAbsent(arbId, k -> new ArbSyncState());
+
+        if (state.isCancelled()) {
+            log.warn("⚠️ Cannot mark deployment - arb already cancelled | ArbId: {} | Bookmaker: {}",
+                    arbId, bookmaker);
+            return false;
+        }
+
+        state.markDeploymentSuccess(bookmaker);
+        log.info("✓ Bet DEPLOYED | ArbId: {} | Bookmaker: {}", arbId, bookmaker);
+        return true;
+    }
+
+    /**
+     * Wait for partner's deployment to complete with timeout
+     * Returns true only if BOTH windows successfully deployed
+     */
+    public boolean waitForPartnerDeploymentOrTimeout(String arbId, BookMaker myBookmaker, Duration timeout) {
+        ArbSyncState state = syncMap.computeIfAbsent(arbId, k -> new ArbSyncState());
+
+        if (state.isCancelled()) {
+            log.warn("⚠️ Arb already cancelled, not waiting for deployment | ArbId: {} | Bookmaker: {}",
+                    arbId, myBookmaker);
+            return false;
+        }
+
+        BookMaker partner = myBookmaker == BookMaker.SPORTY_BET ? BookMaker.M_SPORT : BookMaker.SPORTY_BET;
+
+        if (!state.isDeployed(myBookmaker)) {
+            log.error("❌ BUG: Waiting for deployment but {} never marked deployed! | ArbId: {}", myBookmaker, arbId);
+            skipArbAndSync(arbId);
+            return false;
+        }
+
+        log.info("⏳ Waiting for partner {} deployment | ArbId: {} | Timeout: {}s | My bookmaker: {}",
+                partner, arbId, timeout.toSeconds(), myBookmaker);
+
+        long startTime = System.currentTimeMillis();
+
+        try {
+            boolean awaitResult = state.deploymentLatch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            long elapsedTime = System.currentTimeMillis() - startTime;
+
+            if (state.isCancelled()) {
+                log.warn("⚠️ Arb cancelled while waiting for deployment | ArbId: {} | Elapsed: {}ms | Bookmaker: {}",
+                        arbId, elapsedTime, myBookmaker);
+                return false;
+            }
+
+            if (awaitResult) {
+                if (state.areBothDeployed()) {
+                    log.info("✅ Both windows DEPLOYED successfully | ArbId: {} | Elapsed: {}ms",
+                            arbId, elapsedTime);
+                    return true;
+                } else {
+                    log.error("⚠️ Deployment latch completed but not both deployed | ArbId: {} | Deployed: {}",
+                            arbId, state.getDeployedWindows());
+                    skipArbAndSync(arbId);
+                    return false;
+                }
+            } else {
+                log.warn("⏱️ Timeout waiting for partner {} deployment | ArbId: {} | Elapsed: {}ms | Bookmaker: {}",
+                        partner, arbId, elapsedTime, myBookmaker);
+
+                if (state.trySetDeploymentTimeoutFlag(myBookmaker)) {
+                    log.info("🚫 {} triggered deployment timeout - skipping arb | ArbId: {}",
+                            myBookmaker, arbId);
+                    skipArbAndSync(arbId);
+                } else {
+                    log.info("⏭️ Partner already triggered deployment timeout - following skip | ArbId: {}", arbId);
+                }
+
+                return false;
+            }
+        } catch (InterruptedException e) {
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            Thread.currentThread().interrupt();
+            log.warn("🛑 Interrupted while waiting for partner deployment | ArbId: {} | Elapsed: {}ms | Bookmaker: {}",
+                    arbId, elapsedTime, myBookmaker);
+
+            if (state.trySetDeploymentTimeoutFlag(myBookmaker)) {
+                skipArbAndSync(arbId);
+            }
+
+            return false;
+        }
+    }
+
+    /**
      * Called by a window when it's ready to place bet for a specific arb
      * Returns false if arb is already cancelled
      */
@@ -248,6 +341,16 @@ public class WindowSyncManager {
     }
 
     /**
+     * Check if both bookmakers successfully deployed their bets
+     */
+    public boolean areBothDeployed(String arbId) {
+        ArbSyncState state = syncMap.get(arbId);
+        if (state == null) return false;
+
+        return state.isDeployed(BookMaker.SPORTY_BET) && state.isDeployed(BookMaker.M_SPORT);
+    }
+
+    /**
      * Check if exactly one bookmaker placed bet (rollback scenario)
      */
     public boolean needsRollback(String arbId, BookMaker bookmaker) {
@@ -328,6 +431,17 @@ public class WindowSyncManager {
 
         BookMaker partner = myBookmaker == BookMaker.SPORTY_BET ? BookMaker.M_SPORT : BookMaker.SPORTY_BET;
         return state.hasPlacedBet(partner);
+    }
+
+    /**
+     * Check if the partner has deployed their bet
+     */
+    public boolean hasPartnerDeployed(String arbId, BookMaker myBookmaker) {
+        ArbSyncState state = syncMap.get(arbId);
+        if (state == null) return false;
+
+        BookMaker partner = myBookmaker == BookMaker.SPORTY_BET ? BookMaker.M_SPORT : BookMaker.SPORTY_BET;
+        return state.isDeployed(partner);
     }
 
     /**
@@ -445,9 +559,11 @@ public class WindowSyncManager {
     // Inner class to track synchronization state per Arb
     // =================================================================
     private static class ArbSyncState {
+        private final CountDownLatch deploymentLatch = new CountDownLatch(2); // Wait for both deployments
         private final CountDownLatch latch = new CountDownLatch(2);
         private final CountDownLatch betCompletionLatch = new CountDownLatch(2); // Both must complete
         private final Set<BookMaker> intentRegistered = ConcurrentHashMap.newKeySet();
+        private final Set<BookMaker> deployedWindows = ConcurrentHashMap.newKeySet();
         private final Set<BookMaker> readyWindows = ConcurrentHashMap.newKeySet();
         private final Map<BookMaker, Double> oddsMap = new ConcurrentHashMap<>();
         private final Map<BookMaker, Boolean> betPlaced = new ConcurrentHashMap<>();
@@ -456,11 +572,13 @@ public class WindowSyncManager {
 
         private volatile boolean cancelled = false;
         private volatile BookMaker timeoutTriggeredBy = null;
+        private volatile BookMaker deploymentTimeoutTriggeredBy = null;
         private volatile boolean rollbackNeeded = false;
         private volatile String rollbackReason = null;
         private volatile BookMaker rollbackRequestor = null;
 
         private final AtomicBoolean timeoutFlagSet = new AtomicBoolean(false);
+        private final AtomicBoolean deploymentTimeoutFlagSet = new AtomicBoolean(false);
 
         public synchronized void registerIntent(BookMaker bookmaker, double odds) {
             if (!cancelled) {
@@ -472,6 +590,32 @@ public class WindowSyncManager {
         public synchronized void unRegisterIntent(BookMaker bookmaker) {
             intentRegistered.remove(bookmaker);
             oddsMap.remove(bookmaker);
+        }
+
+        public synchronized void markDeploymentSuccess(BookMaker bookmaker) {
+            if (!cancelled && deployedWindows.add(bookmaker)) {
+                deploymentLatch.countDown();
+            }
+        }
+
+        public boolean isDeployed(BookMaker bookmaker) {
+            return deployedWindows.contains(bookmaker);
+        }
+
+        public boolean areBothDeployed() {
+            return deployedWindows.size() == 2;
+        }
+
+        public Set<BookMaker> getDeployedWindows() {
+            return new HashSet<>(deployedWindows);
+        }
+
+        public boolean trySetDeploymentTimeoutFlag(BookMaker bookmaker) {
+            if (deploymentTimeoutFlagSet.compareAndSet(false, true)) {
+                deploymentTimeoutTriggeredBy = bookmaker;
+                return true;
+            }
+            return false;
         }
 
         public synchronized void markReady(BookMaker bookmaker) {
@@ -503,6 +647,9 @@ public class WindowSyncManager {
         public synchronized void cancel() {
             if (!cancelled) {
                 cancelled = true;
+                while (deploymentLatch.getCount() > 0) {
+                    deploymentLatch.countDown();
+                }
                 while (latch.getCount() > 0) {
                     latch.countDown();
                 }
@@ -561,8 +708,8 @@ public class WindowSyncManager {
         }
 
         public String getStateSummary() {
-            return String.format("Ready: %s, Placed: %s, Failed: %s, Cancelled: %s, Rollback: %s, TimeoutBy: %s",
-                    readyWindows, betPlaced.keySet(), failures.keySet(), cancelled, rollbackNeeded, timeoutTriggeredBy);
+            return String.format("Deployed: %s, Ready: %s, Placed: %s, Failed: %s, Cancelled: %s, Rollback: %s, TimeoutBy: %s, DeployTimeoutBy: %s",
+                    deployedWindows, readyWindows, betPlaced.keySet(), failures.keySet(), cancelled, rollbackNeeded, timeoutTriggeredBy, deploymentTimeoutTriggeredBy);
         }
 
         public boolean hasIntent(BookMaker bookmaker) {

@@ -793,5 +793,13 @@
   {
     "name": "Yokohama_FC",
     "aliases": ["Yokohama FC", "Yokohama Football Club"]
+  },
+  {
+    "name": "Galatasaray Istanbul",
+    "aliases": ["Galatasaray Istanbul", "Galatasaray"]
+  },
+  {
+    "name": "Istanbul BB",
+    "aliases":["Basaksehir", "Istanbul BB"]
   }
 ]

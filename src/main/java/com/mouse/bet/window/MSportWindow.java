@@ -121,8 +121,14 @@ public class MSportWindow implements BettingWindow, Runnable {
     @Value("${msport.poll.interval.ms:2000}")
     private long pollIntervalMs;
 
-    @Value("${msport.bet.timeout.seconds:10}")
+    @Value("${bet.timeout.seconds:30}")
     private int betTimeoutSeconds;
+
+    @Value("${partner.timeout.seconds:10}")
+    private int partnerTimeout;
+
+    @Value("${deploy.timeout.seconds:3}")
+    private int deployTimeout;
 
     @Value("${fetch.enabled.football:false}")
     private boolean fetchFootballEnabled;
@@ -146,7 +152,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                     .setHeadless(true)
                     .setArgs(scraperConfig.getBROWSER_FlAGS())
-                    .setSlowMo(50));
+                    .setSlowMo(0));
 
             log.info("{} {} Playwright initialized successfully", EMOJI_SUCCESS, EMOJI_INIT);
             log.info("Registering MSport Window for Bet placing");
@@ -167,7 +173,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 // USE THIS METHOD IN BOTH SportyWindow AND MSportWindow
 // Replace your existing processBetPlacement method with this one
 // ===================================================================
-
+//MSPORT
     private void processBetPlacement(Page page, LegTask task, BetLeg myLeg) {
         String arbId = task.getArbId();
         BigDecimal myOdds = myLeg.getOdds();
@@ -184,18 +190,11 @@ public class MSportWindow implements BettingWindow, Runnable {
                 return;
             }
 
-            // ========================================
-            // STEP 2: NAVIGATE TO BET PAGE (slow operation)
-            // ========================================
+
             flowLogger.logNavigationStart(arbId, BOOK_MAKER);
 
-            // Use the appropriate navigation method based on BOOK_MAKER
-            boolean gameAvailable;
-            if (BOOK_MAKER == BookMaker.SPORTY_BET) {
-                gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
-            } else {
-                gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);
-            }
+            boolean gameAvailable = navigateToGameOnMSport(page, task.getArb(), myLeg);;
+
 
             if (!gameAvailable) {
                 flowLogger.logGameNotAvailable(arbId, BOOK_MAKER);
@@ -224,7 +223,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
                     arbId,
                     BOOK_MAKER,
-                    Duration.ofSeconds(betTimeoutSeconds)
+                    Duration.ofSeconds(partnerTimeout)
             );
 
             if (!partnersReady) {
@@ -254,27 +253,42 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             flowLogger.logBothPartnersReady(arbId, BOOK_MAKER);
 
-            // ========================================
-            // STEP 5: SIMULTANEOUS BETTING (NO WAITING)
-            // ========================================
             log.info("🚀 SIMULTANEOUS BETTING | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
 
-            // Verify bet deployment
             boolean deployedBet = deployBet(page, task.getLeg());
-            flowLogger.logBetDeploymentCheck(arbId, BOOK_MAKER, deployedBet);
 
             if (!deployedBet) {
-                log.warn("❌ Odds not available | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
-                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Odds changed");
-                arbPollingService.killArb(task.getArb());
-
-                Phaser phaser = task.getBarrier();
-                phaser.arriveAndAwaitAdvance();
+                log.warn("❌ Bet deployment failed | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                syncManager.notifyBetFailure(arbId, BOOK_MAKER, "Deployment failed");
+                syncManager.skipArbAndSync(arbId);
                 return;
             }
 
+// NEW: Mark deployment success
+            boolean markedDeployed = syncManager.markDeploymentSuccess(arbId, BOOK_MAKER);
+            if (!markedDeployed) {
+                flowLogger.logArbCancelled(arbId, BOOK_MAKER);
+                return;
+            }
+
+// NEW: Wait for partner to also deploy
+            boolean partnerDeployed = syncManager.waitForPartnerDeploymentOrTimeout(
+                    arbId,
+                    BOOK_MAKER,
+                    Duration.ofSeconds(deployTimeout)
+            );
+
+            if (!partnerDeployed) {
+                log.warn("❌ Partner deployment failed or timeout | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
+                arbPollingService.killArb(task.getArb());
+                return;
+            }
+
+            log.info("✅ Both windows DEPLOYED - proceeding to mark ready | ArbId: {}", arbId);
+
             // Place the bet (BOTH WINDOWS DO THIS SIMULTANEOUSLY)
             boolean betPlaced = placeBet(page, task.getArb(), myLeg);
+
 
             if (betPlaced) {
                 log.info("✅ Bet PLACED | ArbId: {} | Bookmaker: {} | Stake: {} | Odds: {}",
@@ -289,13 +303,10 @@ public class MSportWindow implements BettingWindow, Runnable {
                 randomHumanDelay(2000, 3000);
 
                 // Spend amount based on bookmaker
-                if (BOOK_MAKER == BookMaker.SPORTY_BET) {
-                    mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-                    closeSuccessModal(page);
-                } else {
-                    mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
-                    closeSuccessModal(page);
-                }
+
+//                mSportLoginUtils.spendAmount(BOOK_MAKER, myLeg.getStake(), arbId);
+                closeSuccessModal(page);
+
 
                 flowLogger.logStakeSpent(arbId, BOOK_MAKER, myLeg.getStake());
 
@@ -330,7 +341,9 @@ public class MSportWindow implements BettingWindow, Runnable {
                 if (partnerResult.isSuccess()) {
                     log.warn("⚠️ Partner SUCCEEDED but I FAILED - partner will rollback | ArbId: {} | Bookmaker: {}",
                             arbId, BOOK_MAKER);
+
                     flowLogger.logPartnerWillRollback(arbId, BOOK_MAKER);
+
                 } else {
                     log.info("ℹ️ Both failed - no rollback needed | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
                 }
@@ -351,10 +364,12 @@ public class MSportWindow implements BettingWindow, Runnable {
             try {
                 navigateBack(page);
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+//                throw new RuntimeException(e);
+                log.error("Error during navigating back to sport page", e.getMessage());
             }
 
             randomHumanDelay(2000, 3000);
+            log.info("Getting ready to welcome another arb by {}", BOOK_MAKER);
 
             Phaser phaser = task.getBarrier();
             phaser.arriveAndAwaitAdvance();
@@ -882,17 +897,12 @@ public class MSportWindow implements BettingWindow, Runnable {
                     continue;
                 }
 
-                // Health check
-                // healthMonitor.checkHealth();
-                log.info("📊 Ready to poll task for betting | Bookmaker: {}", bookmaker);
-
                 // Poll for available Leg task
                 LegTask task = arbOrchestrator.getWorkerQueues().get(BOOK_MAKER).poll();
-                log.info("task polled by {}", BOOK_MAKER);
+
 //                LegTask task = mockTaskSupplier.poll();
 
                 if (task == null) {
-                    log.info("the polled task is null for {}",BOOK_MAKER);
                     randomHumanDelay(500, 1000); // Small delay to prevent busy waiting
                     consecutiveErrors = 0; // Reset error counter on successful poll
                     continue;
@@ -932,6 +942,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 try {
                     processBetPlacement(page, task, myLeg);
                     randomHumanDelay(1000, 2300);
+                    clearBetSlip(page);
 //                    mockTaskSupplier.consume();
                     consecutiveErrors = 0; // Reset on success
 
@@ -939,27 +950,27 @@ public class MSportWindow implements BettingWindow, Runnable {
                             task.getArbId(), BOOK_MAKER);
 
                 } catch (PlaywrightException pe) {
-                    log.error("🎭 Playwright error during bet placement | ArbId: {} | Error: {}",
+                    log.error("🎭 Playwright error during bet deployment and placement | ArbId: {} | Error: {}",
                             task.getArbId(), pe.getMessage());
 
-                    // Notify failure and skip
-                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
-                            "Playwright error: " + pe.getMessage());
-                    syncManager.skipArbAndSync(task.getArbId());
-                    arbPollingService.killArb(task.getArb());
+//                    // Notify failure and skip
+//                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
+//                            "Playwright error: " + pe.getMessage());
+//                    syncManager.skipArbAndSync(task.getArbId());
+//                    arbPollingService.killArb(task.getArb());
 
                     consecutiveErrors++;
 
 
                 } catch (Exception ex) {
-                    log.error("❌ Unexpected error during bet placement | ArbId: {} | Error: {}",
+                    log.error("❌ Unexpected error during bet depployment and placement | ArbId: {} | Error: {}",
                             task.getArbId(), ex.getMessage(), ex);
 
-                    // Notify failure and skip
-                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
-                            "Error: " + ex.getMessage());
-                    syncManager.skipArbAndSync(task.getArbId());
-                    arbPollingService.killArb(task.getArb());
+//                    // Notify failure and skip
+//                    syncManager.notifyBetFailure(task.getArbId(), BOOK_MAKER,
+//                            "Error: " + ex.getMessage());
+//                    syncManager.skipArbAndSync(task.getArbId());
+//                    arbPollingService.killArb(task.getArb());
 
                     consecutiveErrors++;
                 }
@@ -969,7 +980,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                     log.error("🚨 Too many consecutive errors ({}) - pausing window | Bookmaker: {}",
                             consecutiveErrors, BOOK_MAKER);
                     isPaused.set(true);
-                    isWindowUpAndRunning.set(false);
+//                    isWindowUpAndRunning.set(false);
                     // Optionally: trigger alert or notification
                     consecutiveErrors = 0;
                 }
@@ -991,12 +1002,13 @@ public class MSportWindow implements BettingWindow, Runnable {
                 isWindowUpAndRunning.set(false);
 
                 // Optionally: trigger re-login attempt
+                //todo: throw login exc
                 mSportLoginUtils.performLogin(page, msportUsername, msportPassword);
                 if (mSportLoginUtils.isLoggedIn(page)) {
                     isPaused.getAndSet(false);
                 }
 
-                randomHumanDelay(80000, 10000); // Wait before retry
+                randomHumanDelay(8000, 10000); // Wait before retry
 
             } catch (Exception e) {
                 log.error("❌ Unexpected error in betting loop | Bookmaker: {} | Error: {}",
@@ -1248,6 +1260,8 @@ public class MSportWindow implements BettingWindow, Runnable {
             if (expectedUrlSegment != null && !expectedUrlSegment.isEmpty()) {
             page.waitForURL("**/" + expectedUrlSegment + "/**",
                     new Page.WaitForURLOptions().setTimeout(15_000));
+        }
+
         }
     }
 
@@ -2091,7 +2105,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             // Optional: verify odds tolerance
             if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
                 log.warn("Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
-                // return false; //todo: Uncomment if strict odds checking needed
+//                return false; //todo: Uncomment if strict odds checking needed
             }
 
             // Human-like interaction and click
@@ -2657,7 +2671,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 return false;
             }
 
-            randomHumanDelay(800, 1400);
+            randomHumanDelay(100, 200);
             log.info("[OK] Stake entered");
 
             // ── 2. WAIT FOR BET IN SLIP ─────────────────────────────────
@@ -2676,7 +2690,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             boolean betConfirmed = false;
             int cycle = 0;
-            final int MAX_CYCLES = 10;
+            final int MAX_CYCLES = 30;
 
             while (!betConfirmed && cycle < MAX_CYCLES) {
                 cycle++;
@@ -2692,7 +2706,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                 // ── B. CHECK FOR ODDS REJECTION POPUP ──
                 if (handleOddsRejectionPopup(page)) {
-                    randomHumanDelay(1000, 1500);
+                    randomHumanDelay(100, 200);
                     continue;
                 }
 
@@ -2706,7 +2720,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
                     log.warn("FINAL CONFIRM POPUP → Clicking 'Confirm'");
                     jsScrollAndClick(finalConfirm, page);
-                    randomHumanDelay(1000, 1800);
+                    randomHumanDelay(100, 200);
                     continue;
                 }
 
@@ -2728,7 +2742,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                         return false;
                     }
 
-                    randomHumanDelay(1000, 1500);
+                    randomHumanDelay(100, 200);
                     continue;
                 }
 
@@ -2744,7 +2758,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                     // CLICK 1: First click
                    findAndClickPlaceBet(page);
-                    randomHumanDelay(500, 800); // Short delay
+                    randomHumanDelay(100, 200);// Short delay
 
                     // ── CHECK FOR SUCCESS IMMEDIATELY AFTER FIRST CLICK ──
                     if (detectSuccessModal(page)) {
@@ -2767,7 +2781,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                                 // CLICK 2: Immediate follow-up click
                                 jsScrollAndClick(btnAfterClick, page);
-                                randomHumanDelay(1500, 2500); // Longer delay for processing
+                                randomHumanDelay(100, 200); // Longer delay for processing
 
                                 // Check for success after second click
                                 if (detectSuccessModal(page)) {
@@ -2785,13 +2799,13 @@ public class MSportWindow implements BettingWindow, Runnable {
                                 // Check for confirm popup again
                                 if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(500))) {
                                     jsScrollAndClick(finalConfirm, page);
-                                    randomHumanDelay(1000, 1800);
+                                    randomHumanDelay(100, 200);
                                     continue;
                                 }
                             }
                         } else {
                             // Button text didn't change, wait longer and check for success
-                            randomHumanDelay(1500, 2500);
+                            randomHumanDelay(100, 200);
 
                             if (detectSuccessModal(page)) {
                                 log.info("SUCCESS AFTER DELAY!");
@@ -2802,7 +2816,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                         }
                     } else {
                         // Button disappeared after click - check for success
-                        randomHumanDelay(1500, 2500);
+                        randomHumanDelay(100, 200);
                         if (detectSuccessModal(page)) {
                             log.info("SUCCESS - Button disappeared after click!");
                             handleSuccessModal(page);
@@ -2820,7 +2834,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                     // Button disabled
                     log.info("Button disabled → checking state...");
                     handleOddsChangesInLoop(page, cycle);
-                    randomHumanDelay(1000, 1500);
+                    randomHumanDelay(100, 200);
                 }
             }
 
@@ -3136,7 +3150,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             if (okButton != null) {
                 jsScrollAndClick(okButton, page);
-                randomHumanDelay(500, 1000);
+                randomHumanDelay(500, 700);
                 log.info("✅ Success modal closed");
             } else {
                 log.debug("OK button not visible, modal may have auto-closed");
@@ -3188,7 +3202,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                 if (closeSuccess.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
                     log.info("Closing success modal...");
                     jsScrollAndClick(closeSuccess, page);
-                    randomHumanDelay(600, 1200);
+                    randomHumanDelay(600, 700);
                 }
             } catch (Exception e) {
                 log.debug("Success modal already closed or could not close");
@@ -4004,9 +4018,9 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                 BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                         .setUserAgent(profile.getUserAgent())
-                        .setViewportSize(viewportSize)
-                        .setScreenSize(viewportSize.width, viewportSize.height)
-                                        .setDeviceScaleFactor(1)
+//                        .setViewportSize(viewportSize)
+//                        .setScreenSize(viewportSize.width, viewportSize.height)
+//                                        .setDeviceScaleFactor(1)
 //                        .setExtraHTTPHeaders(getAllHeaders(profile))
                         .setStorageStatePath(contextFilePath));
 

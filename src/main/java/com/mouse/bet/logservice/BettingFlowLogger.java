@@ -267,6 +267,12 @@ public class BettingFlowLogger {
                 EMOJI_ROCKET, arbId, bookmaker);
     }
 
+
+    public void logArbCancelled(String arbId, BookMaker bookMaker) {
+        log.warn("⚠️ ARB CANCELLED | ArbId: {} | Bookmaker: {} | Reason: Arb was cancelled by partner or system",
+                arbId, bookMaker);
+    }
+
     @Deprecated
     public void logSecondaryRole(String arbId, BookMaker bookmaker, BookMaker primaryBookmaker) {
         log.info("{} 🥈 I am SECONDARY bookmaker | ArbId: {} | Bookmaker: {} | Primary: {}",

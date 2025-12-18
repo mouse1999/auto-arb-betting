@@ -6,6 +6,8 @@ import com.mouse.bet.enums.MarketCategory;
 import com.mouse.bet.utils.ArbitrageType;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Utility class for detecting arbitrage opportunities across different bookmakers.
  * Handles bookmakers with different marketId/specifier formats by using canonical keys.
@@ -203,6 +205,17 @@ public class ArbitrageUtil {
             this.category = category;
             this.lineValue = lineValue;
             this.position = position;
+        }
+    }
+
+
+
+    public static void randomHumanDelay(long minMs, long maxMs) {
+        try {
+            long delay = minMs + ThreadLocalRandom.current().nextLong(maxMs - minMs + 1);
+            Thread.sleep(delay);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
