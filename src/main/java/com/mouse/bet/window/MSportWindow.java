@@ -1244,8 +1244,8 @@ public class MSportWindow implements BettingWindow, Runnable {
                     return true;
                 },
                 3, 12000, 1000);
-
-        if (expectedUrlSegment != null && !expectedUrlSegment.isEmpty()) {
+        if (!Objects.equals(sportName, "Soccer")) {
+            if (expectedUrlSegment != null && !expectedUrlSegment.isEmpty()) {
             page.waitForURL("**/" + expectedUrlSegment + "/**",
                     new Page.WaitForURLOptions().setTimeout(15_000));
         }
