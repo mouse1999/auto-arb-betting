@@ -1,6 +1,0 @@
-2025-12-18 22:29:56.245 [restartedMain] INFO  c.mouse.bet.manager.ArbOrchestrator - Registering worker | Bookmaker: M_SPORT | QueueCapacity: 2147483647
-2025-12-18 22:29:56.246 [restartedMain] INFO  c.mouse.bet.manager.ArbOrchestrator - Worker registered successfully | Bookmaker: M_SPORT | TotalRegisteredWorkers: 1
-2025-12-18 22:29:59.124 [restartedMain] INFO  c.mouse.bet.manager.ArbOrchestrator - Starting ArbOrchestrator | RegisteredWorkers: [M_SPORT] | PollIntervalMs: 2000
-2025-12-18 22:29:59.126 [arb-orchestrator] INFO  c.mouse.bet.manager.ArbOrchestrator - ArbOrchestrator loop started | Thread: arb-orchestrator
-2025-12-18 22:30:00.492 [restartedMain] INFO  c.mouse.bet.manager.ArbOrchestrator - Registering worker | Bookmaker: SPORTY_BET | QueueCapacity: 2147483647
-2025-12-18 22:30:00.492 [restartedMain] INFO  c.mouse.bet.manager.ArbOrchestrator - Worker registered successfully | Bookmaker: SPORTY_BET | TotalRegisteredWorkers: 2

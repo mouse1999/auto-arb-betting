@@ -160,7 +160,7 @@ public class ArbOrchestrator {
 
                 arbQueue.clear();
 
-                ArbitrageUtil.randomHumanDelay(60000, 150000);
+                ArbitrageUtil.randomHumanDelay(15000, 30000);
 
 
             } catch (InterruptedException ie) {

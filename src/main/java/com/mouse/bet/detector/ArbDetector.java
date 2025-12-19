@@ -42,7 +42,7 @@ public class ArbDetector {
     private final ArbFactory arbFactory;
     private final ArbService arbService;
 
-    private static final int EVENT_EXPIRY_SECONDS = 3;
+    private static final int EVENT_EXPIRY_SECONDS = 2;
     private static final int MAX_EVENTS_PER_GROUP = 50;
 
     @PostConstruct

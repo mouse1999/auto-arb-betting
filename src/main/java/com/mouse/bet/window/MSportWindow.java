@@ -16,7 +16,6 @@ import com.mouse.bet.manager.ArbOrchestrator;
 import com.mouse.bet.manager.PageHealthMonitor;
 import com.mouse.bet.manager.ProfileManager;
 import com.mouse.bet.manager.WindowSyncManager;
-import com.mouse.bet.mock.MockTaskSupplier;
 import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.service.ArbPollingService;
 import com.mouse.bet.service.BetLegRetryService;
@@ -77,7 +76,11 @@ public class MSportWindow implements BettingWindow, Runnable {
 
 
     private static final BookMaker BOOK_MAKER = BookMaker.M_SPORT;
-    final int MAX_DURATION_MS = 15_000; // duration for placing bet after initial failure
+    private static final double TOLERANCE_PERCENT = 10;
+
+    private static final long MAX_WAIT_FOR_RECOVERY = 30000; // 30 seconds max wait
+
+//    final int MAX_DURATION_MS = 15_000; // duration for placing bet after initial failure
     private static final String CONTEXT_FILE = "msport-context.json";
     private static final String M_SPORT_BET_URL = "https://www.msport.com/ng/web";
 
@@ -1088,38 +1091,38 @@ public class MSportWindow implements BettingWindow, Runnable {
      * Places the bet using YOUR ORIGINAL replayOddandBet logic the moment odds are acceptable.
      * Returns true ONLY when bet is successfully placed.
      */
-    private boolean monitorAndPlace(Page page, BetLeg leg) {
-        // 15 seconds max wait
-        final long startTime = System.currentTimeMillis();
-
-        log.info("STARTING 15-SECOND ODDS MONITOR for {} → {} @ {}",
-                leg.getProviderMarketTitle(), leg.getProviderMarketName(), leg.getOdds());
-
-        while (System.currentTimeMillis() - startTime < MAX_DURATION_MS) {
-            boolean placed = replayOddandBet(page, leg);  // YOUR ORIGINAL METHOD
-
-            if (placed) {
-                long elapsed = System.currentTimeMillis() - startTime;
-                log.info("BET PLACED SUCCESSFULLY after {}ms — Exiting monitor", elapsed);
-                return true;
-            }
-
-            // If not placed → odds were too low or error → wait and retry
-            long elapsed = System.currentTimeMillis() - startTime;
-            long remaining = MAX_DURATION_MS - elapsed;
-            if (remaining <= 0) break;
-
-            log.info("Odds not acceptable yet... retrying in 1–1.8s ({}ms left)", remaining);
-            randomHumanDelay(600, 1000);  // Human-like pause
-        }
-
-        // Timeout reached
-        long totalTime = System.currentTimeMillis() - startTime;
-        log.warn("15-SECOND MONITOR TIMEOUT — Odds never recovered ({}ms)", totalTime);
-//        safeRemoveFromSlip(page);
-        clearBetSlip(page);
-        return false;
-    }
+//    private boolean monitorAndPlace(Page page, BetLeg leg) {
+//        // 15 seconds max wait
+//        final long startTime = System.currentTimeMillis();
+//
+//        log.info("STARTING 15-SECOND ODDS MONITOR for {} → {} @ {}",
+//                leg.getProviderMarketTitle(), leg.getProviderMarketName(), leg.getOdds());
+//
+//        while (System.currentTimeMillis() - startTime < MAX_DURATION_MS) {
+//            boolean placed = replayOddandBet(page, leg);  // YOUR ORIGINAL METHOD
+//
+//            if (placed) {
+//                long elapsed = System.currentTimeMillis() - startTime;
+//                log.info("BET PLACED SUCCESSFULLY after {}ms — Exiting monitor", elapsed);
+//                return true;
+//            }
+//
+//            // If not placed → odds were too low or error → wait and retry
+//            long elapsed = System.currentTimeMillis() - startTime;
+//            long remaining = MAX_DURATION_MS - elapsed;
+//            if (remaining <= 0) break;
+//
+//            log.info("Odds not acceptable yet... retrying in 1–1.8s ({}ms left)", remaining);
+//            randomHumanDelay(600, 1000);  // Human-like pause
+//        }
+//
+//        // Timeout reached
+//        long totalTime = System.currentTimeMillis() - startTime;
+//        log.warn("15-SECOND MONITOR TIMEOUT — Odds never recovered ({}ms)", totalTime);
+////        safeRemoveFromSlip(page);
+//        clearBetSlip(page);
+//        return false;
+//    }
 
     /**
      * Navigate to live betting page
@@ -2105,7 +2108,7 @@ public class MSportWindow implements BettingWindow, Runnable {
             // Optional: verify odds tolerance
             if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
                 log.warn("Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
-//                return false; //todo: Uncomment if strict odds checking needed
+                return false;
             }
 
             // Human-like interaction and click
@@ -2386,20 +2389,31 @@ public class MSportWindow implements BettingWindow, Runnable {
     }
 
     /**
-     * Check if the displayed odds are within acceptable tolerance
+     * Check if the displayed odds are acceptable.
+     *
+     * - If displayed odds >= expected odds: always accept (any higher or equal is fine)
+     * - If displayed odds < expected odds: accept only if within the tolerance (e.g. 10%)
      */
     private boolean isOddsAcceptable(double expectedOdds, String displayedOddsStr) {
         try {
             double displayedOdds = Double.parseDouble(displayedOddsStr);
-            double tolerance = 0.10; // 10% tolerance
-            double diff = Math.abs(expectedOdds - displayedOdds);
+
+            // Always accept if the displayed odds are equal or better (higher)
+            if (displayedOdds >= expectedOdds) {
+                return true;
+            }
+
+            // If worse (lower), apply tolerance check
+            double tolerance = TOLERANCE_PERCENT; // 10% tolerance
+            double diff = expectedOdds - displayedOdds; // positive since displayed < expected
             double percentDiff = diff / expectedOdds;
 
             return percentDiff <= tolerance;
 
         } catch (NumberFormatException e) {
             log.warn("Could not parse odds: {}", displayedOddsStr);
-            return true; // Proceed if can't parse
+            // You can choose false here if you prefer to reject unparseable odds
+            return true; // Current behavior: proceed if can't parse
         }
     }
 
@@ -2648,11 +2662,9 @@ public class MSportWindow implements BettingWindow, Runnable {
     }
 
 
-    /**
-     * Place bet on the page
-     */
     private boolean placeBet(Page page, Arb arb, BetLeg leg) {
         BigDecimal stakeAmount = leg.getStake();
+        BigDecimal expectedOdds = leg.getOdds();
         long startTime = System.currentTimeMillis();
 
         log.info("─────────────────────────────────────────────────────────────");
@@ -2664,13 +2676,11 @@ public class MSportWindow implements BettingWindow, Runnable {
         try {
             // ── 1. ENTER STAKE (IMPROVED WITH OVERFLOW HANDLING) ─────────────────────
             log.info("{} [1/6] Entering stake on MSPORT...", EMOJI_BET);
-
             boolean stakeEntered = enterStakeWithOverflowHandling(page, stakeAmount);
             if (!stakeEntered) {
                 log.error("{} Failed to enter stake!", EMOJI_ERROR);
                 return false;
             }
-
             randomHumanDelay(100, 200);
             log.info("[OK] Stake entered");
 
@@ -2685,18 +2695,19 @@ public class MSportWindow implements BettingWindow, Runnable {
             log.info("[3/6] Checking 'Accept odds changes' setting...");
             enableAcceptOddsChanges(page);
 
-            // ── 4. UNKILLABLE LOOP + FULL POPUP HANDLING ─────────────────────
-            log.info("[4/6] Starting UNKILLABLE placement loop...");
-
+            // ── 4. UNKILLABLE LOOP WITH CONTINUOUS MONITORING ─────────────────────────
+            log.info("[4/6] Starting UNKILLABLE placement loop with continuous monitoring...");
             boolean betConfirmed = false;
             int cycle = 0;
             final int MAX_CYCLES = 30;
+            long waitStartTime = 0; // Shared timer for suspended OR unfavorable odds
+
 
             while (!betConfirmed && cycle < MAX_CYCLES) {
                 cycle++;
                 log.info("[Cycle {}/{}] Checking state...", cycle, MAX_CYCLES);
 
-                // ── A. CHECK FOR SUCCESS MODAL FIRST (HIGHEST PRIORITY) ──
+                // ── A. CHECK FOR SUCCESS MODAL FIRST ──
                 if (detectSuccessModal(page)) {
                     log.info("SUCCESS CONFIRMED — 'Bet Successful!' MODAL DETECTED!");
                     handleSuccessModal(page);
@@ -2704,13 +2715,59 @@ public class MSportWindow implements BettingWindow, Runnable {
                     break;
                 }
 
-                // ── B. CHECK FOR ODDS REJECTION POPUP ──
+                // ── B. MARKET & ODDS MONITORING ──
+                MarketStatus marketStatus = checkMarketStatus(page, leg, waitStartTime);
+
+                switch (marketStatus.status) {
+                    case UNAVAILABLE:
+                        log.error("Market is UNAVAILABLE - game finished. Aborting.");
+                        randomHumanDelay(5000, 7000);
+                        clearBetSlip(page);
+                        return false;
+
+                    case SUSPENDED:
+                    case ODDS_UNFAVORABLE:
+                        // Start timer on first bad state
+                        if (waitStartTime == 0) {
+                            waitStartTime = System.currentTimeMillis();
+                            String reason = marketStatus.status == MarketStatusType.SUSPENDED
+                                    ? "Market SUSPENDED"
+                                    : "Odds UNFAVORABLE: " + marketStatus.currentOdds + " (expected ≥ " + expectedOdds + ")";
+                            log.warn("{} - starting wait for recovery...", reason);
+                        }
+
+                        long waitDuration = System.currentTimeMillis() - waitStartTime;
+                        if (waitDuration > MAX_WAIT_FOR_RECOVERY) {
+                            log.error("Waited {}ms for odds/market recovery but still not acceptable. Aborting.", waitDuration);
+                            randomHumanDelay(5000, 7000);
+                            clearBetSlip(page);
+                            return false;
+                        }
+
+                        log.info("Waiting for recovery... {}ms elapsed (max {}ms)", waitDuration, MAX_WAIT_FOR_RECOVERY);
+                        if (marketStatus.status == MarketStatusType.ODDS_UNFAVORABLE) {
+                            log.info("Current odds: {} (need ≥ {})", marketStatus.currentOdds, expectedOdds);
+                        }
+                        randomHumanDelay(400, 800);
+                        continue; // Do NOT attempt to click
+
+                    case AVAILABLE:
+                        if (waitStartTime > 0) {
+                            long recoveryTime = System.currentTimeMillis() - waitStartTime;
+                            log.info("✓ Odds/Market RECOVERED after {}ms | Current odds: {}", recoveryTime, marketStatus.currentOdds);
+                            waitStartTime = 0;
+                        }
+                        log.info("Market AVAILABLE | Odds ACCEPTABLE: {} ✓", marketStatus.currentOdds);
+                        break;
+                }
+
+                // ── C. HANDLE ODDS REJECTION POPUP ──
                 if (handleOddsRejectionPopup(page)) {
                     randomHumanDelay(100, 200);
                     continue;
                 }
 
-                // ── C. CHECK FOR FINAL CONFIRM POPUP ──
+                // ── D. HANDLE FINAL CONFIRM POPUP ──
                 Locator finalConfirm = page.locator(
                         "button:has-text('Confirm'), " +
                                 "button:has-text('Yes'), " +
@@ -2724,117 +2781,90 @@ public class MSportWindow implements BettingWindow, Runnable {
                     continue;
                 }
 
-                // ── D. FIND THE MAIN BUTTON (ROBUST APPROACH) ────────────────────────────────
+                // ── E. FIND MAIN BUTTON ──
                 Locator btn = findPlaceBetButton(page);
-
                 if (btn == null) {
                     log.info("Button not found → checking for success...");
                     if (detectSuccessModal(page)) {
-                        log.info("Button disappeared and success modal detected!");
                         handleSuccessModal(page);
                         betConfirmed = true;
-                        break;
                     }
-
-                    // If still no success after multiple cycles, fail
-                    if (cycle >= 3) {
-                        log.error("Button not found after {} cycles and no success modal", cycle);
-                        return false;
-                    }
-
                     randomHumanDelay(100, 200);
                     continue;
                 }
 
                 String buttonText = getCleanButtonText(btn);
                 boolean isDisabled = btn.isDisabled();
-
                 log.info("Main button: \"{}\" | Disabled: {}", buttonText, isDisabled);
 
-                // ── E. CLICK BUTTON WITH IMMEDIATE FOLLOW-UP ─────────────
-                if (!isDisabled) {
-                    String originalText = buttonText;
-                    log.info("→ Clicking button (cycle {}) - Text: {}", cycle, originalText);
+                if (isDisabled) {
+                    log.info("Button disabled → waiting...");
+                    handleOddsChangesInLoop(page, cycle);
+                    randomHumanDelay(200, 400);
+                    continue;
+                }
 
-                    // CLICK 1: First click
-                   findAndClickPlaceBet(page);
-                    randomHumanDelay(100, 200);// Short delay
+                // ── F. FINAL PRE-CLICK ODDS CHECK (CRITICAL) ──
+                MarketStatus finalCheck = checkMarketStatus(page, leg, waitStartTime);
+                if (finalCheck.status != MarketStatusType.AVAILABLE) {
+                    log.info("Odds not acceptable right before click → skipping attempt");
+                    randomHumanDelay(300, 600);
+                    continue;
+                }
+                log.info("→ FINAL PRE-CLICK CHECK PASSED: {} ✓ → Clicking '{}'", finalCheck.currentOdds, buttonText);
 
-                    // ── CHECK FOR SUCCESS IMMEDIATELY AFTER FIRST CLICK ──
-                    if (detectSuccessModal(page)) {
-                        log.info("SUCCESS AFTER FIRST CLICK!");
-                        handleSuccessModal(page);
-                        betConfirmed = true;
-                        break;
-                    }
+                // ── CLICK 1: Place Bet ──
+                String originalText = buttonText;
+                log.info("→ Clicking button (cycle {}) - Text: {}", cycle, originalText);
+                findAndClickPlaceBet(page);
+                randomHumanDelay(150, 300);
 
-                    // ── CHECK IF BUTTON CHANGED TEXT (e.g., Place Bet → Submit) ──
-                    Locator btnAfterClick = findPlaceBetButton(page);
-                    if (btnAfterClick != null) {
-                        String newText = getCleanButtonText(btnAfterClick);
-                        if (!newText.equals(originalText)) {
-                            log.info("Button text changed from '{}' to '{}'", originalText, newText);
+                if (detectSuccessModal(page)) {
+                    log.info("SUCCESS AFTER FIRST CLICK!");
+                    handleSuccessModal(page);
+                    betConfirmed = true;
+                    break;
+                }
 
-                            // Check if it changed to "Submit" or similar action text
-                            if (isActionText(newText) && btnAfterClick.isEnabled()) {
-                                log.info("→ Immediate follow-up click on '{}'", newText);
+                // ── CHECK IF BUTTON CHANGED (e.g., Place Bet → Submit) ──
+                Locator btnAfter = findPlaceBetButton(page);
+                if (btnAfter != null) {
+                    String newText = getCleanButtonText(btnAfter);
+                    if (!newText.equals(originalText) && isActionText(newText) && btnAfter.isEnabled()) {
+                        log.info("Button changed to '{}' → follow-up click", newText);
 
-                                // CLICK 2: Immediate follow-up click
-                                jsScrollAndClick(btnAfterClick, page);
-                                randomHumanDelay(100, 200); // Longer delay for processing
-
-                                // Check for success after second click
-                                if (detectSuccessModal(page)) {
-                                    log.info("SUCCESS AFTER SECOND CLICK!");
-                                    handleSuccessModal(page);
-                                    betConfirmed = true;
-                                    break;
-                                }
-
-                                // Check for any popups
-                                if (handleOddsRejectionPopup(page)) {
-                                    continue;
-                                }
-
-                                // Check for confirm popup again
-                                if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(500))) {
-                                    jsScrollAndClick(finalConfirm, page);
-                                    randomHumanDelay(100, 200);
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // Button text didn't change, wait longer and check for success
-                            randomHumanDelay(100, 200);
-
-                            if (detectSuccessModal(page)) {
-                                log.info("SUCCESS AFTER DELAY!");
-                                handleSuccessModal(page);
-                                betConfirmed = true;
-                                break;
-                            }
+                        // One more final check before Submit/Confirm
+                        MarketStatus submitCheck = checkMarketStatus(page, leg, waitStartTime);
+                        if (submitCheck.status != MarketStatusType.AVAILABLE) {
+                            log.warn("Odds failed just before final Submit → aborting click");
+                            randomHumanDelay(300, 600);
+                            continue;
                         }
-                    } else {
-                        // Button disappeared after click - check for success
-                        randomHumanDelay(100, 200);
+                        log.info("enable checkbox before clicking place Bet");
+                        enableAcceptOddsChanges(page);
+
+                        jsScrollAndClick(btnAfter, page);
+                        log.info("Just clicked Place Bet button");
+                        randomHumanDelay(200, 400);
+
                         if (detectSuccessModal(page)) {
-                            log.info("SUCCESS - Button disappeared after click!");
+                            log.info("SUCCESS AFTER SECOND CLICK!");
                             handleSuccessModal(page);
                             betConfirmed = true;
                             break;
                         }
                     }
+                }
 
-                    // Check for any rejection popups
-                    if (handleOddsRejectionPopup(page)) {
-                        continue;
-                    }
-
-                } else {
-                    // Button disabled
-                    log.info("Button disabled → checking state...");
-                    handleOddsChangesInLoop(page, cycle);
-                    randomHumanDelay(100, 200);
+                // Final fallback checks
+                randomHumanDelay(100, 200);
+                if (detectSuccessModal(page)) {
+                    handleSuccessModal(page);
+                    betConfirmed = true;
+                    break;
+                }
+                if (handleOddsRejectionPopup(page)) {
+                    continue;
                 }
             }
 
@@ -2842,9 +2872,9 @@ public class MSportWindow implements BettingWindow, Runnable {
                 log.error("FAILED after {} cycles → Could not place bet", MAX_CYCLES);
                 return false;
             }
-            log.info("[OK] Bet placed after {} cycle(s)", cycle);
 
             long duration = System.currentTimeMillis() - startTime;
+            log.info("[OK] Bet placed after {} cycle(s)", cycle);
             log.info("placeBet COMPLETED | SUCCESS | {}ms | {} cycles", duration, cycle);
             log.info("─────────────────────────────────────────────────────────────");
             return true;
@@ -2856,6 +2886,51 @@ public class MSportWindow implements BettingWindow, Runnable {
             return false;
         }
     }
+
+    private MarketStatus checkMarketStatus(Page page, BetLeg leg, long waitStartTime) {
+        try {
+            Locator betSelection = page.locator(".m-bet-selection").first();
+            if (betSelection.count() == 0) {
+                log.warn("Bet selection not found - treating as unavailable");
+                return new MarketStatus(MarketStatusType.UNAVAILABLE, null);
+            }
+
+            // Check if market is unavailable (game over)
+            boolean isUnavailable = (Boolean) betSelection.evaluate(
+                    "el => el.classList.contains('unavailable')");
+            if (isUnavailable) {
+                return new MarketStatus(MarketStatusType.UNAVAILABLE, null);
+            }
+
+            // Check if suspended
+            boolean isSuspended = (Boolean) betSelection.evaluate(
+                    "el => el.classList.contains('abnormal')");
+            if (isSuspended) {
+                return new MarketStatus(MarketStatusType.SUSPENDED, null);
+            }
+
+            // Extract current odds
+            String currentOddsText = page.locator(
+                    ".m-flex-footer span.range-number.value span.tw-whitespace-nowrap," +
+                            ".m-betslip-odds span"
+            ).first().textContent().trim();
+
+            // Check acceptability
+            if (!isOddsAcceptable(leg.getOdds().doubleValue(), currentOddsText)) {
+                return new MarketStatus(MarketStatusType.ODDS_UNFAVORABLE, currentOddsText);
+            }
+
+            return new MarketStatus(MarketStatusType.AVAILABLE, currentOddsText);
+
+        } catch (Exception e) {
+            log.error("Error checking market status: {}", e.toString());
+            return new MarketStatus(MarketStatusType.UNAVAILABLE, null);
+        }
+    }
+
+
+
+
 
     private void findAndClickPlaceBet(Page page) {
         String[] selectors = {
@@ -4623,6 +4698,17 @@ public class MSportWindow implements BettingWindow, Runnable {
 
     public boolean isWindowUpAndRunning() {
         return !isPaused.get() && isWindowUpAndRunning.get();
+    }
+
+    // Helper classes
+    private enum MarketStatusType {
+        AVAILABLE,          // Market is live and odds are acceptable
+        SUSPENDED,          // Market temporarily suspended but game is alive
+        UNAVAILABLE,        // Market closed (game finished)
+        ODDS_UNFAVORABLE    // Market available but odds not acceptable
+    }
+
+    private record MarketStatus(MarketStatusType status, String currentOdds) {
     }
 
     /**
