@@ -91,7 +91,11 @@ public class ArbFactory {
                 .entrySet().stream()
                 .flatMap(entry -> {
                     MarketCategory category = entry.getKey();
-                    List<NormalizedOutcome> outcomes = entry.getValue();
+                    List<NormalizedOutcome> outcomes = entry.getValue()
+                            .stream()
+                            .filter(normalizedOutcome -> normalizedOutcome.getOutcomeStatus().equals(OutcomeStatus.SUSPENDED)
+                            )
+                            .toList();
 
                     log.debug("{} Processing category={} with {} outcomes",
                             EMOJI_TARGET, category, outcomes.size());

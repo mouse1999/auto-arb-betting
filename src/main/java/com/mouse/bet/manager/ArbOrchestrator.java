@@ -160,7 +160,7 @@ public class ArbOrchestrator {
 
                 arbQueue.clear();
 
-                ArbitrageUtil.randomHumanDelay(15000, 30000);
+                ArbitrageUtil.randomHumanDelay(15000, 25000);
 
 
             } catch (InterruptedException ie) {
@@ -418,6 +418,7 @@ public class ArbOrchestrator {
 
         Status finalStatus = allSuccess ? Status.COMPLETED : Status.FAILED;
         arb.setStatus(finalStatus);
+        arb.setActive(false);
         arbService.saveArb(arb);
 
         if (allSuccess) {

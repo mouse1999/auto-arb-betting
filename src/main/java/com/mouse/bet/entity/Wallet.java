@@ -16,7 +16,12 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 @Entity
-@Table(name = "wallets")
+@Table(name = "wallet",
+        indexes = {
+                @Index(name = "idx_wallet_bookmaker", columnList = "bookmaker", unique = true),
+                @Index(name = "idx_wallet_balance", columnList = "availableBalance"),
+                @Index(name = "idx_wallet_last_updated", columnList = "lastUpdated")
+        })
 @EntityListeners(AuditingEntityListener.class)
 
 public class Wallet {

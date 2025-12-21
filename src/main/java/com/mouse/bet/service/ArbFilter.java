@@ -5,10 +5,12 @@ import com.mouse.bet.entity.BetLeg;
 import com.mouse.bet.model.OddsChange;
 import com.mouse.bet.model.VelocityVolatility;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -23,6 +25,14 @@ public class ArbFilter {
     private static final int MIN_SAMPLES_FOR_VOL = 3;
     private static final double VOLATILITY_WEIGHT = 0.08;
     private static final double CHANGE_RATE_WEIGHT = 0.35;
+    private static final int MAX_RECENT_ODDS_CHANGES = 3;
+    private static final long MAX_STALE_SECONDS = 5;
+
+    @Value("${arb.session.min-stable-seconds:30}")
+    private int minStableSessionSeconds;
+
+    @Value("${arb.session.max-allowed-breaks:2}")
+    private int maxAllowedBreaks;
 
     // Emoji constants
     private static final String EMOJI_CHART = "📊";
@@ -30,6 +40,89 @@ public class ArbFilter {
     private static final String EMOJI_WARNING = "⚠️";
     private static final String EMOJI_ERROR = "❌";
     private static final String EMOJI_SUCCESS = "✅";
+    private static final String EMOJI_CLOCK = "⏰";
+
+    /**
+     * Check if arb has been stable long enough for betting
+     * Combines session duration with other stability metrics
+     */
+    public boolean isStableForBetting(Arb arb) {
+        try {
+            if (arb == null) return false;
+
+            // Check session duration
+            Long sessionSeconds = arb.getCurrentSessionDurationSeconds();
+            if (sessionSeconds == null || sessionSeconds < minStableSessionSeconds) {
+                log.info("{} {} Session too short: {}s (need {}s) | ArbId: {}",
+                        EMOJI_CLOCK, EMOJI_WARNING,
+                        sessionSeconds, minStableSessionSeconds, arb.getArbId());
+                return false;
+            }
+
+            // Check continuity breaks
+            if (arb.getContinuityBreakCount() > maxAllowedBreaks) {
+                log.info("{} {} Too many continuity breaks: {} | ArbId: {}",
+                        EMOJI_WARNING, EMOJI_CLOCK,
+                        arb.getContinuityBreakCount(), arb.getArbId());
+                return false;
+            }
+
+            // Check odds stability
+            if (!hasStableOdds(arb)) {
+                log.info("{} {} Odds not stable | ArbId: {}",
+                        EMOJI_WARNING, EMOJI_CHART, arb.getArbId());
+                return false;
+            }
+
+            // Check recent activity
+            if (isStale(arb)) {
+                log.info("{} {} Arb is stale | Last updated: {} | ArbId: {}",
+                        EMOJI_CLOCK, EMOJI_WARNING,
+                        arb.getLastUpdatedAt(), arb.getArbId());
+                return false;
+            }
+
+            log.info("{} {} Arb is stable | Session: {}s | Breaks: {} | ArbId: {}",
+                    EMOJI_SUCCESS, EMOJI_CLOCK,
+                    sessionSeconds, arb.getContinuityBreakCount(), arb.getArbId());
+
+            return true;
+
+        } catch (Exception e) {
+            log.error("{} {} Error checking stability | Error: {}",
+                    EMOJI_ERROR, EMOJI_CALC, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if odds have been stable recently
+     */
+    private boolean hasStableOdds(Arb arb) {
+        if (arb.getOddsChangeCount() == null || arb.getOddsChangeCount() < 2) {
+            return true; // Not enough data to determine
+        }
+
+        Instant cutoff = Instant.now().minusSeconds(minStableSessionSeconds); // Last 30 seconds
+        List<OddsChange> recent = arb.getOddsChangesBetween(cutoff, Instant.now());
+
+        if (recent.size() > MAX_RECENT_ODDS_CHANGES) {
+            log.debug("Too many recent odds changes: {} | ArbId: {}", recent.size(), arb.getArbId());
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if arb is stale (no recent updates)
+     */
+    private boolean isStale(Arb arb) {
+        if (arb.getLastUpdatedAt() == null) return true;
+
+        long ageSeconds = Duration.between(arb.getLastUpdatedAt(), Instant.now()).getSeconds();
+        return ageSeconds > MAX_STALE_SECONDS;
+    }
 
     /**
      * Recompute all derived metrics for an arb
@@ -41,7 +134,8 @@ public class ArbFilter {
                 return;
             }
 
-            log.info("{} {} Starting metric recomputation | ArbId: {}", EMOJI_CHART, EMOJI_CALC, arb.getArbId());
+            log.info("{} {} Starting metric recomputation | ArbId: {} | Session: {}s",
+                    EMOJI_CHART, EMOJI_CALC, arb.getArbId(), arb.getCurrentSessionDurationSeconds());
 
             Instant now = Instant.now();
             Instant cutoff = now.minusSeconds(METRICS_WINDOW_MINUTES * 60L);
@@ -270,7 +364,8 @@ public class ArbFilter {
                 return 0.0;
             }
 
-            log.info("Calculating mean deviation for ArbId: {}", arb.getArbId());
+            log.info("Calculating mean deviation for ArbId: {} | Session: {}s",
+                    arb.getArbId(), arb.getCurrentSessionDurationSeconds());
 
             double devA = 0.0, devB = 0.0;
             int n = 0;

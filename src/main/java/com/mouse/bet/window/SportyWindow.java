@@ -87,11 +87,12 @@ public class SportyWindow implements BettingWindow, Runnable {
     private static final int RETRY_MAX_ATTEMPTS = 3;
     private static final long RETRY_TIMEOUT_MS = 10_000;
     private static final long RETRY_DELAY_MS = 1000;
-    private static final int TOLERANCE_PERCENT = 10;
+    private static final int TOLERANCE_PERCENT = (int)0.01;
 
 
 
     private static final BookMaker BOOK_MAKER = BookMaker.SPORTY_BET;
+    private static final int MAX_CYCLES = 30;
     final int MAX_DURATION_MS = 15_000; // duration for placing bet after initial failure
     private static final String CONTEXT_FILE = "sporty-context.json";
     private static final String SPORTY_BET_URL = "https://www.sportybet.com/ng";
@@ -163,8 +164,8 @@ public class SportyWindow implements BettingWindow, Runnable {
         try {
             playwright = Playwright.create();
             browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(true)
-//                    .setArgs(scraperConfig.getBROWSER_FlAGS())
+                    .setHeadless(false)
+                    .setArgs(scraperConfig.getBROWSER_FlAGS())
                     .setSlowMo(0));
 
             log.info("{} {} Playwright initialized successfully", EMOJI_SUCCESS, EMOJI_INIT);
@@ -369,7 +370,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             try {
                 navigateBack(page);
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
 //                throw new RuntimeException(e);
                 log.error("Error during navigating back to sport page", e.getMessage());
             }
@@ -1049,7 +1050,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
     private void navigateBack(Page page) throws InterruptedException {
         page.goBack(new Page.GoBackOptions().setTimeout(15000));
-        page.waitForLoadState(LoadState.NETWORKIDLE);
+        page.waitForLoadState(LoadState.DOMCONTENTLOADED);
         log.info("{} Returned to previous page", EMOJI_NAVIGATION);
 
     }
@@ -1491,7 +1492,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         log.info("{} Navigating to: {} | EventId: {}", EMOJI_BET, fullMatch, leg.getEventId());
 
         try {
-            randomHumanDelay(500, 1500);
+            randomHumanDelay(100, 150);
 
             if (tryDirectNavigation(page, home, away, leg)) return true;
             if (tryEventIdNavigation(page, leg)) return true;
@@ -1745,7 +1746,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         try {
             // Ensure element is in viewport
             matchElement.scrollIntoViewIfNeeded();
-            randomHumanDelay(500, 1000);
+            randomHumanDelay(100, 150);
 
             // Verify it's still visible
             if (!matchElement.isVisible()) {
@@ -2074,7 +2075,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 deleteBtn.click(new Locator.ClickOptions()
                         .setForce(true)
-                        .setTimeout(10000));
+                        .setTimeout(5000));
 
                 page.waitForTimeout(500);
 
@@ -2083,7 +2084,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             }
         }
 
-        page.waitForTimeout(1000);
+        page.waitForTimeout(200);
         boolean cleared = isBetstipEmpty(page);
 
         if (cleared) {
@@ -2467,14 +2468,21 @@ public class SportyWindow implements BettingWindow, Runnable {
     /**
      * Place bet on the page
      */
+    private enum BetslipStatus {
+        ACCEPTABLE,
+        SUSPENDED,
+        UNAVAILABLE,
+        ODDS_TOO_LOW
+    }
+
     private boolean placeBet(Page page, Arb arb, BetLeg leg) {
         BigDecimal stake = leg.getStake();
+        BigDecimal expectedOdds = leg.getOdds();
         long startTime = System.currentTimeMillis();
 
         log.info("─────────────────────────────────────────────────────────────");
         log.info("START placeBet() → {} → {} @ {} | Stake: {} | {}",
-                leg.getProviderMarketTitle(), leg.getProviderMarketName(),
-                leg.getOdds(), stake,
+                leg.getProviderMarketTitle(), leg.getProviderMarketName(), expectedOdds, stake,
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")));
 
         try {
@@ -2505,25 +2513,51 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             // ── 3. UNKILLABLE LOOP + FULL POPUP HANDLING ─────────────────────
             log.info("[3/6] Starting UNKILLABLE placement loop...");
-
             boolean betConfirmed = false;
-            boolean oddsChangedFailure = false;
+            boolean permanentFailure = false;
             int cycle = 0;
-            final int MAX_CYCLES = 30;
 
-            while (!betConfirmed && !oddsChangedFailure && cycle < MAX_CYCLES) {
+
+            while (!betConfirmed && !permanentFailure && cycle < MAX_CYCLES) {
                 cycle++;
                 log.info("[Cycle {}/{}] Checking state...", cycle, MAX_CYCLES);
 
-                // ── A. ODDS CHANGE POPUP (CRITICAL FAILURE) ──
+                // ── A. CRITICAL ODDS NOT ACCEPTABLE POPUP (IMMEDIATE FAILURE) ──
                 Locator oddsChangePopup = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
                 if (oddsChangePopup.isVisible(new Locator.IsVisibleOptions().setTimeout(500))) {
-                    log.error("ODDS CHANGE DETECTED → 'Odds not acceptable' popup shown → FAILURE");
-                    oddsChangedFailure = true;
+                    log.error("ODDS NOT ACCEPTABLE POPUP → Permanent failure");
+                    permanentFailure = true;
                     break;
                 }
 
-                // ── B. FINAL CONFIRM POPUP ──
+                // ── B. MONITOR BETSLIP STATUS (FIXED WITH FRESH DOM READS) ──
+                BetslipStatus status = monitorAndHandleOddsInBetslip(page, expectedOdds);
+
+                switch (status) {
+                    case UNAVAILABLE:
+                        log.error("❌ MARKET UNAVAILABLE → Game over → ABORTING");
+                        permanentFailure = true;
+                        break;
+
+                    case ODDS_TOO_LOW:
+                        log.warn("⚠️ ODDS CURRENTLY TOO LOW → Waiting for odds to improve...");
+                        // Wait and let the loop continue checking for odds improvement
+                        randomHumanDelay(300, 600);
+                        continue;
+
+                    case SUSPENDED:
+                        log.warn("⏸️ Market suspended → Waiting for odds to return...");
+                        randomHumanDelay(800, 1500);
+                        continue;
+
+                    case ACCEPTABLE:
+                        log.info("✅ Odds acceptable in betslip → Proceeding");
+                        break; // Continue with button logic
+                }
+
+                if (permanentFailure) break;
+
+                // ── C. FINAL CONFIRM POPUP ──
                 Locator finalConfirm = page.locator("xpath=//button[.//span[text()='Confirm' or text()='Yes' or text()='OK']]").first();
                 if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
                     log.warn("FINAL CONFIRM POPUP → Clicking 'Confirm'");
@@ -2531,24 +2565,22 @@ public class SportyWindow implements BettingWindow, Runnable {
                     randomHumanDelay(100, 200);
                 }
 
-                // ── NEW: MONITOR ODDS AND HANDLE SUSPENSION ──
-                if (!monitorAndHandleOddsInBetslip(page, leg.getOdds())) {
-                    log.error("ODDS NOT ACCEPTABLE IN BETSLIP → ABORTING");
-                    oddsChangedFailure = true;
+                // ── D. MAIN BUTTON LOGIC (ONLY IF ODDS ARE ACCEPTABLE) ──
+                if (status != BetslipStatus.ACCEPTABLE) {
+                    // Don't try to click buttons if odds aren't acceptable yet
                     continue;
                 }
 
-                // ── C. MAIN BUTTON LOGIC ──
                 Locator btn = page.locator("button.af-button--primary >> visible=true").first();
                 if (btn.count() == 0) {
                     log.info("Primary button gone → likely success");
+                    randomHumanDelay(300, 600);
                     continue;
                 }
 
                 String text = btn.innerText().trim();
                 log.info("Main button: \"{}\" | Disabled: {}", text, btn.isDisabled());
 
-                // 1. Accept Changes
                 if (text.matches(".*(Accept Changes|Accept|Confirm Changes).*")) {
                     log.warn("→ Clicking 'Accept Changes' (cycle {})", cycle);
                     jsScrollAndClick(btn, page);
@@ -2556,105 +2588,86 @@ public class SportyWindow implements BettingWindow, Runnable {
                     continue;
                 }
 
-                // 2. Place Bet + ENABLED → click
                 if (text.matches(".*(Place Bet|Bet Now|Confirm Bet|Place bet).*") && !btn.isDisabled()) {
                     log.info("→ Clicking 'Place Bet' (cycle {})", cycle);
                     jsScrollAndClick(btn, page);
                     randomHumanDelay(100, 200);
 
-                    // CHECK "ODDS NOT ACCEPTABLE" RIGHT AFTER CLICK
+                    // Check for rejection popup right after click
                     Locator oddsRejected = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
                     if (oddsRejected.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
-                        log.error("ODDS NOT ACCEPTABLE POPUP → Detected after Place Bet click → FAILURE");
-                        oddsChangedFailure = true;
+                        log.error("ODDS NOT ACCEPTABLE after clicking Place Bet → FAILURE");
+                        permanentFailure = true;
                         break;
                     }
                     continue;
                 }
 
-                // 3. Place Bet disabled → wait
                 if (text.contains("Place Bet") && btn.isDisabled()) {
                     log.info("Place Bet disabled → waiting...");
-                    randomHumanDelay(100, 200);
+                    randomHumanDelay(200, 400);
                     continue;
                 }
 
-                // ── 4. 100% RELIABLE SUCCESS DETECTION (MULTI-LAYER) ──
+                // ── E. SUCCESS DETECTION ──
                 boolean successDetected = page.locator("div.m-dialog-wrapper.m-dialog-suc").count() > 0 ||
                         page.locator("text='Submission Successful'").count() > 0 ||
                         page.locator("i.m-icon-suc").count() > 0 ||
                         page.locator("div.booking-code").isVisible(new Locator.IsVisibleOptions().setTimeout(1000));
 
                 if (successDetected) {
-                    log.info("SUCCESS CONFIRMED — OFFICIAL 'Submission Successful' MODAL DETECTED!");
-
-                    // Extract booking code
+                    log.info("SUCCESS CONFIRMED — Official success modal detected!");
                     try {
                         String code = page.locator("div.booking-code").textContent().trim();
                         log.info("BOOKING CODE: {}", code.isEmpty() ? "Hidden" : code);
                     } catch (Exception ignored) {}
-
                     betConfirmed = true;
                     break;
                 }
 
-                randomHumanDelay(100, 200);
+                randomHumanDelay(200, 400);
             }
 
-            // ── HANDLE ODDS CHANGE FAILURE (CLOSE POPUP OUTSIDE LOOP) ──
-            if (oddsChangedFailure) {
-                log.error("BET PLACEMENT FAILED → Odds changed and not acceptable");
+            // ── HANDLE PERMANENT FAILURE ──
+            if (permanentFailure) {
+                log.error("BET PLACEMENT FAILED → Unrecoverable state (unavailable / rejected)");
                 try {
                     Locator closeBtn = page.locator("div.m-dialog-wrapper button:has-text('OK'), " +
                             "div.m-dialog-wrapper img.close-icon[data-action='close']").first();
                     if (closeBtn.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
-                        log.info("Closing 'Odds not acceptable' popup...");
                         jsScrollAndClick(closeBtn, page);
                         randomHumanDelay(100, 200);
-                        log.info("Popup closed");
                     }
-                } catch (Exception e) {
-                    log.warn("Failed to close odds change popup: {}", e.getMessage());
-                }
-
+                } catch (Exception ignored) {}
                 long duration = System.currentTimeMillis() - startTime;
-                log.info("placeBet() COMPLETED | FAILURE (Odds Changed) | {}ms", duration);
+                log.info("placeBet() COMPLETED | FAILURE | {}ms", duration);
                 log.info("─────────────────────────────────────────────────────────────");
                 return false;
             }
 
             if (!betConfirmed) {
-                log.error("FAILED after {} cycles → Could not place bet", MAX_CYCLES);
+                log.error("FAILED after {} cycles → Timeout (odds never became acceptable)", MAX_CYCLES);
                 return false;
             }
+
             log.info("[OK] Bet placed after {} cycle(s)", cycle);
 
-            // ── 5. FINAL SUCCESS VERIFICATION (HARD CONFIRMATION) ─────────────
-            boolean finalSuccess = false;
+            // ── FINAL SUCCESS VERIFICATION ──
             try {
                 page.waitForFunction("""
-        () => {
-            return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
-                   document.querySelector('span[data-cms-key="submission_successful"]') ||
-                   document.querySelector('div.booking-code');
-        }
-        """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
-
-                log.info("FINAL SUCCESS VERIFIED — Official modal confirmed");
-
-                try {
-                    String code = page.locator("div.booking-code").textContent().trim();
-                    log.info("FINAL BOOKING CODE: {}", code.isEmpty() ? "Not shown" : code);
-                } catch (Exception ignored) {}
-
-                finalSuccess = true;
-
+            () => {
+                return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
+                       document.querySelector('span[data-cms-key="submission_successful"]') ||
+                       document.querySelector('div.booking-code');
+            }
+            """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
+                log.info("FINAL SUCCESS VERIFIED");
             } catch (TimeoutError te) {
                 log.error("NO SUCCESS MODAL AFTER 15s → BET FAILED");
                 return false;
             }
 
-            // ── 6. CLOSE SUCCESS MODAL CLEANLY ─────────────────────────────
+            // ── CLOSE SUCCESS MODAL ──
             try {
                 Locator closeSuccess = page.locator("div.m-dialog-suc button:has-text('OK'), " +
                         "div.m-dialog-suc i.m-icon-close, " +
@@ -2662,9 +2675,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 jsScrollAndClick(closeSuccess, page);
                 randomHumanDelay(100, 200);
                 log.info("Success modal closed");
-            } catch (Exception e) {
-                log.debug("Success modal already closed");
-            }
+            } catch (Exception ignored) {}
 
             long duration = System.currentTimeMillis() - startTime;
             log.info("placeBet() COMPLETED | SUCCESS | {}ms | {} cycles", duration, cycle);
@@ -2679,111 +2690,117 @@ public class SportyWindow implements BettingWindow, Runnable {
     }
 
     /**
-     * Monitor odds in betslip and handle suspension
-     * Returns true if odds are acceptable, false otherwise
+     * Monitors the betslip odds and status - ALWAYS READS FRESH FROM DOM
+     * @return BetslipStatus indicating current state
      */
-    private boolean monitorAndHandleOddsInBetslip(Page page, BigDecimal expectedOdds) {
+    private BetslipStatus monitorAndHandleOddsInBetslip(Page page, BigDecimal expectedOdds) {
         try {
+            // ── CRITICAL: Always query fresh from DOM, never reuse locators ──
             Locator betItem = page.locator("div.m-item").first();
             if (betItem.count() == 0) {
-                log.warn("No bet item found in betslip");
-                return true; // Continue, might be loading
+                log.warn("No bet item in slip yet");
+                return BetslipStatus.ACCEPTABLE; // Assume loading, continue
             }
 
-            // Check odds container for status
-            Locator oddsContainer = betItem.locator("div.m-item-odds");
+            // Force a small wait to ensure DOM has updated
+            page.waitForTimeout(50);
 
-            // Check for status text (Unavailable or Suspended)
+            // Re-query to get fresh element
+            Locator oddsContainer = page.locator("div.m-item").first().locator("div.m-item-odds");
+
+            // Check for status indicators (Suspended / Unavailable)
             Locator statusText = oddsContainer.locator("span.m-text-min.m-text-btn");
-            if (statusText.count() > 0) {
+            if (statusText.count() > 0 && statusText.isVisible()) {
                 String status = statusText.textContent().trim().toLowerCase();
+                log.info("📋 Status text detected: '{}'", status);
+
                 if (status.contains("unavailable")) {
-                    log.error("❌ GAME UNAVAILABLE → Game has finished → ABORT");
-                    return false;
+                    return BetslipStatus.UNAVAILABLE;
                 }
                 if (status.contains("suspended")) {
-                    log.warn("⏸️ ODDS SUSPENDED → Waiting for odds to return...");
-                    // Wait for odds to return or become unavailable (max 5 seconds)
+                    log.warn("⏸️ Detected suspended market → Waiting up to 15s for recovery");
+
                     try {
                         page.waitForFunction("""
-                        () => {
-                            const container = document.querySelector('div.m-item-odds');
-                            if (!container) return false;
-                            const statusSpan = container.querySelector('span.m-text-min.m-text-btn');
-                            if (!statusSpan) return true; // Status gone, odds likely back
-                            const text = statusSpan.textContent.toLowerCase();
-                            if (text.includes('unavailable')) return true;
-                            return !text.includes('suspended');
-                        }
-                        """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
+                    () => {
+                        const container = document.querySelector('div.m-item-odds');
+                        if (!container) return false;
+                        const statusSpan = container.querySelector('span.m-text-min.m-text-btn');
+                        if (!statusSpan) return true; // Status gone → odds back
+                        const text = statusSpan.textContent.toLowerCase();
+                        return text.includes('unavailable') || !text.includes('suspended');
+                    }
+                    """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
 
-                        // Re-check status after wait
-                        if (statusText.count() > 0) {
-                            String newStatus = statusText.textContent().trim().toLowerCase();
+                        // Re-check after wait - FRESH query
+                        Locator freshStatus = page.locator("div.m-item-odds span.m-text-min.m-text-btn").first();
+                        if (freshStatus.count() > 0) {
+                            String newStatus = freshStatus.textContent().trim().toLowerCase();
                             if (newStatus.contains("unavailable")) {
-                                log.error("❌ GAME BECAME UNAVAILABLE during wait → Game has finished → ABORT");
-                                return false;
+                                return BetslipStatus.UNAVAILABLE;
                             }
                             if (newStatus.contains("suspended")) {
-                                log.error("❌ Odds still suspended after 5s → ABORT");
-                                return false;
+                                return BetslipStatus.SUSPENDED;
                             }
                         }
-                        log.info("✅ Odds returned after suspension");
+                        log.info("✅ Odds restored after suspension");
                     } catch (TimeoutError te) {
-                        log.error("❌ Odds did not return after 5s suspension → ABORT");
-                        return false;
+                        return BetslipStatus.SUSPENDED;
                     }
                 }
             }
 
-            // Normal odds check - only care about the actual odds text
-            Locator oddsText = oddsContainer.locator("span.m-text-main");
-            if (oddsText.count() == 0) {
-                log.warn("No odds text element found in betslip (m-text-main missing)");
-                return false;
+            // ── CRITICAL: Read odds value FRESH from DOM each time ──
+            // Use JavaScript evaluation to force fresh read from live DOM
+            String oddsValue = (String) page.evaluate("""
+            () => {
+                const oddsSpan = document.querySelector('div.m-item-odds span.m-text-main');
+                return oddsSpan ? oddsSpan.textContent.trim() : '';
+            }
+        """);
+
+            if (oddsValue == null || oddsValue.isEmpty()) {
+                log.warn("⚠️ Odds text not visible or empty - treating as suspended");
+                return BetslipStatus.SUSPENDED;
             }
 
-            String currentOddsStr = oddsText.textContent().trim();
-            if (currentOddsStr.isEmpty()) {
-                log.warn("Current odds text is empty in betslip");
-                return false;
-            }
-
-            BigDecimal currentOdds = new BigDecimal(currentOddsStr);
-            log.info("📊 Betslip odds: {} | Expected: {}", currentOdds, expectedOdds);
-
-            // Check if odds are acceptable (allow worse only within tolerance)
+            BigDecimal currentOdds = new BigDecimal(oddsValue);
             BigDecimal minAcceptable = expectedOdds.multiply(BigDecimal.valueOf(1 - TOLERANCE_PERCENT * 0.01));
+
+            log.info("📊 LIVE ODDS: {} | Expected: {} | Min acceptable: {}",
+                    currentOdds, expectedOdds, minAcceptable);
+
             if (currentOdds.compareTo(minAcceptable) < 0) {
-                log.error("❌ ODDS TOO LOW → Current: {} | Min Acceptable: {}", currentOdds, minAcceptable);
-                return false;
+                log.warn("⚠️ Current odds {} below minimum {} → Waiting for improvement",
+                        currentOdds, minAcceptable);
+                return BetslipStatus.ODDS_TOO_LOW;
             }
 
-            // Ensure checkbox is ticked (m-lay-left)
-            Locator checkbox = betItem.locator("div.m-lay-left i.m-icon-check");
-            if (checkbox.count() > 0) {
-                String checkboxClass = checkbox.getAttribute("class");
-                if (checkboxClass == null || !checkboxClass.contains("m-icon-check--checked")) {
-                    log.warn("⚠️ Checkbox not ticked → Clicking to enable bet");
-                    Locator clickableArea = betItem.locator("div.m-lay-left");
-                    jsScrollAndClick(clickableArea, page);
-                    randomHumanDelay(100, 200);
-                    log.info("✅ Checkbox ticked");
-                } else {
-                    log.debug("✓ Checkbox already ticked");
-                }
+            // ── Ensure checkbox is checked ──
+            Boolean isChecked = (Boolean) page.evaluate("""
+            () => {
+                const checkbox = document.querySelector('div.m-lay-left i.m-icon-check');
+                return checkbox && checkbox.classList.contains('m-icon-check--checked');
+            }
+        """);
+
+            if (Boolean.FALSE.equals(isChecked)) {
+                log.warn("⚠️ Checkbox not ticked → Enabling");
+                page.locator("div.m-lay-left").first().click();
+                randomHumanDelay(100, 200);
             }
 
-            return true;
+            log.info("✅ Odds are acceptable → Ready to place bet");
+            return BetslipStatus.ACCEPTABLE;
 
+        } catch (NumberFormatException nfe) {
+            log.error("Failed to parse odds value: {}", nfe.getMessage());
+            return BetslipStatus.SUSPENDED;
         } catch (Exception e) {
-            log.error("Error monitoring odds in betslip: {}", e.getMessage());
-            return true; // Continue on error to avoid blocking
+            log.error("Error in monitorAndHandleOddsInBetslip: {}", e.getMessage());
+            return BetslipStatus.ACCEPTABLE; // Don't block on error
         }
     }
-// ── HELPER METHODS (100% CORRECT SIGNATURES) ──────────────────────────────────
-
     private void jsScrollAndClick(Locator locator, Page page) {
         try {
             locator.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'smooth' })");
@@ -3040,7 +3057,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                 .setUserAgent(profile.getUserAgent())
                         .setLocale("en-US")
                 .setViewportSize(profile.getViewport().getWidth(), profile.getViewport().getHeight())
-                .setExtraHTTPHeaders(getAllHeaders(profile))
+//                .setExtraHTTPHeaders(getAllHeaders(profile))
         );
     }
 

@@ -6,6 +6,7 @@ import com.mouse.bet.enums.Status;
 import com.mouse.bet.finance.WalletService;
 import com.mouse.bet.model.NormalizedEvent;
 import com.mouse.bet.logservice.ArbitrageLogService;
+import com.mouse.bet.model.msport.MSportEvent;
 import com.mouse.bet.service.ArbService;
 import com.mouse.bet.utils.ArbFactory;
 import jakarta.annotation.PostConstruct;

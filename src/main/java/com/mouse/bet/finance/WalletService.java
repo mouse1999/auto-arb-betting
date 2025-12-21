@@ -22,37 +22,56 @@ public class WalletService {
     private final ExecutionLogService executionLogService;
 
     /**
-     * Save or update balance for a bookmaker
+     * Save or update the available balance for a bookmaker.
+     * This is typically called after scraping or syncing balance from the bookmaker site.
+     *
+     * @param bookMaker The bookmaker
+     * @param balance   The new available balance (must not be null)
+     * @return The updated/persisted Wallet entity
+     * @throws IllegalArgumentException if inputs are invalid
+     */
+    /**
+     * Sync the actual available balance from the bookmaker (e.g., after scraping).
+     * This REPLACES the stored balance with the real one.
      */
     @Transactional
-    public Wallet saveBalance(BookMaker bookMaker, BigDecimal balance) {
-        if (bookMaker == null || balance == null) {
-            log.warn("Cannot save balance with null bookMaker or balance");
-            return null;
+    public Wallet saveBalance(BookMaker bookMaker, BigDecimal actualBalance) {
+        if (bookMaker == null) {
+            throw new IllegalArgumentException("BookMaker cannot be null");
+        }
+        if (actualBalance == null) {
+            throw new IllegalArgumentException("Balance cannot be null");
+        }
+        if (actualBalance.compareTo(BigDecimal.ZERO) < 0) {
+            log.warn("Received negative balance for {}: {}. Clamping to zero.", bookMaker, actualBalance);
+            actualBalance = BigDecimal.ZERO;
         }
 
-        Optional<Wallet> existing = walletRepository.findByBookmaker(bookMaker);
-
-        Wallet wallet;
-        if (existing.isPresent()) {
-            wallet = existing.get();
-            BigDecimal oldBalance = wallet.getAvailableBalance();
-            wallet.setAvailableBalance(balance);
-            wallet.setLastUpdated(Instant.now());
-
-            log.info("Updated balance for bookmaker={}: {} -> {}", bookMaker, oldBalance, balance);
-        } else {
-            wallet = Wallet.builder()
-                    .bookmaker(bookMaker)
-                    .availableBalance(balance)
-                    .lastUpdated(Instant.now())
-                    .build();
-
-            log.info("Created new wallet for bookmaker={} with balance={}", bookMaker, balance);
-
-        }
-
-        return walletRepository.save(wallet);
+        BigDecimal finalActualBalance = actualBalance;
+        return walletRepository.findByBookmaker(bookMaker)
+                .map(existing -> {
+                    BigDecimal oldBalance = existing.getAvailableBalance();
+                    if (oldBalance.compareTo(finalActualBalance) != 0) {
+                        existing.setAvailableBalance(finalActualBalance);
+                        existing.setLastUpdated(Instant.now());
+                        log.info("🔄 Synced balance for {}: {} → {}", bookMaker, oldBalance, finalActualBalance);
+                    } else {
+                        log.debug("Balance unchanged for {}: {}", bookMaker, finalActualBalance);
+                        existing.setLastUpdated(Instant.now());
+                    }
+                    return walletRepository.save(existing);
+                })
+                .orElseGet(() -> {
+                    log.info("🆕 Created new wallet for {} with initial synced balance {}", bookMaker, finalActualBalance);
+                    Wallet newWallet = Wallet.builder()
+                            .bookmaker(bookMaker)
+                            .availableBalance(finalActualBalance)
+                            .totalDeposited(BigDecimal.ZERO)
+                            .totalWithdrawn(BigDecimal.ZERO)
+                            .lastUpdated(Instant.now())
+                            .build();
+                    return walletRepository.save(newWallet);
+                });
     }
 
     /**

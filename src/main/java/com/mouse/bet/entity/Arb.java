@@ -29,13 +29,14 @@ import java.util.*;
 @Table(name = "arb", indexes = {
         // Existing ones...
         @Index(name = "idx_arb_status_active_profit", columnList = "status, active, profitPercentage"),
-//        @Index(name = "idx_arb_session_duration", columnList = "currentSessionDurationSeconds"),
+        @Index(name = "idx_arb_session_duration", columnList = "currentSessionStartedAt, lastUpdatedAt"),
+        @Index(name = "idx_arb_cumulative_duration", columnList = "totalCumulativeDurationSeconds"),
+        @Index(name = "idx_arb_stability", columnList = "continuityBreakCount, currentSessionStartedAt"),
         @Index(name = "idx_arb_continuity_breaks", columnList = "continuityBreakCount"),
         @Index(name = "idx_arb_confidence", columnList = "confidenceScore"),
         @Index(name = "idx_arb_last_seen", columnList = "lastSeenAt"),
         @Index(name = "idx_arb_last_updated", columnList = "lastUpdatedAt"),
         @Index(name = "idx_arb_profit_last_updated", columnList = "profitPercentage, lastUpdatedAt"), // composite for your ORDER BY
-
         @Index(name = "idx_arb_expires_at_status", columnList = "expiresAt, status, active")
 })
 @EntityListeners(AuditingEntityListener.class)
@@ -118,6 +119,13 @@ public class Arb {
     private BigDecimal stakeB;
     private BigDecimal profitPercentage;
 
+    // Duration tracking
+    /**
+     * Total cumulative duration this arb has existed (sum of all sessions)
+     * Persisted to track total lifetime
+     */
+    private Long totalCumulativeDurationSeconds;
+
     // Relationships
     @Builder.Default
     @OneToMany(
@@ -162,6 +170,12 @@ public class Arb {
     private static final long MAX_CONTINUITY_GAP_SECONDS = 5;
 
     /**
+     * Minimum session duration for reliable metrics (in seconds)
+     */
+    @Transient
+    private static final long MIN_MATURE_SESSION_SECONDS = 10;
+
+    /**
      * Timestamp of the last continuous update
      * Used to detect gaps in arb existence
      */
@@ -182,13 +196,23 @@ public class Arb {
     private Instant currentSessionStartedAt;
 
     /**
-     * Total seconds of continuous existence in current session
-     * Calculated from currentSessionStartedAt
+     * Duration of current continuous session (calculated)
      */
     @Transient
     public Long getCurrentSessionDurationSeconds() {
-        if (currentSessionStartedAt == null) return 0L;
-        return Instant.now().getEpochSecond() - currentSessionStartedAt.getEpochSecond();
+        if (currentSessionStartedAt == null || lastUpdatedAt == null) {
+            return null;
+        }
+        return Math.max(0L, lastUpdatedAt.getEpochSecond() - currentSessionStartedAt.getEpochSecond());
+    }
+
+    /**
+     * Check if current session is "mature" enough for reliable metrics
+     */
+    @Transient
+    public boolean isSessionMature() {
+        Long duration = getCurrentSessionDurationSeconds();
+        return duration != null && duration >= MIN_MATURE_SESSION_SECONDS;
     }
 
     /**
@@ -207,6 +231,9 @@ public class Arb {
      * Mark continuity break and reset session tracking
      */
     public void breakContinuity(Instant now) {
+        // Accumulate current session duration before resetting
+        accumulateSessionDuration();
+
         continuityBreakCount++;
         currentSessionStartedAt = now;
         lastContinuousUpdateAt = now;
@@ -232,13 +259,16 @@ public class Arb {
     }
 
     /**
-     * Check if arb is in a reliable state for metrics
-     * Returns true only if session has been running long enough
+     * Accumulate current session duration to total cumulative duration
      */
-    @Transient
-    public boolean hasReliableMetrics(int minSessionSeconds) {
-        Long duration = getCurrentSessionDurationSeconds();
-        return duration != null && duration >= minSessionSeconds;
+    public void accumulateSessionDuration() {
+        Long sessionDuration = getCurrentSessionDurationSeconds();
+        if (sessionDuration != null && sessionDuration > 0) {
+            if (totalCumulativeDurationSeconds == null) {
+                totalCumulativeDurationSeconds = 0L;
+            }
+            totalCumulativeDurationSeconds += sessionDuration;
+        }
     }
 
     // ==================== LEG ACCESSORS ====================

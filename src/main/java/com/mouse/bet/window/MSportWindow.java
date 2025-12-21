@@ -76,7 +76,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
 
     private static final BookMaker BOOK_MAKER = BookMaker.M_SPORT;
-    private static final double TOLERANCE_PERCENT = 10;
+    private static final double TOLERANCE_PERCENT = 0.01;
 
     private static final long MAX_WAIT_FOR_RECOVERY = 30000; // 30 seconds max wait
 
@@ -2693,13 +2693,13 @@ public class MSportWindow implements BettingWindow, Runnable {
 
             // ── 3. ENABLE AUTO-ACCEPT ODDS CHANGES (CHECKBOX) ─────────────
             log.info("[3/6] Checking 'Accept odds changes' setting...");
-            enableAcceptOddsChanges(page);
+            disableAcceptOddsChanges(page);
 
             // ── 4. UNKILLABLE LOOP WITH CONTINUOUS MONITORING ─────────────────────────
             log.info("[4/6] Starting UNKILLABLE placement loop with continuous monitoring...");
             boolean betConfirmed = false;
             int cycle = 0;
-            final int MAX_CYCLES = 30;
+            final int MAX_CYCLES = 50;
             long waitStartTime = 0; // Shared timer for suspended OR unfavorable odds
 
 
@@ -2841,7 +2841,7 @@ public class MSportWindow implements BettingWindow, Runnable {
                             continue;
                         }
                         log.info("enable checkbox before clicking place Bet");
-                        enableAcceptOddsChanges(page);
+                        disableAcceptOddsChanges(page);
 
                         jsScrollAndClick(btnAfter, page);
                         log.info("Just clicked Place Bet button");
@@ -3639,62 +3639,65 @@ public class MSportWindow implements BettingWindow, Runnable {
     }
 
 // ── EXISTING HELPER METHODS (UNCHANGED) ────────────────────────────────
-
     /**
-     * Enables the "Accept odds changes" checkbox if it's not already checked
+     * Ensures 'Accept odds changes' checkbox is UNCHECKED (disabled)
+     * This ensures bets will only go through at the expected odds
      */
-    private void enableAcceptOddsChanges(Page page) {
+    private void disableAcceptOddsChanges(Page page) {
         try {
-            Locator checkbox = withLocatorRetry(page,
-                    "div.checkbox-square.nochecked, " +
-                            "div.checkbox-square-wrap:has-text('Accept odds changes') div.checkbox-square.nochecked, " +
-                            "div:has-text('Accept odds changes') div.checkbox-square.nochecked",
+            // Look for the CHECKED checkbox (we want to uncheck it)
+            Locator checkedCheckbox = withLocatorRetry(page,
+                    "div.checkbox-square:not(.nochecked), " +
+                            "div.checkbox-square-wrap:has-text('Accept odds changes') div.checkbox-square:not(.nochecked), " +
+                            "div:has-text('Accept odds changes') div.checkbox-square:not(.nochecked)",
                     loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(2000))
                             ? loc.first() : null,
                     2, 2000, 500);
 
-            if (checkbox != null) {
-                log.info("'Accept odds changes' checkbox is UNCHECKED → Enabling it");
-                jsScrollAndClick(checkbox, page);
+            if (checkedCheckbox != null) {
+                log.info("'Accept odds changes' checkbox is CHECKED → Disabling it");
+                jsScrollAndClick(checkedCheckbox, page);
                 randomHumanDelay(300, 600);
 
-                Locator checkedBox = withLocatorRetry(page,
-                        "div.checkbox-square:not(.nochecked)",
+                // Verify it's now unchecked
+                Locator uncheckedBox = withLocatorRetry(page,
+                        "div.checkbox-square.nochecked",
                         loc -> loc.first().isVisible(new Locator.IsVisibleOptions().setTimeout(1000))
                                 ? loc.first() : null,
                         2, 1000, 300);
 
-                if (checkedBox != null) {
-                    log.info("[OK] 'Accept odds changes' ENABLED");
+                if (uncheckedBox != null) {
+                    log.info("[OK] 'Accept odds changes' DISABLED (unchecked)");
+                } else {
+                    log.warn("Could not verify checkbox was unchecked");
                 }
             } else {
-                log.info("[OK] 'Accept odds changes' already enabled or not present");
+                log.info("[OK] 'Accept odds changes' already disabled (unchecked) or not present");
             }
         } catch (Exception e) {
-            log.debug("Could not enable 'Accept odds changes': {}", e.getMessage());
+            log.debug("Could not disable 'Accept odds changes': {}", e.getMessage());
         }
     }
-
 
     /**
      * Handles odds changes during the betting loop
+     * Ensures the checkbox stays UNCHECKED so bets are rejected if odds change
      */
     private void handleOddsChangesInLoop(Page page, int cycle) {
         try {
-
-            // Re-ensure checkbox is still enabled
-            Locator uncheckedBox = page.locator("div.checkbox-square.nochecked").first();
-            if (uncheckedBox.isVisible(new Locator.IsVisibleOptions().setTimeout(500))) {
-                log.warn("[Cycle {}] Checkbox became unchecked → Re-enabling", cycle);
-                jsScrollAndClick(uncheckedBox, page);
+            // Check if checkbox became checked (we want it unchecked)
+            Locator checkedBox = page.locator("div.checkbox-square:not(.nochecked)").first();
+            if (checkedBox.isVisible(new Locator.IsVisibleOptions().setTimeout(500))) {
+                log.warn("[Cycle {}] Checkbox became CHECKED → Re-disabling it", cycle);
+                jsScrollAndClick(checkedBox, page);
                 randomHumanDelay(300, 600);
+                log.info("[Cycle {}] Checkbox re-disabled", cycle);
             }
         } catch (Exception e) {
-            log.debug("No odds changes to handle in cycle {}", cycle);
+            log.debug("Checkbox check in cycle {}: {}", cycle, e.getMessage());
         }
     }
 
-// ── HELPER METHODS
 
     private void jsScrollAndClick(Locator locator, Page page) {
         try {
@@ -4093,7 +4096,7 @@ public class MSportWindow implements BettingWindow, Runnable {
 
                 BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                         .setUserAgent(profile.getUserAgent())
-//                        .setViewportSize(viewportSize)
+                        .setViewportSize(viewportSize)
 //                        .setScreenSize(viewportSize.width, viewportSize.height)
 //                                        .setDeviceScaleFactor(1)
 //                        .setExtraHTTPHeaders(getAllHeaders(profile))

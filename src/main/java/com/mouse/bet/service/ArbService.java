@@ -35,11 +35,12 @@ public class ArbService {
     private final ArbRepository arbRepository;
     private final ArbFilter arbFilter;
     private final ArbContinuityService continuityService;
-    // Minimum session duration for reliable metrics (in seconds)
-    @Value("${arb.min.reliable.session.seconds:10}")
-    private int minReliableSessionSeconds;
-    @Value("${arb.max.continuity.breaks:2}")
-    private int maxContinuityBreaks; //
+
+    @Value("${arb.session.min-stable-seconds:30}")
+    private int minStableSessionSeconds;
+
+    @Value("${arb.session.max-allowed-breaks:2}")
+    private int maxAllowedBreaks;
 
     // Emoji constants
     private static final String EMOJI_SAVE = "💾";
@@ -85,8 +86,9 @@ public class ArbService {
                     boolean continuityMaintained = continuityService.checkAndHandleContinuity(existing, now);
 
                     if (!continuityMaintained) {
-                        log.warn("{} {} Treating as NEW arb due to continuity break | ArbId: {}",
-                                EMOJI_WARNING, EMOJI_NEW, existing.getArbId());
+                        log.warn("{} {} Treating as NEW arb due to continuity break | ArbId: {} | Old Session: {}s",
+                                EMOJI_WARNING, EMOJI_NEW,
+                                existing.getArbId(), existing.getCurrentSessionDurationSeconds());
                         // Reset and treat as new session
                         return updateExistingArbAfterBreak(existing, incoming, now);
                     }
@@ -98,29 +100,34 @@ public class ArbService {
 
         Arb persisted = arbRepository.save(result);
 
-        log.info("{} {} Arb saved | ArbId: {} | Status: {} | Profit: {}% | Session: {}s | Breaks: {}",
+        log.info("{} {} Arb saved | ArbId: {} | Status: {} | Profit: {}% | Session: {}s | Total: {}s | Breaks: {}",
                 EMOJI_SUCCESS, EMOJI_SAVE,
                 persisted.getArbId(),
                 persisted.getStatus(),
                 persisted.getProfitPercentage(),
                 persisted.getCurrentSessionDurationSeconds(),
+                persisted.getTotalCumulativeDurationSeconds(),
                 persisted.getContinuityBreakCount());
     }
 
     /**
-     * Update existing arb
-     */
-    /**
      * Update existing arb (with continuity maintained)
      */
     private Arb updateExistingArb(Arb existing, Arb incoming, Instant now) {
-        log.info("{} {} Updating arb (continuous) | ArbId: {} | Session: {}s",
+        log.info("{} {} Updating arb (continuous) | ArbId: {} | Session: {}s | Total: {}s",
                 EMOJI_UPDATE, EMOJI_FIRE,
                 existing.getArbId(),
-                existing.getCurrentSessionDurationSeconds());
+                existing.getCurrentSessionDurationSeconds(),
+                existing.getTotalCumulativeDurationSeconds());
+
+        // Update timestamps for session tracking
+        existing.setLastUpdatedAt(now);
+        existing.markSeen(now);
+
+        // Update continuity tracking
+        existing.updateContinuity(now);
 
         mergeScalarFields(existing, incoming);
-        existing.markSeen(now);
 
         BigDecimal oldA = existing.getLegA().map(BetLeg::getOdds).orElse(null);
         BigDecimal oldB = existing.getLegB().map(BetLeg::getOdds).orElse(null);
@@ -147,20 +154,23 @@ public class ArbService {
         return existing;
     }
 
-
     /**
      * Update existing arb after continuity break
      * Treat similar to new arb but keep the entity
      */
     private Arb updateExistingArbAfterBreak(Arb existing, Arb incoming, Instant now) {
-        log.info("{} {} Resetting arb after break | ArbId: {} | OldSession: {}s",
+        log.info("{} {} Resetting arb after break | ArbId: {} | OldSession: {}s | Total: {}s",
                 EMOJI_NEW, EMOJI_FIRE,
                 existing.getArbId(),
-                existing.getCurrentSessionDurationSeconds());
+                existing.getCurrentSessionDurationSeconds(),
+                existing.getTotalCumulativeDurationSeconds());
 
         // Merge current data
         mergeScalarFields(existing, incoming);
         existing.markSeen(now);
+
+        // Break continuity and start new session
+        existing.breakContinuity(now);
 
         // Update legs
         upsertLeg(existing, incoming.getLegA().orElse(null), true);
@@ -188,10 +198,11 @@ public class ArbService {
         // Recompute metrics (will be limited due to new session)
         arbFilter.recomputeMetrics(existing);
 
-        log.info("{} {} New session established | ArbId: {} | StartedAt: {}",
+        log.info("{} {} New session established | ArbId: {} | StartedAt: {} | Total Duration: {}s",
                 EMOJI_SUCCESS, EMOJI_NEW,
                 existing.getArbId(),
-                existing.getCurrentSessionStartedAt());
+                existing.getCurrentSessionStartedAt(),
+                existing.getTotalCumulativeDurationSeconds());
 
         return existing;
     }
@@ -243,8 +254,9 @@ public class ArbService {
         boolean bChanged = hasChanged(oldB, newB);
 
         if (aChanged || bChanged) {
-            log.info("{} {} Odds changed | ArbId: {} | A: {} -> {} | B: {} -> {}",
-                    EMOJI_CHANGE, EMOJI_FIRE, arb.getArbId(), oldA, newA, oldB, newB);
+            log.info("{} {} Odds changed | ArbId: {} | A: {} -> {} | B: {} -> {} | Session: {}s",
+                    EMOJI_CHANGE, EMOJI_FIRE, arb.getArbId(),
+                    oldA, newA, oldB, newB, arb.getCurrentSessionDurationSeconds());
 
             try {
                 captureAndRecordOddsChange(arb, oldA, oldB, newA, newB, ChangeReason.SERVICE_UPSERT);
@@ -317,10 +329,13 @@ public class ArbService {
                     .velocityPctPerSec(arb.getVelocityPctPerSec())
                     .status(arb.getStatus())
                     .changeReason(reason)
+//                    .sessionDurationSeconds(arb.getCurrentSessionDurationSeconds())
+//                    .continuityBreaks(arb.getContinuityBreakCount())
                     .build();
 
             arb.addSnapshot(snapshot);
-            log.debug("{} Snapshot captured | Reason: {}", EMOJI_SUCCESS, reason);
+            log.debug("{} Snapshot captured | Reason: {} | Session: {}s",
+                    EMOJI_SUCCESS, reason, arb.getCurrentSessionDurationSeconds());
         } catch (Exception e) {
             log.warn("{} {} Snapshot failed | Reason: {} | Error: {}",
                     EMOJI_WARNING, EMOJI_ERROR, reason, e.getMessage());
@@ -438,22 +453,24 @@ public class ArbService {
         target.setBalanceAfterBet(source.getBalanceAfterBet());
     }
 
-    /**
-     * Fetch top arbs by metrics (with continuity validation)
-     */
+//    /**
+//     * Fetch top arbs by metrics (with stability filtering)
+//     */
 //    public List<Arb> fetchTopArbsByMetrics(BigDecimal minProfit, int limit) {
-//        log.info("{} {} Fetching top arbs | minProfit={}%, limit={}",
+//        log.info("{} {} Fetching top arbs with duration filtering | minProfit={}%, limit={}",
 //                EMOJI_SEARCH, EMOJI_TROPHY, minProfit, limit);
 //
 //        Instant now = Instant.now();
-//        Instant freshCutoff = now.minusSeconds(3); // Only very fresh arbs (updated in last 5s)
+//
+//        // Get fresh arbs (updated in last 5 seconds)
+//        Instant freshCutoff = now.minusSeconds(5);
 //
 //        Page<Arb> page = arbRepository.findLiveArbsForBetting(
 //                now,
 //                minProfit,
 //                freshCutoff,
 //                PageRequest.of(0,
-//                        Math.max(limit * 5, 100), // safety margin for scoring
+//                        Math.max(limit * 5, 100),
 //                        Sort.by(
 //                                Sort.Order.desc("profitPercentage"),
 //                                Sort.Order.desc("lastUpdatedAt")
@@ -461,65 +478,85 @@ public class ArbService {
 //        );
 //
 //        List<Arb> candidates = page.getContent();
-//        long totalMatching = page.getTotalElements();
 //
-//        log.info("{} Found {} candidates (total in DB: {})",
-//                EMOJI_CHART, candidates.size(), totalMatching);
+//        log.info("{} {} Found {} fresh candidates | minProfit: {}%",
+//                EMOJI_SUCCESS, EMOJI_SEARCH, candidates.size(), minProfit);
 //
 //        if (candidates.isEmpty()) {
-//            log.warn("{} No fresh live arbs found (updated within last 5s)", EMOJI_WARNING);
+//            log.warn("{} No fresh arbs found (updated within last 5s)", EMOJI_WARNING);
 //            return Collections.emptyList();
 //        }
 //
-//        // Final business filters: shouldBet + reliable session duration
+//        // Apply stability-based filtering
 //        List<Arb> topArbs = candidates.stream()
 //                .filter(arb -> {
 //                    if (!arb.isShouldBet()) {
-//                        log.debug("{} Skipped {} | shouldBet=false", EMOJI_WARNING, arb.getArbId());
+//                        log.debug("Skipped {} | shouldBet=false", arb.getArbId());
 //                        return false;
 //                    }
 //                    return true;
 //                })
-////                .filter(arb -> {
-////                    long sessionSeconds = arb.getCurrentSessionDurationSeconds();
-////                    if (sessionSeconds < minReliableSessionSeconds) {
-////                        log.info("{} Skipped {} | session={}s (need >= {}s)",
-////                                EMOJI_WARNING, arb.getArbId(), sessionSeconds, minReliableSessionSeconds);
-////                        return false;
-////                    }
-////                    return true;
-////                })
-//                .sorted(Comparator.comparingDouble(this::calculateScore).reversed())
-////                .filter(item -> {
-////                    Duration diff = Duration.between(item.getLastUpdatedAt(), item.getLastSeenAt());
-////                    return diff.getSeconds() > 5;
-////                })
+//                .filter(arb -> {
+//                    // NEW: Check if arb is stable enough for betting
+//                    if (!arbFilter.isStableForBetting(arb)) {
+//                        log.debug("Skipped {} | Not stable for betting", arb.getArbId());
+//                        return false;
+//                    }
+//                    return true;
+//                })
+//                .sorted(Comparator.comparingDouble(this::calculateEnhancedScore).reversed())
 //                .limit(limit)
 //                .toList();
 //
-//        log.info("{} {} Selected {} top arbs (from {} candidates)",
+//        log.info("{} {} Selected {} stable arbs (from {} candidates)",
 //                EMOJI_SUCCESS, EMOJI_FIRE, topArbs.size(), candidates.size());
 //
 //        if (!topArbs.isEmpty()) {
 //            Arb best = topArbs.get(0);
-//            double score = calculateScore(best);
+//            double score = calculateEnhancedScore(best);
 //
-//            log.info("{} {} BEST ARB | ID={} | Profit={} | Score={} | Session={}s | Breaks={} | Sport={}",
+//            log.info("{} {} BEST ARB | ID={} | Profit={}% | Score={} | Session={}s | Total={}s | Breaks={} | Sport={}",
 //                    EMOJI_TROPHY, EMOJI_FIRE,
 //                    best.getArbId(),
 //                    best.getProfitPercentage(),
 //                    score,
 //                    best.getCurrentSessionDurationSeconds(),
+//                    best.getTotalCumulativeDurationSeconds(),
 //                    best.getContinuityBreakCount(),
 //                    best.getSportEnum());
 //        } else {
-//            log.info("{} No arbs passed final filters (shouldBet + reliable session)", EMOJI_WARNING);
+//            log.info("{} No arbs passed stability filters", EMOJI_WARNING);
 //        }
 //
 //        return topArbs;
 //    }
 
+    /**
+     * Enhanced scoring with duration consideration
+     */
+    private double calculateEnhancedScore(Arb arb) {
+        double baseScore = calculateScore(arb); // Your existing score
 
+        // Add duration bonus for mature sessions
+        double durationBonus = 0.0;
+        Long sessionSeconds = arb.getCurrentSessionDurationSeconds();
+
+        if (sessionSeconds != null && sessionSeconds > minStableSessionSeconds) {
+            // Bonus increases with session length, capped at 0.5
+            durationBonus = Math.min(0.5, sessionSeconds / 60.0 * 0.1);
+            log.debug("Duration bonus for {}: {} (session: {}s)",
+                    arb.getArbId(), durationBonus, sessionSeconds);
+        }
+
+        // Penalty for continuity breaks
+        double breakPenalty = arb.getContinuityBreakCount() * 0.1;
+
+        double enhancedScore = baseScore + durationBonus - breakPenalty;
+        log.debug("Enhanced score for {}: {} (base: {}, bonus: {}, penalty: {})",
+                arb.getArbId(), enhancedScore, baseScore, durationBonus, breakPenalty);
+
+        return enhancedScore;
+    }
 
     /**
      * Calculate composite score for ranking
@@ -553,6 +590,4 @@ public class ArbService {
     private double nz(BigDecimal b) {
         return b == null ? 0.0 : b.doubleValue();
     }
-
-
 }
