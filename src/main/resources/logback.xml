@@ -212,11 +212,11 @@
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-<!--    &lt;!&ndash; ArbDetector Logger &ndash;&gt;-->
-<!--    <logger name="com.mouse.bet.detector.ArbDetector" level="INFO" additivity="false">-->
-<!--        <appender-ref ref="ARB_DETECTOR_FILE"/>-->
-<!--        <appender-ref ref="CONSOLE"/>-->
-<!--    </logger>-->
+    <!-- ArbDetector Logger -->
+    <logger name="com.mouse.bet.detector.ArbDetector" level="INFO" additivity="false">
+        <appender-ref ref="ARB_DETECTOR_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
 
     <!-- ArbFactory Logger -->
     <logger name="com.mouse.bet.utils.ArbFactory" level="INFO" additivity="false">

@@ -43,7 +43,7 @@ public class ArbPollingService {
     @Value("${arb.lookback.seconds:2}")
     private int lookbackSeconds;
 
-    @Value("${arb.polling.min-session-seconds:5}")
+    @Value("${arb.polling.min-session-seconds:2}")
     private int minSessionSeconds = 3;
 
     @Value("${arb.polling.max-breaks:2}")

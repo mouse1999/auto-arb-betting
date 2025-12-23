@@ -164,7 +164,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         try {
             playwright = Playwright.create();
             browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(false)
+                    .setHeadless(true)
                     .setArgs(scraperConfig.getBROWSER_FlAGS())
                     .setSlowMo(0));
 
@@ -218,51 +218,51 @@ public class SportyWindow implements BettingWindow, Runnable {
             }
 
 
-            boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
-
-            if (!markedReady) {
-                flowLogger.logPartnerTimeout(arbId, BOOK_MAKER);
-                arbPollingService.killArb(task.getArb());
-                return;
-            }
-
-            flowLogger.logMarkedReady(arbId, BOOK_MAKER);
-
-            // ========================================
-            // STEP 4: WAIT FOR PARTNER TO BE READY
-            // ========================================
-            boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
-                    arbId,
-                    BOOK_MAKER,
-                    Duration.ofSeconds(partnerTimeout)
-            );
-
-            if (!partnersReady) {
-                flowLogger.logPartnersNotReady(arbId, BOOK_MAKER);
-                arbPollingService.killArb(task.getArb());
-
-                // Clear partner's task queue
-                arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
-                    if (bookmaker.equals(BOOK_MAKER)) {
-                        log.debug("⏭️ Skipping {} queue (current window: {})", bookmaker, BOOK_MAKER);
-                        return;
-                    }
-
-                    int clearedCount = queue.size();
-                    LegTask legTask = queue.peek();
-
-                    if (legTask != null) {
-                        Phaser phaser = legTask.getBarrier();
-                        phaser.arriveAndAwaitAdvance();
-                    }
-
-                    log.info("✅ Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
-                            bookmaker, clearedCount, BOOK_MAKER);
-                });
-                return;
-            }
-
-            flowLogger.logBothPartnersReady(arbId, BOOK_MAKER);
+//            boolean markedReady = syncManager.markReady(arbId, BOOK_MAKER);
+//
+//            if (!markedReady) {
+//                flowLogger.logPartnerTimeout(arbId, BOOK_MAKER);
+//                arbPollingService.killArb(task.getArb());
+//                return;
+//            }
+//
+//            flowLogger.logMarkedReady(arbId, BOOK_MAKER);
+//
+//            // ========================================
+//            // STEP 4: WAIT FOR PARTNER TO BE READY
+//            // ========================================
+//            boolean partnersReady = syncManager.waitForPartnersReadyOrTimeout(
+//                    arbId,
+//                    BOOK_MAKER,
+//                    Duration.ofSeconds(partnerTimeout)
+//            );
+//
+//            if (!partnersReady) {
+//                flowLogger.logPartnersNotReady(arbId, BOOK_MAKER);
+//                arbPollingService.killArb(task.getArb());
+//
+//                // Clear partner's task queue
+//                arbOrchestrator.getWorkerQueues().forEach((bookmaker, queue) -> {
+//                    if (bookmaker.equals(BOOK_MAKER)) {
+//                        log.debug("⏭️ Skipping {} queue (current window: {})", bookmaker, BOOK_MAKER);
+//                        return;
+//                    }
+//
+//                    int clearedCount = queue.size();
+//                    LegTask legTask = queue.peek();
+//
+//                    if (legTask != null) {
+//                        Phaser phaser = legTask.getBarrier();
+//                        phaser.arriveAndAwaitAdvance();
+//                    }
+//
+//                    log.info("✅ Cleared worker queue | Bookmaker: {} | TasksRemoved: {} from {} window",
+//                            bookmaker, clearedCount, BOOK_MAKER);
+//                });
+//                return;
+//            }
+//
+//            flowLogger.logBothPartnersReady(arbId, BOOK_MAKER);
 
             log.info("🚀 SIMULTANEOUS BETTING | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
 
@@ -2134,137 +2134,175 @@ public class SportyWindow implements BettingWindow, Runnable {
         }
     }
 
-    // Step 2: Select and verify the betting option
     private boolean selectAndVerifyBet(Page page, BetLeg leg) {
-        String market = leg.getProviderMarketTitle();
-        String outcome = leg.getProviderMarketName();
+        String market = leg.getProviderMarketTitle().trim();
+        String outcome = leg.getProviderMarketName().trim();
+        double expectedOdds = leg.getOdds().doubleValue();
+        log.info("Selecting: {} → {}", market, outcome);
 
         try {
-            log.info("Selecting: {} → {}", market, outcome);
-
-            withLocatorRetry(
-                    page, "div.m-nav-item--active >> text=All",
-                    loc -> {
-                        loc.first().waitFor(new Locator.WaitForOptions().setTimeout(10000));
-                        return true;
-                    },
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
-
-            page.locator("div.m-nav-item:has-text('All')").click();
-            randomHumanDelay(100, 200);
-
-            String marketHeaderXPath = String.format(
-                    "//div[contains(@class,'m-table__wrapper')]//span[contains(@class,'m-table-header-title') and normalize-space()=%s]",
-                    escapeXPath(market)
-            );
-
-            // CHANGE 1: Get ALL market headers matching the name
-            Locator marketHeaders = withLocatorRetry(
-                    page, "xpath=" + marketHeaderXPath,
-                    loc -> loc,
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
-
-            if (marketHeaders == null || marketHeaders.count() == 0) {
-                log.error("Market NOT FOUND: {}", market);
-                takeMarketScreenshot(page, "market-not-found-" + market.replaceAll("[^a-zA-Z0-9]", "_"));
-                return false;
-            }
-
-            // CHANGE 2: Get ALL corresponding market blocks
-            Locator marketBlocks = marketHeaders.locator("xpath=ancestor::div[contains(@class,'m-table__wrapper')]");
-
-            log.info("Found {} market block(s) with name: {}", marketBlocks.count(), market);
-
-            takeMarketScreenshot(page, market.replaceAll("[^a-zA-Z0-9]", "_"));
-
-            // Try to find exact match first
-            String targetOutcome = outcome;
-            String cellXPath = String.format(
-                    ".//div[contains(@class,'m-table-cell--responsive') and not(contains(@class,'m-table-cell--disable'))]" +
-                            "[.//span[contains(@class,'m-table-cell-item') and contains(normalize-space(), %s)]]",
-                    escapeXPath(targetOutcome)
-            );
-
-            Locator outcomeCell = null;
-            List<String> allAvailableOutcomes = new ArrayList<>();
-
-            // CHANGE 3: Iterate through all market blocks to find the outcome
-            for (int i = 0; i < marketBlocks.count(); i++) {
-                Locator currentBlock = marketBlocks.nth(i);
-
-                // Collect outcomes for logging
-                List<String> blockOutcomes = currentBlock.locator("span.m-table-cell-item").allTextContents();
-                allAvailableOutcomes.addAll(blockOutcomes);
-
-                Locator candidate = currentBlock.locator("xpath=" + cellXPath).first();
-
-                if (candidate.count() > 0) {
-                    try {
-                        candidate.waitFor(new Locator.WaitForOptions()
-                                .setTimeout(1500)
-                                .setState(WaitForSelectorState.VISIBLE));
-                        outcomeCell = candidate;
-                        log.info("Outcome '{}' found in market block {}/{}", outcome, i + 1, marketBlocks.count());
-                        break; // Found it — stop searching
-                    } catch (TimeoutError ignored) {
-                        // Not visible, continue to next block
-                    }
+            // Ensure "All" tab is active
+            Locator allTab = page.locator("div.m-nav-item:has-text('All')");
+            if (allTab.isVisible()) {
+                String classes = allTab.getAttribute("class");
+                if (classes == null || !classes.contains("m-nav-item--active")) {
+                    allTab.click(new Locator.ClickOptions().setTimeout(3000));
+                    randomHumanDelay(200, 400);
                 }
             }
 
-            // If still not found, log all available outcomes across all blocks
-            if (outcomeCell == null || outcomeCell.count() == 0) {
-                log.error("❌ Outcome '{}' not found in any of the {} market(s) named '{}'", outcome, marketBlocks.count(), market);
-                log.error("All available outcomes across markets: {}", allAvailableOutcomes);
-                takeMarketScreenshot(page, "outcome-not-found-" + market.replaceAll("[^a-zA-Z0-9]", "_"));
+            // JavaScript to find the best matching cell
+            String jsFind = """
+                (args) => {
+                    const { market, outcome } = args;
+                    const marketNorm = market.trim();
+                    const outcomeNorm = outcome.trim();
+                    const outcomeLower = outcomeNorm.toLowerCase();
+                    const wrappers = document.querySelectorAll('div.m-table__wrapper');
+                    const allOutcomes = [];
+                    let bestMatch = null;
+                    let wrapperIndex = 0;
+
+                    wrappers.forEach(wrapper => {
+                        const header = wrapper.querySelector('span.m-table-header-title');
+                        if (!header || !header.textContent.trim().includes(marketNorm)) {
+                            wrapperIndex++;
+                            return;
+                        }
+
+                        const cells = wrapper.querySelectorAll('div.m-table-cell--responsive');
+                        let cellIndex = 0;
+                        cells.forEach(cell => {
+                            const textSpan = cell.querySelector('span.m-table-cell-item');
+                            if (!textSpan) {
+                                cellIndex++;
+                                return;
+                            }
+                            const text = textSpan.textContent.trim();
+                            const oddsSpans = cell.querySelectorAll('span.m-table-cell-item');
+                            const odds = oddsSpans.length > 1 ? oddsSpans[1].textContent.trim() : 'N/A';
+                            const disabled = cell.classList.contains('m-table-cell--disable');
+
+                            allOutcomes.push({
+                                marketTitle: header.textContent.trim(),
+                                outcomeText: text,
+                                odds: odds,
+                                disabled: disabled
+                            });
+
+                            if (!disabled && (text === outcomeNorm || text.toLowerCase() === outcomeLower)) {
+                                if (!bestMatch) {
+                                    bestMatch = {
+                                        wrapperIndex: wrapperIndex,
+                                        cellIndex: cellIndex,
+                                        outcomeText: text,
+                                        odds: odds
+                                    };
+                                }
+                            }
+                            cellIndex++;
+                        });
+                        wrapperIndex++;
+                    });
+
+                    return {
+                        found: bestMatch,
+                        allOutcomes: allOutcomes,
+                        matchingBlockCount: wrapperIndex
+                    };
+                }
+                """;
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) page.evaluate(jsFind, Map.of("market", market, "outcome", outcome));
+            Object foundObj = result.get("found");
+
+            if (foundObj == null) {
+                log.error("Market '{}' or outcome '{}' NOT FOUND", market, outcome);
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> allOutcomes = (List<Map<String, Object>>) result.get("allOutcomes");
+                log.warn("=== AVAILABLE OUTCOMES ===");
+                allOutcomes.forEach(entry -> {
+                    String status = (Boolean) entry.get("disabled") ? " [DISABLED]" : "";
+                    log.warn(" → {} @ {} | Market: {}{}",
+                            entry.get("outcomeText"), entry.get("odds"), entry.get("marketTitle"), status);
+                });
+                log.warn("=== END DEBUG ===");
+                takeMarketScreenshot(page, "not-found-" + safeFileName(market + "-" + outcome));
                 return false;
             }
 
-            // Rest of the logic remains EXACTLY the same
-            Locator oddsSpan = outcomeCell.locator("span.m-table-cell-item").nth(1);
-            String displayedOdds = oddsSpan.textContent().trim();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> match = (Map<String, Object>) foundObj;
+            int wrapperIdx = (Integer) match.get("wrapperIndex");
+            int cellIdx = (Integer) match.get("cellIndex");
+            String actualOutcome = (String) match.get("outcomeText");
+            String actualOddsStr = (String) match.get("odds");
 
-            if(targetOutcome.equals(outcome)) {
-                log.info("✅ FOUND: {} → {} @ {}", market, outcome, displayedOdds);
-            } else {
-                log.info("✅ FOUND (fuzzy): {} → {} (matched as '{}') @ {}",
-                        market, outcome, targetOutcome, displayedOdds);
-            }
+            log.info("FOUND: {} → {} @ {}", market, actualOutcome, actualOddsStr);
 
-            if (!isOddsAcceptable(leg.getOdds().doubleValue(), displayedOdds)) {
-                log.warn("⚠️ Odds drifted: expected {} → got {}", leg.getOdds(), displayedOdds);
+            // Verify outcome match
+            if (!actualOutcome.equalsIgnoreCase(outcome)) {
+                log.warn("Outcome mismatch: expected '{}' → got '{}'", outcome, actualOutcome);
+                takeMarketScreenshot(page, "mismatch-" + safeFileName(market + "-" + outcome));
                 return false;
             }
 
+            // Odds check
+            if (!isOddsAcceptable(expectedOdds, actualOddsStr)) {
+                log.warn("Odds drifted: expected ≥ {} → got {}", expectedOdds, actualOddsStr);
+                return false; // Fail on odds drift
+            }
+
+            // Re-query cell for reliability
+            Locator wrapper = page.locator("div.m-table__wrapper").nth(wrapperIdx);
+            Locator outcomeCell = wrapper.locator("div.m-table-cell--responsive:not(.m-table-cell--disable)").nth(cellIdx);
+
+            // Verify cell content before clicking
+            String cellText = outcomeCell.locator("span.m-table-cell-item").first().textContent().trim();
+            if (!cellText.equalsIgnoreCase(outcome)) {
+                log.error("Cell content mismatch: expected '{}' → got '{}'", outcome, cellText);
+                takeMarketScreenshot(page, "cell-mismatch-" + safeFileName(market + "-" + outcome));
+                return false;
+            }
+
+            // Click with visual feedback
             outcomeCell.scrollIntoViewIfNeeded();
-            randomHumanDelay(100, 200);
-
             try {
                 outcomeCell.evaluate("el => el.style.border = '3px solid red'");
-                randomHumanDelay(50, 100);
+                randomHumanDelay(100, 200);
+                outcomeCell.click(new Locator.ClickOptions().setForce(true).setTimeout(8000));
+                outcomeCell.evaluate("el => el.style.border = ''");
             } catch (Exception e) {
-                log.debug("Could not highlight cell: {}", e.getMessage());
-            }
-
-            try {
-                outcomeCell.click(new Locator.ClickOptions().setTimeout(10000));
-                log.info("✅ CLICKED: {} → {} @ {}", market, targetOutcome, displayedOdds);
-            } catch (Exception e) {
-                log.warn("Standard click failed, trying JS click: {}", e.getMessage());
+                log.warn("Primary click failed, attempting fallback click");
                 outcomeCell.evaluate("el => el.click()");
-                log.info("✅ JS CLICKED: {} → {} @ {}", market, targetOutcome, displayedOdds);
+            }
+            randomHumanDelay(200, 400);
+
+            // Post-click verification (check if selection is reflected, e.g., in a bet slip)
+            Locator betSlipOutcome = page.locator("div.bet-slip .outcome-name"); // Adjust selector based on actual bet slip
+            if (betSlipOutcome.isVisible()) {
+                String betSlipText = betSlipOutcome.textContent().trim();
+                if (!betSlipText.contains(outcome)) {
+                    log.error("Bet slip mismatch: expected '{}' → got '{}'", outcome, betSlipText);
+                    takeMarketScreenshot(page, "betslip-mismatch-" + safeFileName(market + "-" + outcome));
+                    return false;
+                }
             }
 
-            randomHumanDelay(100, 200);
+            log.info("CLICKED: {} → {} @ {}", market, actualOutcome, actualOddsStr);
             return true;
 
         } catch (Exception e) {
-            log.error("❌ FATAL: Failed to select {} → {}", market, outcome, e);
-            takeMarketScreenshot(page, "error-" + market.replaceAll("[^a-zA-Z0-9]", "_"));
+            log.error("Failed to select {} → {} | Error: {}", market, outcome, e.getMessage());
+            takeMarketScreenshot(page, "error-" + safeFileName(market + "-" + outcome));
             return false;
         }
+    }
+
+    // Helper for safe filenames
+    private String safeFileName(String name) {
+        return name.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
 
 
@@ -2316,10 +2354,10 @@ public class SportyWindow implements BettingWindow, Runnable {
             log.warn("{} {} Failed to clear bet slip, continuing anyway", EMOJI_WARNING, EMOJI_BET);
         }
 
-        // 2. Verify market exists
-        if (!selectMarketByTitle(page, leg.getProviderMarketTitle())) {
-            return false;
-        }
+//        // 2. Verify market exists
+//        if (!selectMarketByTitle(page, leg.getProviderMarketTitle())) {
+//            return false;
+//        }
 
         // 3. Select and verify bet
         if (!selectAndVerifyBet(page, leg)) {
@@ -2336,72 +2374,52 @@ public class SportyWindow implements BettingWindow, Runnable {
         return true;
     }
 
-    // Optional: Verify bet appeared in slip
     private boolean verifyBetSlip(Page page, BetLeg leg) {
         String outcome = leg.getProviderMarketName();
         String market = leg.getProviderMarketTitle();
 
         try {
-            Locator betslip = withLocatorRetry(
-                    page, "#j_betslip .m-betslips",
-                    loc -> {
-                        loc.waitFor(new Locator.WaitForOptions()
-                                .setState(WaitForSelectorState.VISIBLE)
-                                .setTimeout(8000));
-                        return loc;
-                    },
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            // 1. Fast check: is there exactly 1 bet item in the slip?
+            Locator betItem = page.locator(".m-betslips .m-list .m-item") // More resilient than #j_betslip
+                    .first();
 
-            if (betslip == null) return false;
+            // Wait for it to be visible (auto-waiting + low timeout)
+            if (!betItem.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
+                log.warn("⏱️ Bet not appeared in slip within 3s");
+                debugBetslipContents(page, outcome, market);
+                return false;
+            }
 
-            Locator betItem = withLocatorRetry(
-                    page, "#j_betslip .m-betslips .m-list .m-item",
-                    loc -> {
-                        loc.first().waitFor(new Locator.WaitForOptions()
-                                .setState(WaitForSelectorState.VISIBLE)
-                                .setTimeout(3000));
-                        return loc.first();
-                    },
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            // 2. Extract all texts in parallel — super fast for single item
+            String displayedOutcome = betItem.locator(".m-item-play span")
+                    .first()
+                    .textContent(new Locator.TextContentOptions().setTimeout(1000))
+                    .trim();
 
-            if (betItem == null) return false;
+            String displayedMarket = betItem.locator(".m-item-market")
+                    .textContent(new Locator.TextContentOptions().setTimeout(800))
+                    .trim();
 
-            String displayedOutcome = withLocatorRetry(
-                    page, ".m-item-play span",
-                    loc -> betItem.locator(loc).first().textContent().trim(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            String displayedOdds = betItem.locator(".m-item-odds .m-text-main")
+                    .textContent(new Locator.TextContentOptions().setTimeout(800))
+                    .trim();
 
-            String displayedMarket = withLocatorRetry(
-                    page, ".m-item-market",
-                    loc -> betItem.locator(loc).textContent().trim(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
-
-            String displayedOdds = withLocatorRetry(
-                    page, ".m-item-odds .m-text-main",
-
-                    loc -> betItem.locator(loc).textContent().trim(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
-
-            String displayedTeam = withLocatorRetry(
-                    page, ".m-item-team",
-                    loc -> betItem.locator(loc).textContent().trim(),
-                    RETRY_MAX_ATTEMPTS, RETRY_TIMEOUT_MS, RETRY_DELAY_MS
-            );
+            String displayedTeam = betItem.locator(".m-item-team")
+                    .textContent(new Locator.TextContentOptions().setTimeout(800))
+                    .trim();
 
             boolean isLive = betItem.locator(".m-icon-live").count() > 0;
 
+            // 3. Verification
             if (!displayedOutcome.equalsIgnoreCase(outcome)) {
-                log.warn("⚠️ Outcome mismatch: expected '{}' but found '{}'", outcome, displayedOutcome);
+                log.warn("⚠️ Outcome mismatch: expected '{}' → got '{}'", outcome, displayedOutcome);
+                debugBetslipContents(page, outcome, market);
                 return false;
             }
 
             if (!displayedMarket.equalsIgnoreCase(market)) {
-                log.warn("⚠️ Market mismatch: expected '{}' but found '{}'", market, displayedMarket);
+                log.warn("⚠️ Market mismatch: expected '{}' → got '{}'", market, displayedMarket);
+                debugBetslipContents(page, outcome, market);
                 return false;
             }
 
@@ -2410,16 +2428,9 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             return true;
 
-        } catch (PlaywrightException pe) {
-            if (pe.getMessage().contains("Timeout")) {
-                log.warn("⏱️ Timeout waiting for bet in slip: {}", pe.getMessage());
-                debugBetslipContents(page, outcome, market);
-            } else {
-                log.error("❌ Playwright error: {}", pe.getMessage());
-            }
-            return false;
         } catch (Exception e) {
-            log.error("❌ Unexpected error: {}", e.getMessage(), e);
+            log.warn("❌ Error verifying bet slip: {}", e.getMessage());
+            debugBetslipContents(page, outcome, market);
             return false;
         }
     }
@@ -2427,40 +2438,37 @@ public class SportyWindow implements BettingWindow, Runnable {
 
     private void debugBetslipContents(Page page, String expectedOutcome, String expectedMarket) {
         try {
-            // Check if betslip is even visible
-            boolean betslipVisible = page.locator("#j_betslip").isVisible();
-            log.warn("❌ TIMEOUT - Betslip visible: {}", betslipVisible);
+            boolean slipVisible = page.locator(".m-betslips").isVisible(new Locator.IsVisibleOptions().setTimeout(1000));
+            log.warn("🔍 DEBUG: Betslip container visible: {}", slipVisible);
 
-            if (!betslipVisible) {
-                log.warn("Betslip container not found or not visible!");
+            if (!slipVisible) {
+                log.warn("Betslip not visible at all!");
                 return;
             }
 
-            // Get bet count
-            String betCount = page.locator(".m-bet-count").first().textContent().trim();
-            log.warn("Bet count showing: {}", betCount);
+            Locator items = page.locator(".m-betslips .m-list .m-item");
+            int count = items.count();
+            log.warn("🔍 Betslip has {} item(s)", count);
 
-            // List all items in betslip
-            Locator allItems = page.locator("#j_betslip .m-list .m-item");
-            int itemCount = allItems.count();
-            log.warn("Number of items in betslip: {}", itemCount);
-
-            // Show details of each item
-            for (int i = 0; i < itemCount; i++) {
-                Locator item = allItems.nth(i);
-                String outcome = item.locator(".m-item-play span").nth(0).textContent().trim();
-                String market = item.locator(".m-item-market").textContent().trim();
+            for (int i = 0; i < count; i++) {
+                Locator item = items.nth(i);
+                String outc = item.locator(".m-item-play span").first().textContent().trim();
+                String mkt = item.locator(".m-item-market").textContent().trim();
                 String odds = item.locator(".m-item-odds .m-text-main").textContent().trim();
                 String team = item.locator(".m-item-team").textContent().trim();
 
-                log.warn("  Item {}: outcome='{}', market='{}', odds='{}', team='{}'",
-                        i, outcome, market, odds, team);
+                log.warn("   Item {}: outcome='{}' | market='{}' | odds='{}' | team='{}'",
+                        i + 1, outc, mkt, odds, team);
             }
 
-            log.warn("Expected: outcome='{}', market='{}'", expectedOutcome, expectedMarket);
+            log.warn("🔍 Expected: outcome='{}' | market='{}'", expectedOutcome, expectedMarket);
 
-        } catch (Exception e) {
-            log.warn("Debug failed: {}", e.getMessage());
+            // Optional: screenshot only on debug
+            page.screenshot(new Page.ScreenshotOptions()
+                    .setPath(Paths.get("screenshots/debug-slip-" + System.currentTimeMillis() + ".png")));
+
+        } catch (Exception ex) {
+            log.warn("Debug failed: {}", ex.getMessage());
         }
     }
 
@@ -2489,21 +2497,23 @@ public class SportyWindow implements BettingWindow, Runnable {
             // ── 1. ENTER STAKE ─────────────────────────────────────
             log.info("[1/6] Entering stake...");
             Locator stakeInput = page.locator("#j_stake_0 input.m-input, .m-input[placeholder*='min']").first();
+
             if (stakeInput.count() == 0) {
                 log.error("Stake input missing");
                 return false;
             }
-            jsScrollAndFocus(stakeInput, page);
-            stakeInput.fill("");
-            randomHumanDelay(150, 400);
-            SportyLoginUtils.typeFastHumanLike(stakeInput, stake.toPlainString());
+
+            // Fast: no scroll/focus/delay needed
+            stakeInput.fill(""); // Clear
+            stakeInput.fill(stake.toPlainString()); // Type stake directly
             stakeInput.press("Enter");
-            randomHumanDelay(200, 500);
+
             log.info("[OK] Stake entered");
 
             // ── 2. WAIT FOR BET IN SLIP ─────────────────────────────────
-            if (page.locator("div.m-item, .m-bet-item").count() == 0) {
-                page.waitForTimeout(3000);
+            Locator betItemCheck = page.locator("div.m-item, .m-bet-item");
+            if (betItemCheck.count() == 0) {
+                betItemCheck.first().waitFor(new Locator.WaitForOptions().setTimeout(4000));
                 if (page.locator("div.m-item").count() == 0) {
                     log.error("Bet never appeared in slip");
                     return false;
@@ -2517,12 +2527,11 @@ public class SportyWindow implements BettingWindow, Runnable {
             boolean permanentFailure = false;
             int cycle = 0;
 
-
             while (!betConfirmed && !permanentFailure && cycle < MAX_CYCLES) {
                 cycle++;
                 log.info("[Cycle {}/{}] Checking state...", cycle, MAX_CYCLES);
 
-                // ── A. CRITICAL ODDS NOT ACCEPTABLE POPUP (IMMEDIATE FAILURE) ──
+                // ── A. CRITICAL ODDS NOT ACCEPTABLE POPUP ──
                 Locator oddsChangePopup = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
                 if (oddsChangePopup.isVisible(new Locator.IsVisibleOptions().setTimeout(500))) {
                     log.error("ODDS NOT ACCEPTABLE POPUP → Permanent failure");
@@ -2530,7 +2539,7 @@ public class SportyWindow implements BettingWindow, Runnable {
                     break;
                 }
 
-                // ── B. MONITOR BETSLIP STATUS (FIXED WITH FRESH DOM READS) ──
+                // ── B. MONITOR BETSLIP STATUS ──
                 BetslipStatus status = monitorAndHandleOddsInBetslip(page, expectedOdds);
 
                 switch (status) {
@@ -2538,21 +2547,15 @@ public class SportyWindow implements BettingWindow, Runnable {
                         log.error("❌ MARKET UNAVAILABLE → Game over → ABORTING");
                         permanentFailure = true;
                         break;
-
                     case ODDS_TOO_LOW:
                         log.warn("⚠️ ODDS CURRENTLY TOO LOW → Waiting for odds to improve...");
-                        // Wait and let the loop continue checking for odds improvement
-                        randomHumanDelay(300, 600);
                         continue;
-
                     case SUSPENDED:
                         log.warn("⏸️ Market suspended → Waiting for odds to return...");
-                        randomHumanDelay(800, 1500);
                         continue;
-
                     case ACCEPTABLE:
                         log.info("✅ Odds acceptable in betslip → Proceeding");
-                        break; // Continue with button logic
+                        break;
                 }
 
                 if (permanentFailure) break;
@@ -2561,20 +2564,21 @@ public class SportyWindow implements BettingWindow, Runnable {
                 Locator finalConfirm = page.locator("xpath=//button[.//span[text()='Confirm' or text()='Yes' or text()='OK']]").first();
                 if (finalConfirm.isVisible(new Locator.IsVisibleOptions().setTimeout(800))) {
                     log.warn("FINAL CONFIRM POPUP → Clicking 'Confirm'");
-                    jsScrollAndClick(finalConfirm, page);
-                    randomHumanDelay(100, 200);
+                    finalConfirm.click(new Locator.ClickOptions()
+                            .setForce(true)
+                            .setNoWaitAfter(true)
+                            .setTimeout(1500));
                 }
 
-                // ── D. MAIN BUTTON LOGIC (ONLY IF ODDS ARE ACCEPTABLE) ──
+                // ── D. MAIN BUTTON LOGIC (ONLY IF ODDS ACCEPTABLE) ──
                 if (status != BetslipStatus.ACCEPTABLE) {
-                    // Don't try to click buttons if odds aren't acceptable yet
                     continue;
                 }
 
                 Locator btn = page.locator("button.af-button--primary >> visible=true").first();
+
                 if (btn.count() == 0) {
                     log.info("Primary button gone → likely success");
-                    randomHumanDelay(300, 600);
                     continue;
                 }
 
@@ -2583,17 +2587,15 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 if (text.matches(".*(Accept Changes|Accept|Confirm Changes).*")) {
                     log.warn("→ Clicking 'Accept Changes' (cycle {})", cycle);
-                    jsScrollAndClick(btn, page);
-                    randomHumanDelay(100, 200);
+                    btn.click(new Locator.ClickOptions().setForce(true).setNoWaitAfter(true));
                     continue;
                 }
 
                 if (text.matches(".*(Place Bet|Bet Now|Confirm Bet|Place bet).*") && !btn.isDisabled()) {
                     log.info("→ Clicking 'Place Bet' (cycle {})", cycle);
-                    jsScrollAndClick(btn, page);
-                    randomHumanDelay(100, 200);
+                    btn.click(new Locator.ClickOptions().setForce(true).setNoWaitAfter(true));
 
-                    // Check for rejection popup right after click
+                    // Check rejection right after
                     Locator oddsRejected = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
                     if (oddsRejected.isVisible(new Locator.IsVisibleOptions().setTimeout(3000))) {
                         log.error("ODDS NOT ACCEPTABLE after clicking Place Bet → FAILURE");
@@ -2605,7 +2607,6 @@ public class SportyWindow implements BettingWindow, Runnable {
 
                 if (text.contains("Place Bet") && btn.isDisabled()) {
                     log.info("Place Bet disabled → waiting...");
-                    randomHumanDelay(200, 400);
                     continue;
                 }
 
@@ -2624,8 +2625,6 @@ public class SportyWindow implements BettingWindow, Runnable {
                     betConfirmed = true;
                     break;
                 }
-
-                randomHumanDelay(200, 400);
             }
 
             // ── HANDLE PERMANENT FAILURE ──
@@ -2635,12 +2634,10 @@ public class SportyWindow implements BettingWindow, Runnable {
                     Locator closeBtn = page.locator("div.m-dialog-wrapper button:has-text('OK'), " +
                             "div.m-dialog-wrapper img.close-icon[data-action='close']").first();
                     if (closeBtn.isVisible(new Locator.IsVisibleOptions().setTimeout(2000))) {
-                        jsScrollAndClick(closeBtn, page);
-                        randomHumanDelay(100, 200);
+                        closeBtn.click(new Locator.ClickOptions().setForce(true).setNoWaitAfter(true));
                     }
                 } catch (Exception ignored) {}
-                long duration = System.currentTimeMillis() - startTime;
-                log.info("placeBet() COMPLETED | FAILURE | {}ms", duration);
+                log.info("placeBet() COMPLETED | FAILURE | {}ms", System.currentTimeMillis() - startTime);
                 log.info("─────────────────────────────────────────────────────────────");
                 return false;
             }
@@ -2652,28 +2649,27 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             log.info("[OK] Bet placed after {} cycle(s)", cycle);
 
-            // ── FINAL SUCCESS VERIFICATION ──
+            // ── FINAL SUCCESS VERIFICATION (kept exactly as original) ──
             try {
                 page.waitForFunction("""
-            () => {
-                return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
-                       document.querySelector('span[data-cms-key="submission_successful"]') ||
-                       document.querySelector('div.booking-code');
-            }
-            """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
+                () => {
+                    return document.querySelector('div.m-dialog-wrapper.m-dialog-suc') ||
+                           document.querySelector('span[data-cms-key="submission_successful"]') ||
+                           document.querySelector('div.booking-code');
+                }
+                """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
                 log.info("FINAL SUCCESS VERIFIED");
             } catch (TimeoutError te) {
                 log.error("NO SUCCESS MODAL AFTER 15s → BET FAILED");
                 return false;
             }
 
-            // ── CLOSE SUCCESS MODAL ──
+            // ── CLOSE SUCCESS MODAL (kept exactly as original) ──
             try {
                 Locator closeSuccess = page.locator("div.m-dialog-suc button:has-text('OK'), " +
                         "div.m-dialog-suc i.m-icon-close, " +
                         "div.m-dialog-suc [data-action='close']").first();
-                jsScrollAndClick(closeSuccess, page);
-                randomHumanDelay(100, 200);
+                closeSuccess.click(new Locator.ClickOptions().setForce(true).setNoWaitAfter(true));
                 log.info("Success modal closed");
             } catch (Exception ignored) {}
 
@@ -2695,112 +2691,64 @@ public class SportyWindow implements BettingWindow, Runnable {
      */
     private BetslipStatus monitorAndHandleOddsInBetslip(Page page, BigDecimal expectedOdds) {
         try {
-            // ── CRITICAL: Always query fresh from DOM, never reuse locators ──
-            Locator betItem = page.locator("div.m-item").first();
-            if (betItem.count() == 0) {
-                log.warn("No bet item in slip yet");
-                return BetslipStatus.ACCEPTABLE; // Assume loading, continue
-            }
-
-            // Force a small wait to ensure DOM has updated
-            page.waitForTimeout(50);
-
-            // Re-query to get fresh element
-            Locator oddsContainer = page.locator("div.m-item").first().locator("div.m-item-odds");
-
-            // Check for status indicators (Suspended / Unavailable)
-            Locator statusText = oddsContainer.locator("span.m-text-min.m-text-btn");
-            if (statusText.count() > 0 && statusText.isVisible()) {
-                String status = statusText.textContent().trim().toLowerCase();
-                log.info("📋 Status text detected: '{}'", status);
-
-                if (status.contains("unavailable")) {
-                    return BetslipStatus.UNAVAILABLE;
-                }
-                if (status.contains("suspended")) {
-                    log.warn("⏸️ Detected suspended market → Waiting up to 15s for recovery");
-
-                    try {
-                        page.waitForFunction("""
-                    () => {
-                        const container = document.querySelector('div.m-item-odds');
-                        if (!container) return false;
-                        const statusSpan = container.querySelector('span.m-text-min.m-text-btn');
-                        if (!statusSpan) return true; // Status gone → odds back
-                        const text = statusSpan.textContent.toLowerCase();
-                        return text.includes('unavailable') || !text.includes('suspended');
-                    }
-                    """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
-
-                        // Re-check after wait - FRESH query
-                        Locator freshStatus = page.locator("div.m-item-odds span.m-text-min.m-text-btn").first();
-                        if (freshStatus.count() > 0) {
-                            String newStatus = freshStatus.textContent().trim().toLowerCase();
-                            if (newStatus.contains("unavailable")) {
-                                return BetslipStatus.UNAVAILABLE;
-                            }
-                            if (newStatus.contains("suspended")) {
-                                return BetslipStatus.SUSPENDED;
-                            }
-                        }
-                        log.info("✅ Odds restored after suspension");
-                    } catch (TimeoutError te) {
-                        return BetslipStatus.SUSPENDED;
-                    }
-                }
-            }
-
-            // ── CRITICAL: Read odds value FRESH from DOM each time ──
-            // Use JavaScript evaluation to force fresh read from live DOM
+            // Fresh read every time via JS
             String oddsValue = (String) page.evaluate("""
             () => {
                 const oddsSpan = document.querySelector('div.m-item-odds span.m-text-main');
-                return oddsSpan ? oddsSpan.textContent.trim() : '';
+                if (!oddsSpan || !oddsSpan.offsetParent) return ''; // Not visible
+                return oddsSpan.textContent.trim();
             }
-        """);
+            """);
 
-            if (oddsValue == null || oddsValue.isEmpty()) {
-                log.warn("⚠️ Odds text not visible or empty - treating as suspended");
+            // Check status indicators
+            String statusText = (String) page.evaluate("""
+            () => {
+                const status = document.querySelector('div.m-item-odds span.m-text-min.m-text-btn');
+                return status ? status.textContent.trim().toLowerCase() : '';
+            }
+            """);
+
+            if (statusText.contains("unavailable")) {
+                return BetslipStatus.UNAVAILABLE;
+            }
+            if (statusText.contains("suspended")) {
+                return BetslipStatus.SUSPENDED;
+            }
+
+            if (oddsValue.isEmpty()) {
                 return BetslipStatus.SUSPENDED;
             }
 
             BigDecimal currentOdds = new BigDecimal(oddsValue);
             BigDecimal minAcceptable = expectedOdds.multiply(BigDecimal.valueOf(1 - TOLERANCE_PERCENT * 0.01));
 
-            log.info("📊 LIVE ODDS: {} | Expected: {} | Min acceptable: {}",
-                    currentOdds, expectedOdds, minAcceptable);
+            log.info("📊 LIVE ODDS: {} | Expected: {} | Min: {}", currentOdds, expectedOdds, minAcceptable);
 
             if (currentOdds.compareTo(minAcceptable) < 0) {
-                log.warn("⚠️ Current odds {} below minimum {} → Waiting for improvement",
-                        currentOdds, minAcceptable);
                 return BetslipStatus.ODDS_TOO_LOW;
             }
 
-            // ── Ensure checkbox is checked ──
-            Boolean isChecked = (Boolean) page.evaluate("""
+            // Ensure checkbox is checked
+            Boolean checked = (Boolean) page.evaluate("""
             () => {
-                const checkbox = document.querySelector('div.m-lay-left i.m-icon-check');
-                return checkbox && checkbox.classList.contains('m-icon-check--checked');
+                const check = document.querySelector('div.m-lay-left i.m-icon-check');
+                return check && check.classList.contains('m-icon-check--checked');
             }
-        """);
+            """);
 
-            if (Boolean.FALSE.equals(isChecked)) {
-                log.warn("⚠️ Checkbox not ticked → Enabling");
-                page.locator("div.m-lay-left").first().click();
-                randomHumanDelay(100, 200);
+            if (Boolean.FALSE.equals(checked)) {
+                page.locator("div.m-lay-left").first().click(new Locator.ClickOptions().setForce(true));
             }
 
-            log.info("✅ Odds are acceptable → Ready to place bet");
             return BetslipStatus.ACCEPTABLE;
 
-        } catch (NumberFormatException nfe) {
-            log.error("Failed to parse odds value: {}", nfe.getMessage());
-            return BetslipStatus.SUSPENDED;
         } catch (Exception e) {
-            log.error("Error in monitorAndHandleOddsInBetslip: {}", e.getMessage());
-            return BetslipStatus.ACCEPTABLE; // Don't block on error
+            log.debug("Error reading betslip odds: {}", e.getMessage());
+            return BetslipStatus.ACCEPTABLE; // Don't block on read error
         }
     }
+
+
     private void jsScrollAndClick(Locator locator, Page page) {
         try {
             locator.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'smooth' })");

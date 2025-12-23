@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -21,243 +22,195 @@ import java.util.stream.Collectors;
 public class MSportMarketSearchUtils {
     private static final BookMaker BOOK_MAKER = BookMaker.M_SPORT;
 
-    public static Locator findAndExpandMarket(Page page, String targetMarket) {
-        String method = "findAndExpandMarket(\"" + targetMarket + "\")";
-        log.info("Entering {} – searching for market...", method);
+
+    /**
+     * Returns ALL matching market blocks (sorted by match score descending)
+     * Useful when the same market title appears multiple times with different outcomes
+     */
+    public static List<MarketBlockResult> findAndExpandMarkets(Page page, String targetMarket) {
+        String method = "findAndExpandMarkets(\"" + targetMarket + "\")";
+        log.info("Entering {} – searching for all markets with exact title match...", method);
+
+        List<MarketBlockResult> matchedBlocks = new ArrayList<>();
 
         try {
-            // === NEW: Check if target market contains "game" and switch tab ===
-            String targetLower = targetMarket.toLowerCase();
-            if (targetLower.contains("game")) {
-                log.info("Target market '{}' contains 'game' - checking for Game tab...", targetMarket);
+            String targetLower = targetMarket.toLowerCase().trim();
 
-                try {
-                    // Find and click the "Game" tab if not already active
-                    Locator gameTab = page.locator("ul.snap-nav li.m-sub-nav-item")
-                            .locator("span.m-group", new Locator.LocatorOptions().setHasText("Game"))
-                            .locator("..");
+            // 1. Ensure Game tab is active if target contains "game"
+            boolean needsGameTab = targetLower.contains("game");
+            if (needsGameTab) {
+                log.info("Target contains 'game' – ensuring Game tab is active...");
+                Locator gameTab = page.locator("ul.snap-nav li.m-sub-nav-item")
+                        .locator("span.m-group:has-text(\"Game\")")
+                        .locator("..");
 
-                    if (gameTab.count() > 0) {
-                        // Check if already active
-                        String classes = gameTab.getAttribute("class");
-                        if (classes != null && !classes.contains("active")) {
-                            log.info("Clicking 'Game' tab to switch market view...");
-                            gameTab.click();
-                            randomHumanDelay(500, 800);
-                            page.waitForTimeout(1000); // Wait for market content to reload
-                            log.info("✅ Switched to 'Game' tab successfully");
-                        } else {
-                            log.info("'Game' tab is already active");
+                if (gameTab.count() > 0) {
+                    String classes = gameTab.getAttribute("class");
+                    boolean isActive = classes != null && classes.contains("active");
+                    if (!isActive) {
+                        log.info("Clicking 'Game' tab...");
+                        gameTab.click();
+                        page.waitForFunction("""
+                        () => {
+                            const list = document.querySelector('.m-market-list');
+                            return list && list.querySelectorAll('.m-market-item').length > 3;
                         }
-                    } else {
-                        log.warn("'Game' tab not found in navigation, continuing with current view...");
+                        """, null, new Page.WaitForFunctionOptions().setTimeout(15000));
+                        randomHumanDelay(300, 600);
+                        log.info("Game tab switched + markets reloaded");
                     }
-                } catch (Exception tabEx) {
-                    log.warn("Failed to switch to Game tab: {} - continuing with current view", tabEx.getMessage());
-                }
-            }
-            // === End of new tab switching logic ===
-
-            // Wait for market list
-            page.locator(".m-market-list").waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(12_000));
-
-            // Take screenshot of market content
-            takeMarketScreenshot(page, "market-content-before-search");
-
-            // Get all market titles + visibility + index
-            var markets = page.evaluate("""
-    () => {
-        const items = document.querySelectorAll('.m-market-item');
-        const result = [];
-        items.forEach((item, index) => {
-            const span = item.querySelector('.m-market-item--name span');
-            if (span) {
-                const title = span.textContent.trim();
-                if (title) {
-                    result.push({
-                        title: title,
-                        index: index,
-                        visible: item.offsetParent !== null && getComputedStyle(item).display !== 'none'
-                    });
-                }
-            }
-        });
-        return result;
-    }
-    """);
-
-            // Log all markets (as before)
-            String allMarkets = markets.toString()
-                    .replaceAll("[{}]", "")
-                    .replaceAll(", ", " | ");
-            log.info("Available markets ({} found): [ {} ]",
-                    ((List<?>) markets).size(),
-                    allMarkets.isEmpty() ? "NONE" : allMarkets);
-
-            // List of common "main" phrases that often get prefixed
-            List<String> keyPhrases = List.of(
-                    "point handicap", "game handicap", "total games", "total points",
-                    "game winner", "set winner", "correct score", "total sets", "gg/ng",
-                    "total maps", "handicap", "over/under", "match winner", "1x2", "Asian Handicap"
-            );
-
-            String matchedKeyPhrase = null;
-            for (String phrase : keyPhrases) {
-                if (targetLower.contains(phrase)) {
-                    matchedKeyPhrase = phrase;
-                    break;
+                } else {
+                    log.warn("'Game' tab locator not found – proceeding anyway");
                 }
             }
 
-            // Find matching market
-            String matchedTitle = null;
-            for (Object marketObj : (List<?>) markets) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> market = (Map<String, Object>) marketObj;
-                String title = (String) market.get("title");
-                Boolean visible = (Boolean) market.get("visible");
+            // 2. Wait for market list to be visible
+            page.locator(".m-market-list")
+                    .waitFor(new Locator.WaitForOptions()
+                            .setState(WaitForSelectorState.VISIBLE)
+                            .setTimeout(10000));
 
-                if (!visible) continue;
+            // 3. Find ALL markets with exact title match (case-insensitive)
+            String markerPrefix = "pw-market-" + System.nanoTime();
 
-                String titleLower = title.toLowerCase();
-                boolean matches = matchedKeyPhrase != null
-                        ? titleLower.contains(matchedKeyPhrase)
-                        : titleLower.contains(targetLower);
+            String jsFindAllExact = """
+            (args) => {
+                const { target, prefix } = args;
+                const targetLower = target.toLowerCase().trim();
+                const items = document.querySelectorAll('.m-market-item');
+                const matches = [];
 
-                if (matches) {
-                    matchedTitle = title;
-                    log.info("MATCH FOUND → Market: '{}'", title);
-                    break;
-                }
-            }
+                items.forEach((item, index) => {
+                    const span = item.querySelector('.m-market-item--name span');
+                    if (!span) return;
 
-            if (matchedTitle == null) {
-                log.error("Market containing '{}' NOT FOUND in available markets", targetMarket);
+                    const title = span.textContent.trim();
+                    const titleLower = title.toLowerCase().trim();
 
-                // Take screenshot when market not found
-                takeMarketScreenshot(page, "market-not-found-" + targetMarket.replaceAll("[^a-zA-Z0-9-]", "_"));
+                    const visible = item.offsetParent !== null &&
+                                    getComputedStyle(item).display !== 'none' &&
+                                    getComputedStyle(item).visibility !== 'hidden';
 
-                // === NEW: Log all available betting options inside visible markets ===
-                log.warn("Dumping all visible betting options for debugging...");
-
-                var allOptions = page.evaluate("""
-        () => {
-            const options = [];
-            document.querySelectorAll('.m-market-item').forEach(item => {
-                const marketTitleSpan = item.querySelector('.m-market-item--name span');
-                const marketTitle = marketTitleSpan ? marketTitleSpan.textContent.trim() : 'UNKNOWN MARKET';
-                
-                const isVisible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
-                if (!isVisible) return;
-
-                const optionElements = item.querySelectorAll('.m-outcome-item .m-outcome-item--name');
-                if (optionElements.length > 0) {
-                    const optionTexts = Array.from(optionElements)
-                        .map(el => el.textContent.trim())
-                        .filter(text => text);
-                    if (optionTexts.length > 0) {
-                        options.push({
-                            market: marketTitle,
-                            selections: optionTexts
+                    if (visible && titleLower === targetLower) {
+                        const markerId = prefix + '-' + index;
+                        item.setAttribute('data-pw-market-marker', markerId);
+                        matches.push({
+                            index,
+                            title,
+                            markerId
                         });
                     }
-                }
-            });
-            return options;
-        }
-        """);
+                });
 
-                if (((List<?>) allOptions).isEmpty()) {
-                    log.warn("No betting options found in any visible market (page may still be loading or empty)");
-                } else {
-                    log.warn("Available betting options by market:");
-                    for (Object obj : (List<?>) allOptions) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> entry = (Map<String, Object>) obj;
-                        String marketName = (String) entry.get("market");
-                        List<String> selections = (List<String>) entry.get("selections");
-                        log.warn("   → {}: [ {} ]", marketName, String.join(" | ", selections));
+                return { matches };
+            }
+            """;
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) page.evaluate(jsFindAllExact,
+                    Map.of("target", targetMarket, "prefix", markerPrefix));
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> matches = (List<Map<String, Object>>) result.get("matches");
+
+            if (matches.isEmpty()) {
+                log.info("No markets found with exact title: '{}'", targetMarket);
+                return matchedBlocks; // empty list
+            }
+
+            log.info("Found {} market(s) with exact title '{}'", matches.size(), targetMarket);
+
+            // 4. Process each exact match
+            for (Map<String, Object> match : matches) {
+                String matchedTitle = (String) match.get("title");
+                String markerId = (String) match.get("markerId");
+
+                Locator marketBlock = page.locator("[data-pw-market-marker='" + markerId + "']");
+
+                if (marketBlock.count() == 0) {
+                    log.warn("Marked market block disappeared for title '{}'", matchedTitle);
+                    continue;
+                }
+
+                // Expand if not already expanded
+                Locator expandIcon = marketBlock.locator(".ms-icon-trangle.expanded");
+                if (expandIcon.count() == 0) {
+                    log.info("Expanding market '{}'...", matchedTitle);
+                    marketBlock.locator(".m-market-item--header").click();
+                    randomHumanDelay(200, 400);
+                    try {
+                        marketBlock.locator(".ms-icon-trangle.expanded")
+                                .waitFor(new Locator.WaitForOptions().setTimeout(3000));
+                        log.info("Market '{}' expanded successfully", matchedTitle);
+                    } catch (Exception e) {
+                        log.warn("Expansion not confirmed for market '{}'", matchedTitle);
                     }
-                }
-                // === End of new logging ===
-
-                return null;
-            }
-
-            // Build XPath for the matched market (unchanged)
-            String marketXPath = String.format(
-                    "//div[@class='m-market-item']" +
-                            "[.//h1[@class='m-market-item--name']//span[normalize-space(text())=%s]]",
-                    escapeXPath(matchedTitle)
-            );
-
-            Locator marketBlock = page.locator("xpath=" + marketXPath).first();
-
-            if (marketBlock.count() == 0) {
-                log.error("Market block NOT FOUND after match: {}", matchedTitle);
-                return null;
-            }
-
-            // Expand logic (unchanged)
-            Locator expandIcon = marketBlock.locator(".ms-icon-trangle.expanded");
-            if (expandIcon.count() == 0) {
-                log.info("Market '{}' is collapsed, expanding...", matchedTitle);
-                marketBlock.locator(".m-market-item--header").click();
-                randomHumanDelay(200, 400);
-                page.waitForTimeout(300);
-                if (marketBlock.locator(".ms-icon-trangle.expanded").count() > 0) {
-                    log.info("✅ Market '{}' expanded successfully", matchedTitle);
-                    // Take screenshot after successful expansion
-                    takeMarketScreenshot(page, "market-expanded-" + matchedTitle.replaceAll("[^a-zA-Z0-9-]", "_"));
                 } else {
-                    log.warn("⚠️ Market '{}' may not have expanded", matchedTitle);
+                    log.info("Market '{}' already expanded", matchedTitle);
                 }
-            } else {
-                log.info("Market '{}' is already expanded", matchedTitle);
+
+                // Add to results (no marker cleanup needed yet – kept for refresh later if needed)
+                matchedBlocks.add(new MarketBlockResult(marketBlock, markerId, matchedTitle));
             }
 
-            return marketBlock;
+            log.info("Returning {} expanded market block(s) with exact title '{}'", matchedBlocks.size(), targetMarket);
+            return matchedBlocks;
 
         } catch (Exception e) {
             log.error("Exception in {}: {}", method, e.getMessage(), e);
-            // Take screenshot on exception
-            takeMarketScreenshot(page, "market-error-exception");
-            return null;
+            takeMarketScreenshot(page, "market-error-exception-" + sanitizeFilename(targetMarket));
+            return matchedBlocks; // return whatever was found before error
         }
     }
+    // Utility methods (kept mostly unchanged, just cleaned up)
 
-    /**
-     * Takes a screenshot of the market list area
-     */
-    private static void takeMarketScreenshot(Page page, String filenameSuffix) {
+    private static void takeMarketScreenshot(Page page, String suffix) {
         try {
-            Path screenshotDir = Paths.get("screenshots", "markets");
-            Files.createDirectories(screenshotDir);
-
+            Path dir = Paths.get("screenshots", "markets");
+            Files.createDirectories(dir);
             String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS").format(new Date());
-
-            String filename = String.format("%s-%s-%s.png", timestamp, BOOK_MAKER, filenameSuffix);
-            Path screenshotPath = screenshotDir.resolve(filename);
+            String filename = String.format("%s-%s-%s.png", timestamp, BOOK_MAKER, suffix);
+            Path path = dir.resolve(filename);
 
             Locator marketList = page.locator(".m-market-list");
             if (marketList.count() > 0) {
-                marketList.screenshot(new Locator.ScreenshotOptions()
-                        .setPath(screenshotPath)
-                        .setType(ScreenshotType.PNG));
-                log.info("📸 Market screenshot saved: {}", screenshotPath);
+                marketList.screenshot(new Locator.ScreenshotOptions().setPath(path).setType(ScreenshotType.PNG));
             } else {
-                page.screenshot(new Page.ScreenshotOptions()
-                        .setPath(screenshotPath)
-                        .setFullPage(true)
-                        .setType(ScreenshotType.PNG));
-                log.info("📸 Full page screenshot saved: {}", screenshotPath);
+                page.screenshot(new Page.ScreenshotOptions().setPath(path).setFullPage(true).setType(ScreenshotType.PNG));
             }
+            log.info("📸 Screenshot saved: {}", path);
         } catch (Exception e) {
             log.warn("Failed to take screenshot: {}", e.getMessage());
         }
     }
+
+    private static void dumpAllVisibleMarketsForDebug(Page page) {
+        try {
+            var markets = page.evaluate("""
+                    () => {
+                        const items = document.querySelectorAll('.m-market-item');
+                        const result = [];
+                        items.forEach(item => {
+                            const span = item.querySelector('.m-market-item--name span');
+                            if (span) {
+                                const title = span.textContent.trim();
+                                const visible = item.offsetParent !== null && getComputedStyle(item).display !== 'none';
+                                if (visible && title) result.push(title);
+                            }
+                        });
+                        return result;
+                    }
+                    """);
+            log.warn("All visible markets for debug: {}", markets);
+        } catch (Exception e) {
+            log.warn("Failed to dump markets for debug: {}", e.getMessage());
+        }
+    }
+
+    private static String sanitizeFilename(String s) {
+        return s.replaceAll("[^a-zA-Z0-9-]", "_");
+    }
+
 
     // Detect market type based on market name and outcome pattern
     public static MarketType detectMarketType(String market, String outcome) {
@@ -300,86 +253,266 @@ public class MSportMarketSearchUtils {
     }
 
     // Select outcome based on market type
-    public static Locator selectOutcomeByType(Locator marketBlock, MarketType marketType, String outcome) {
+    public static Locator selectOutcomeByType(List<MarketBlockResult> marketBlock,
+                                              MarketType marketType, String outcome, Page page) {
         switch (marketType) {
             case OVER_UNDER:
-                return selectOverUnderOutcome(marketBlock, outcome);
+                return selectOverUnderOutcome(marketBlock, outcome, page);
 
             case POINT_HANDICAP:
-                return selectHandicapOutcome(marketBlock, outcome);
+                return selectHandicapOutcome(marketBlock, outcome, page);
 
             case WINNER:
             case BOTH_TEAMS_SCORE:
             default:
-                return selectStandardOutcome(marketBlock, outcome);
+                return null; //selectStandardOutcome(marketBlock, outcome, page);
         }
     }
 
     // Standard selection for Winner/Home/Away/Draw markets
+    /**
+     * FAST: Select standard outcome (e.g., Home, Away, Draw, Yes, No)
+     * Uses efficient text filtering instead of slow XPath.
+     */
     private static Locator selectStandardOutcome(Locator marketBlock, String outcome) {
         try {
-            String cellXPath = String.format(
-                    ".//div[contains(@class,'m-outcome') and contains(@class,'multiple') and not(contains(@class,'disabled'))]" +
-                            "[.//div[@class='desc' and normalize-space(text())=%s]]",
-                    escapeXPath(outcome)
-            );
+            // Fastest approach: use Playwright's built-in text filtering
+            Locator outcomeCell = marketBlock
+                    .locator(".m-outcome.multiple:not(.disabled)")
+                    .filter(new Locator.FilterOptions().setHasText(outcome))
+                    .first();
 
-            Locator outcomeCell = marketBlock.locator("xpath=" + cellXPath).first();
-            return outcomeCell.count() > 0 ? outcomeCell : null;
+            if (outcomeCell.count() > 0) {
+                return outcomeCell;
+            }
+
+            // Fallback: case-insensitive partial match (in case of extra spaces or formatting)
+            Locator allOutcomes = marketBlock.locator(".m-outcome.multiple:not(.disabled)");
+            int count = allOutcomes.count();
+            for (int i = 0; i < count; i++) {
+                Locator cell = allOutcomes.nth(i);
+                String descText = cell.locator(".desc").textContent().trim();
+                if (descText.equalsIgnoreCase(outcome.trim())) {
+                    return cell;
+                }
+            }
+
+            log.warn("Standard outcome '{}' not found in market (tried exact and case-insensitive)", outcome);
+            return null;
+
         } catch (Exception e) {
-            log.error("Error selecting standard outcome: {}", e.getMessage());
+            log.error("Error selecting standard outcome '{}': {}", outcome, e.getMessage());
             return null;
         }
     }
 
-    // Selection for Over/Under markets (e.g., "Over 76.5", "Under 77.5")
-    private static Locator selectOverUnderOutcome(Locator marketBlock, String outcome) {
+    private static Locator selectOverUnderOutcome(List<MarketBlockResult> marketResults,
+                                                  String outcome,
+                                                  Page page) {
+        if (marketResults == null || marketResults.isEmpty()) {
+            log.warn("No market blocks provided for O/U outcome '{}'", outcome);
+            return null;
+        }
+
+        String[] parts = outcome.split("\\s+", 2);
+        if (parts.length != 2) {
+            log.error("Invalid O/U format: '{}'. Expected 'Over X' or 'Under X'", outcome);
+            return null;
+        }
+
+        String type = parts[0].trim();          // "Over" or "Under"
+        String lineValue = parts[1].trim();     // "14.5"
+
+        String expectedFullText = type + " " + lineValue;
+        String expectedNorm = expectedFullText
+//                .replace('½', '.5')
+                .replace("(", "")
+                .replace(")", "")
+                .trim()
+                .toLowerCase();
+
+        String typeLower = type.toLowerCase();
+
+        log.debug("Searching for O/U: '{}' (normalized: {})", outcome, expectedNorm);
+
+        // Use only the first market block — all others are duplicates
+        MarketBlockResult result = marketResults.get(0);
+        log.debug("Using market block: '{}'", result.title);
+
         try {
-            // Parse outcome: "Over 76.5" or "Under 77.5"
-            String[] parts = outcome.split("\\s+", 2);
-            if (parts.length != 2) {
-                log.error("Invalid O/U outcome format: {}. Expected 'Over X' or 'Under X'", outcome);
+            Locator freshBlock = result.refresh(page);
+            if (freshBlock.count() == 0) {
+                log.warn("Market block disappeared");
                 return null;
             }
 
-            String type = parts[0].trim();        // "Over" or "Under"
-            String lineValue = parts[1].trim();   // "76.5"
+            String baseMarker = "pw-ou-" + System.nanoTime();
 
-            log.debug("Looking for {} {} in O/U market", type, lineValue);
+            String jsFindAndMark = """
+        (el, args) => {
+            const expectedNorm = args.expectedNorm || '';
+            const typeLower = args.typeLower || '';
+            const baseMarker = args.baseMarker || '';
 
-            // Find the row containing the line value
-            Locator marketRow = marketBlock
-                    .locator(".m-market-row.m-market-row")
-                    .filter(new Locator.FilterOptions().setHasText(lineValue));
+            const available = [];
+            let matchedMarkerId = null;
 
-            if (marketRow.count() == 0) {
-                log.error("Line value '{}' not found in O/U market", lineValue);
-                return null;
+            const rows = el.querySelectorAll('.m-market-row');
+
+            for (const row of rows) {
+                // === LAYOUT 1: 3-column (Point O/U) — Line in middle, Over left, Under right ===
+                const lineSpan = row.querySelector('.m-outcome-desc span');
+                if (lineSpan && lineSpan.textContent) {
+                    const lineText = lineSpan.textContent.trim();
+                    const lineNorm = lineText.replace('½', '.5')
+                                             .replace(/[()]/g, '')
+                                             .trim()
+                                             .toLowerCase();
+
+                    if (lineNorm === expectedNorm || lineNorm.includes(expectedNorm.replace(/[^0-9.]/g, ''))) {
+                        const outcomeCells = row.querySelectorAll('.m-outcome:not(.m-outcome-desc)');
+                        if (outcomeCells.length >= 2) {
+                            const overCell = outcomeCells[0];
+                            const underCell = outcomeCells[1];
+
+                            const checkCell = (cell, label) => {
+                                if (!cell || cell.classList.contains('disabled')) return;
+                                available.push({ layout: '3-column', line: lineText, side: label });
+                                if (label.toLowerCase() === typeLower) {
+                                    const markerId = baseMarker + '-match';
+                                    cell.setAttribute('data-pw-marker', markerId);
+                                    matchedMarkerId = markerId;
+                                }
+                            };
+
+                            checkCell(overCell, 'Over');
+                            checkCell(underCell, 'Under');
+
+                            if (matchedMarkerId) return { found: true, markerId: matchedMarkerId, available };
+                        }
+                    }
+                    continue; // skip 2-column check if this is 3-column row
+                }
+
+                // === LAYOUT 2: 2-column (Game total points) — full text in .desc ===
+                const descEls = row.querySelectorAll('.m-outcome .desc');
+                for (const descEl of descEls) {
+                    const text = descEl.textContent?.trim();
+                    if (!text) continue;
+
+                    const textNorm = text.replace('½', '.5')
+                                        .replace(/[()]/g, '')
+                                        .trim()
+                                        .toLowerCase();
+
+                    const cell = descEl.closest('.m-outcome');
+                    if (!cell) continue;
+
+                    const disabled = cell.classList.contains('disabled');
+                    const odds = cell.querySelector('.odds')?.textContent.trim() || 'N/A';
+
+                    available.push({ layout: '2-column', text, odds, disabled, textNorm });
+
+                    if (disabled) continue;
+
+                    // Exact match on full normalized text
+                    if (textNorm === expectedNorm) {
+                        const markerId = baseMarker + '-match';
+                        cell.setAttribute('data-pw-marker', markerId);
+                        matchedMarkerId = markerId;
+                        return { found: true, markerId: matchedMarkerId, available };
+                    }
+                }
             }
 
-            // Determine which outcome to select (1 for Over, 2 for Under)
-            // Structure: nth(0)=line descriptor, nth(1)=Over, nth(2)=Under
-            int outcomeIndex = type.equalsIgnoreCase("Over") ? 1 : 2;
+            return { found: false, markerId: null, available };
+        }
+        """;
 
-            Locator outcomeCell = marketRow.locator(".m-outcome").nth(outcomeIndex);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> jsResult = (Map<String, Object>) freshBlock.evaluate(jsFindAndMark,
+                    Map.of("expectedNorm", expectedNorm,
+                            "typeLower", typeLower,
+                            "baseMarker", baseMarker));
 
-            if (outcomeCell.count() == 0) {
-                log.error("Could not find {} outcome for line {}", type, lineValue);
-                return null;
+            Boolean found = (Boolean) jsResult.get("found");
+            String matchedMarkerId = (String) jsResult.get("markerId");
+
+            log.debug("JS Result - found: {}, markerId: {}", found, matchedMarkerId);
+
+            if (found != null && found && matchedMarkerId != null) {
+                Locator outcomeCell = page.locator("[data-pw-marker='" + matchedMarkerId + "']").first();
+
+                try {
+                    // Ensure Playwright sees the marked element
+                    outcomeCell.waitFor(new Locator.WaitForOptions()
+                            .setState(WaitForSelectorState.ATTACHED)
+                            .setTimeout(5000));
+                } catch (Exception e) {
+                    log.warn("Timeout waiting for O/U marked element: {}", e.getMessage());
+                    return null;
+                }
+
+                if (outcomeCell.count() > 0) {
+                    log.info("SUCCESS: Found and located O/U '{}' using marker '{}' in block '{}'",
+                            outcome, matchedMarkerId, result.title);
+
+                    // Get stable locator using position instead of marker
+                    String jsGetPosition = """
+                (el) => {
+                    const row = el.closest('.m-market-row');
+                    const allRows = Array.from(document.querySelectorAll('.m-market-row'));
+                    const rowIndex = allRows.indexOf(row);
+                    const outcomes = row.querySelectorAll('.m-outcome');
+                    const colIndex = Array.from(outcomes).indexOf(el);
+                    return { rowIndex, colIndex };
+                }
+                """;
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> position = (Map<String, Object>) outcomeCell.evaluate(jsGetPosition);
+                    Integer rowIdx = (Integer) position.get("rowIndex");
+                    Integer colIdx = (Integer) position.get("colIndex");
+
+                    log.debug("O/U outcome position: row {}, col {}", rowIdx, colIdx);
+
+                    // Cleanup marker
+                    outcomeCell.evaluate("el => el.removeAttribute('data-pw-marker')");
+
+                    // Return stable locator using position
+                    Locator stableOutcome = page.locator(".m-market-row").nth(rowIdx)
+                            .locator(".m-outcome").nth(colIdx);
+
+                    return stableOutcome;
+                } else {
+                    log.warn("JS marked cell with '{}' but Playwright could not find it", matchedMarkerId);
+                }
+            } else {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> available = (List<Map<String, Object>>) jsResult.get("available");
+                log.debug("O/U '{}' not found. Seen {} outcomes in block '{}'", outcome, available.size(), result.title);
+
+                if (!available.isEmpty()) {
+                    log.debug("Sample available outcomes: {}", available.stream().limit(5).collect(Collectors.toList()));
+                }
             }
-
-            return outcomeCell;
 
         } catch (Exception e) {
-            log.error("Error selecting O/U outcome '{}': {}", outcome, e.getMessage());
-            return null;
+            log.warn("Error searching O/U '{}' in block '{}': {}", outcome, result.title, e.toString());
         }
+
+        log.warn("O/U outcome '{}' NOT FOUND", outcome);
+        return null;
     }
+
+
 
     // Selection for Point Handicap markets (e.g., "+2.5", "-3.5", "Home +2.5", "Away -1.5")
-    private static Locator selectHandicapOutcome(Locator marketBlock, String outcome) {
+    private static Locator selectHandicapOutcome(List<MarketBlockResult> marketBlock,
+                                                 String outcome, Page page) {
         try {
             log.debug("Selecting handicap outcome: {}", outcome);
+
 
             // MSport has TWO types of handicap markets:
             // Type 1: Point Handicap - .desc contains just value (e.g., "-1.5", "+2.5")
@@ -388,15 +521,15 @@ public class MSportMarketSearchUtils {
             //         Full team name in the desc
 
             // Determine which type by checking for column headers
-            boolean hasColumnHeaders = marketBlock.locator(".m-market-row .m-title").count() > 0;
-
-            if (hasColumnHeaders) {
+//            boolean hasColumnHeaders = marketBlock.locator(".m-market-row .m-title").count() > 0;
+//
+//            if (hasColumnHeaders) {
                 log.debug("Detected handicap market with column headers (Point Handicap type)");
-                return selectPointHandicapWithColumns(marketBlock, outcome);
-            } else {
-                log.debug("Detected handicap market without column headers (standard type)");
-                return selectStandardHandicap(marketBlock, outcome);
-            }
+                return selectPointHandicapWithColumns(marketBlock, outcome, page);
+//            } else {
+//                log.debug("Detected handicap market without column headers (standard type)");
+//                return selectStandardHandicap(marketBlock, outcome);
+//            }
 
         } catch (Exception e) {
             log.error("Error selecting handicap outcome '{}': {}", outcome, e.getMessage());
@@ -404,167 +537,349 @@ public class MSportMarketSearchUtils {
         }
     }
 
-    // Type 1: Point Handicap with column headers (Home | Away)
-// Outcome format: "+2.5" or "Home +2.5"
-// .desc contains only: "-1.5", "+2.5", etc.
-    private static Locator selectPointHandicapWithColumns(Locator marketBlock, String outcomeInput) {
+    /**
+     * ULTRA-FAST Point Handicap with columns + FULL DEBUG DUMP on failure
+     */
+    /**
+     * Point Handicap selector - finds handicap by value in .desc and team column
+     */
+    /**
+     * SUPER FAST Point Handicap selector - uses ONLY first market block
+     */
+    /**
+     * SUPER FAST Point Handicap selector - uses ONLY first market block
+     */
+    /**
+     * SUPER FAST Point Handicap selector - uses ONLY first market block
+     */
+    /**
+     * SUPER FAST Point Handicap selector - uses ONLY first market block
+     */
+    /**
+     * SUPER FAST Point Handicap selector - uses ONLY first market block
+     */
+    private static Locator selectPointHandicapWithColumns(List<MarketBlockResult> marketResults,
+                                                          String outcomeInput,
+                                                          Page page) {
+        if (marketResults == null || marketResults.isEmpty()) {
+            log.warn("No market blocks provided for handicap '{}'", outcomeInput);
+            return null;
+        }
+
+        String handicapValue = extractHandicapValue(outcomeInput);
+        if (handicapValue == null) {
+            log.error("Could not extract handicap value from: {}", outcomeInput);
+            return null;
+        }
+
+        String teamSide = extractTeamSide(outcomeInput);
+
+        // Normalize handicap (handles +2.5, 2.5, +2½, (+2.5), etc.)
+        String normalizedHandicap = handicapValue
+//                .replace('½', '.5')
+                .replace("(", "")
+                .replace(")", "")
+                .trim();
+
+        log.debug("Searching for handicap: '{}' (normalized: '{}'), team: {}",
+                outcomeInput, normalizedHandicap, teamSide != null ? teamSide : "any");
+
+        // Use ONLY the first market block — all duplicates have same content
+        MarketBlockResult result = marketResults.get(0);
+        log.debug("Using market block: '{}'", result.title);
+
         try {
-            // Extract handicap value
-            String handicapValue = extractHandicapValue(outcomeInput);
-            if (handicapValue == null) {
-                log.error("Could not extract handicap value from: {}", outcomeInput);
+            Locator freshBlock = result.refresh(page);
+            if (freshBlock.count() == 0) {
+                log.warn("Market block disappeared");
                 return null;
             }
 
-            log.debug("Looking for handicap value: {}", handicapValue);
+            String baseMarker = "pw-hcap-" + System.nanoTime();
 
-            // Get column headers to determine positions
-            List<String> columnHeaders = marketBlock
-                    .locator(".m-market-row .m-title")
-                    .allTextContents()
-                    .stream()
-                    .map(String::trim)
-                    .collect(Collectors.toList());
+            String jsFindAndMark = """
+        (el, args) => {
+            const { handicap, team, baseMarker } = args;
+            const allRows = el.querySelectorAll('.m-market-row');
 
-            log.debug("Column headers: {}", columnHeaders);
+            let headers = [];
+            let headerRow = null;
+            let targetColIndex = null;
 
-            // Extract team side from outcome if specified
-            String teamSide = extractTeamSide(outcomeInput);
-
-            // Find all rows and search for the handicap value
-            Locator allRows = marketBlock.locator(".m-market-row.m-market-row");
-            int rowCount = allRows.count();
-
-            for (int i = 0; i < rowCount; i++) {
-                Locator row = allRows.nth(i);
-                Locator outcomes = row.locator(".m-outcome");
-                int outcomeCount = outcomes.count();
-
-                // Check each outcome in the row
-                for (int j = 0; j < outcomeCount; j++) {
-                    Locator outcome = outcomes.nth(j);
-
-                    // Skip disabled outcomes
-                    if (outcome.getAttribute("class").contains("disabled")) {
-                        continue;
-                    }
-
-                    String desc = outcome.locator(".desc").textContent().trim();
-
-                    // Check if this is our handicap value
-                    if (desc.equals(handicapValue)) {
-                        // If team side is specified, verify we're in the right column
-                        if (teamSide != null && j < columnHeaders.size()) {
-                            String columnHeader = columnHeaders.get(j);
-                            if (!columnHeader.equalsIgnoreCase(teamSide)) {
-                                continue; // Wrong column, keep searching
+            // Find header row (has multiple .m-title elements with "Home", "Away")
+            for (let r of allRows) {
+                const titles = r.querySelectorAll('.m-title');
+                if (titles.length > 1) {
+                    headerRow = r;
+                    headers = Array.from(titles).map(t => t.textContent.trim().toLowerCase());
+                    
+                    // Determine target column if team specified
+                    if (team) {
+                        const teamLower = team.toLowerCase();
+                        headers.forEach((h, idx) => {
+                            if (h === teamLower || 
+                                (teamLower === 'home' && (h.includes('1') || h === 'home')) ||
+                                (teamLower === 'away' && (h.includes('2') || h === 'away'))) {
+                                targetColIndex = idx;
                             }
-                        }
-
-                        log.debug("Found handicap {} in row {} column {}", handicapValue, i, j);
-                        return outcome;
+                        });
                     }
+                    break;
                 }
             }
 
-            log.error("Could not find handicap outcome: {} with value: {}", outcomeInput, handicapValue);
-            return null;
+            const dataRows = headerRow ? Array.from(allRows).filter(r => r !== headerRow) : Array.from(allRows);
+            
+            let matchedMarkerId = null;
+            const available = [];
+
+            // Search all data rows for specific outcome
+            dataRows.forEach((row, rowIdx) => {
+                const outcomes = row.querySelectorAll('.m-outcome');
+                
+                outcomes.forEach((cell, colIdx) => {
+                    const descEl = cell.querySelector('.desc');
+                    if (!descEl) return;
+
+                    const descText = descEl.textContent.trim();
+                    const normDesc = descText.replace('½', '.5')
+                                             .replace(/[()]/g, '')
+                                             .trim();
+
+                    const disabled = cell.classList.contains('disabled');
+                    const oddsEl = cell.querySelector('.odds');
+                    const odds = oddsEl ? oddsEl.textContent.trim() : 'N/A';
+                    const header = colIdx < headers.length ? headers[colIdx] : '';
+
+                    available.push({ 
+                        row: rowIdx, 
+                        col: colIdx, 
+                        desc: descText, 
+                        normalized: normDesc,
+                        header, 
+                        odds, 
+                        disabled 
+                    });
+
+                    // Skip if already found or disabled
+                    if (matchedMarkerId || disabled) return;
+
+                    // Match handicap value
+                    if (normDesc !== handicap) return;
+
+                    // If team specified, check column
+                    if (targetColIndex !== null && colIdx !== targetColIndex) return;
+
+                    // FOUND: mark this cell
+                    const markerId = baseMarker + '-match';
+                    cell.setAttribute('data-pw-marker', markerId);
+                    matchedMarkerId = markerId;
+                });
+            });
+
+            return {
+                found: matchedMarkerId !== null,
+                markerId: matchedMarkerId,
+                headers: headers,
+                targetColumn: targetColIndex,
+                available: available
+            };
+        }
+        """;
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> jsResult = (Map<String, Object>) freshBlock.evaluate(jsFindAndMark,
+                    Map.of("handicap", normalizedHandicap,
+                            "team", teamSide != null ? teamSide.toLowerCase() : "",
+                            "baseMarker", baseMarker));
+
+            Boolean found = (Boolean) jsResult.get("found");
+            String matchedMarkerId = (String) jsResult.get("markerId");
+
+            log.debug("JS Result - found: {}, markerId: {}", found, matchedMarkerId);
+
+            if (found != null && found && matchedMarkerId != null) {
+                // Search from page root since marker might be deep in DOM
+                Locator outcomeCell = page.locator("[data-pw-marker='" + matchedMarkerId + "']").first();
+
+                log.debug("Searching for marker: {}", matchedMarkerId);
+                log.debug("Initial count: {}", outcomeCell.count());
+
+                try {
+                    // Ensure Playwright sees the marked element
+                    outcomeCell.waitFor(new Locator.WaitForOptions()
+                            .setState(WaitForSelectorState.ATTACHED)
+                            .setTimeout(5000));
+
+                    log.debug("After wait, count: {}", outcomeCell.count());
+                } catch (Exception e) {
+                    log.warn("Timeout waiting for marked element '{}': {}", matchedMarkerId, e.getMessage());
+                    // Try to see if marker exists in DOM
+                    String markerCheck = (String) page.evaluate("() => { const el = document.querySelector('[data-pw-marker=\"" + matchedMarkerId + "\"]'); return el ? 'EXISTS' : 'NOT FOUND'; }");
+                    log.warn("Marker check in DOM: {}", markerCheck);
+                    return null;
+                }
+
+                if (outcomeCell.count() > 0) {
+                    @SuppressWarnings("unchecked")
+                    List<String> headers = (List<String>) jsResult.get("headers");
+                    Integer targetCol = (Integer) jsResult.get("targetColumn");
+
+                    log.info("SUCCESS: Found handicap '{}' in block '{}', headers: {}, target col: {}",
+                            outcomeInput, result.title, headers, targetCol);
+
+                    // Get stable locator using position instead of marker
+                    String jsGetPosition = """
+                (el) => {
+                    const row = el.closest('.m-market-row');
+                    const allRows = Array.from(document.querySelectorAll('.m-market-row'));
+                    const rowIndex = allRows.indexOf(row);
+                    const outcomes = row.querySelectorAll('.m-outcome');
+                    const colIndex = Array.from(outcomes).indexOf(el);
+                    return { rowIndex, colIndex };
+                }
+                """;
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> position = (Map<String, Object>) outcomeCell.evaluate(jsGetPosition);
+                    Integer rowIdx = (Integer) position.get("rowIndex");
+                    Integer colIdx = (Integer) position.get("colIndex");
+
+                    log.debug("Outcome position: row {}, col {}", rowIdx, colIdx);
+
+                    // Cleanup marker
+                    outcomeCell.evaluate("el => el.removeAttribute('data-pw-marker')");
+
+                    // Return stable locator using position
+                    Locator stableOutcome = page.locator(".m-market-row").nth(rowIdx)
+                            .locator(".m-outcome").nth(colIdx);
+
+                    return stableOutcome;
+                } else {
+                    log.warn("JS marked cell but Playwright could not find it");
+                }
+            } else {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> available = (List<Map<String, Object>>) jsResult.get("available");
+                @SuppressWarnings("unchecked")
+                List<String> headers = (List<String>) jsResult.get("headers");
+
+                log.debug("Handicap '{}' not found in block '{}', headers: {}, found {} outcomes",
+                        outcomeInput, result.title, headers, available.size());
+
+                if (!available.isEmpty()) {
+                    log.debug("Sample outcomes: {}", available.stream().limit(3).collect(Collectors.toList()));
+                }
+            }
 
         } catch (Exception e) {
-            log.error("Error in selectPointHandicapWithColumns: {}", e.getMessage());
-            return null;
+            log.warn("Error searching handicap '{}' in block '{}': {}", outcomeInput, result.title, e.getMessage());
         }
+
+        log.warn("Handicap '{}' NOT FOUND", outcomeInput);
+        return null;
     }
-
-    // Type 2: Standard Handicap without column headers
-// Outcome format: "Home +2.5" or "Away -1.5"
-// .desc contains full text: "Home +2.5", "Away -1.5", etc.
-    private static Locator selectStandardHandicap(Locator marketBlock, String outcome) {
-        try {
-            // For this type, the .desc should contain the exact outcome text
-            // or a close match
-
-            log.debug("Looking for standard handicap: {}", outcome);
-
-            // Try exact match first
-            String outcomeXPath = String.format(
-                    ".//div[contains(@class,'m-outcome') and " +
-                            "not(contains(@class,'disabled'))]" +
-                            "[.//div[@class='desc' and normalize-space(text())=%s]]",
-                    escapeXPath(outcome)
-            );
-
-            Locator exactMatch = marketBlock.locator("xpath=" + outcomeXPath).first();
-
-            if (exactMatch.count() > 0) {
-                log.debug("Found exact match for: {}", outcome);
-                return exactMatch;
-            }
-
-            // If no exact match, try to find by handicap value and infer team
-            String handicapValue = extractHandicapValue(outcome);
-            if (handicapValue == null) {
-                log.error("Could not extract handicap value from: {}", outcome);
-                return null;
-            }
-
-            String teamSide = extractTeamSide(outcome);
-            if (teamSide == null) {
-                log.error("Could not determine team side from: {}", outcome);
-                return null;
-            }
-
-            // Build a pattern to match "Home +2.5" or "Away -1.5" etc.
-            String pattern = teamSide + "\\s+" + handicapValue.replace("+", "\\+").replace("-", "\\-");
-
-            // Find outcomes matching the pattern
-            Locator allOutcomes = marketBlock.locator(".m-outcome:not(.disabled)");
-            int count = allOutcomes.count();
-
-            for (int i = 0; i < count; i++) {
-                Locator outcomeCell = allOutcomes.nth(i);
-                String desc = outcomeCell.locator(".desc").textContent().trim();
-
-                if (desc.matches("(?i).*" + pattern + ".*")) {
-                    log.debug("Found handicap match: {}", desc);
-                    return outcomeCell;
-                }
-            }
-
-            log.error("Could not find standard handicap outcome: {}", outcome);
-            return null;
-
-        } catch (Exception e) {
-            log.error("Error in selectStandardHandicap: {}", e.getMessage());
-            return null;
-        }
+    /**
+     * ULTRA-FAST: Select handicap outcome in markets WITHOUT column headers
+     * (e.g., .desc contains "Home +2.5", "Away -1.5")
+     * Uses single JS evaluation for maximum speed.
+     */
+    private static Locator selectStandardHandicap(List<MarketBlockResult> marketBlock, String outcome, Page page) {
+//        try {
+//            log.debug("Looking for standard handicap outcome: {}", outcome);
+//
+//            String handicapValue = extractHandicapValue(outcome);
+//            if (handicapValue == null) {
+//                log.error("Could not extract handicap value from: {}", outcome);
+//                return null;
+//            }
+//
+//            String teamSide = extractTeamSide(outcome);
+//            if (teamSide == null) {
+//                log.error("Could not determine team side (Home/Away) from: {}", outcome);
+//                return null;
+//            }
+//
+//            String normalizedTeam = teamSide.toLowerCase(); // "home" or "away"
+//            String cleanValue = handicapValue.trim();
+//
+//            log.debug("Searching for '{}' with value '{}'", teamSide, cleanValue);
+//
+//            String jsScript = """
+//                (args) => {
+//                    const { teamLower, value } = args;
+//                    const outcomes = document.querySelectorAll('.m-outcome:not(.disabled)');
+//
+//                    for (let i = 0; i < outcomes.length; i++) {
+//                        const el = outcomes[i];
+//                        const descEl = el.querySelector('.desc');
+//                        if (!descEl) continue;
+//
+//                        let descText = descEl.textContent.trim();
+//                        let descLower = descText.toLowerCase();
+//
+//                        // 1. Try exact match first (case-insensitive)
+//                        if (descLower === args.fullOutcomeLower) {
+//                            return i;
+//                        }
+//
+//                        // 2. Flexible match: contains team name + handicap value
+//                        // Handles: "Home +2.5", "home+2.5", "Home+ 2.5", etc.
+//                        if (descLower.includes(teamLower) && descLower.includes(value.toLowerCase())) {
+//                            return i;
+//                        }
+//                    }
+//                    return null;
+//                }
+//                """;
+//
+//            String fullOutcomeLower = outcome.trim().toLowerCase();
+//
+//            Object result = marketBlock.evaluate(jsScript, Map.of(
+//                    "teamLower", normalizedTeam,
+//                    "value", cleanValue,
+//                    "fullOutcomeLower", fullOutcomeLower
+//            ));
+//
+//            if (result == null) {
+//                log.warn("Standard handicap outcome '{}' not found (team: {}, value: {})",
+//                        outcome, teamSide, handicapValue);
+//                return null;
+//            }
+//
+//            int index = (Integer) result;
+//
+//            Locator outcomeCell = marketBlock
+//                    .locator(".m-outcome:not(.disabled)")
+//                    .nth(index);
+//
+//            String foundText = outcomeCell.locator(".desc").textContent().trim();
+//            log.debug("Found standard handicap match: '{}' → '{}'", outcome, foundText);
+//
+//            return outcomeCell;
+//
+//        } catch (Exception e) {
+//            log.error("Error in selectStandardHandicap for '{}': {}", outcome, e.getMessage());
+//            return null;
+//        }
+        return null;
     }
 
     // Extract handicap value from outcome string (e.g., "Home +2.5" → "+2.5", "-1.5" → "-1.5")
     private static String extractHandicapValue(String outcome) {
-        // Match pattern: +/- followed by number with optional decimal
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("([+-]\\d+(?:\\.\\d+)?)");
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("([+-]?\\d+(?:\\.\\d+)?)");
         java.util.regex.Matcher matcher = pattern.matcher(outcome);
-
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-
-        return null;
+        return matcher.find() ? matcher.group(1) : null;
     }
 
-    // Extract team side from outcome string (e.g., "Home +2.5" → "Home", "Away -1.5" → "Away")
     private static String extractTeamSide(String outcome) {
-        String lowerOutcome = outcome.toLowerCase();
-
-        // Check for explicit team names
-        if (lowerOutcome.contains("home") || lowerOutcome.matches("^h\\s.*")) {
+        String lower = outcome.toLowerCase().trim();
+        if (lower.contains("home") || lower.startsWith("h ") || lower.matches("^h[\\+\\-].*")) {
             return "Home";
-        } else if (lowerOutcome.contains("away") || lowerOutcome.matches("^a\\s.*")) {
+        }
+        if (lower.contains("away") || lower.startsWith("a ") || lower.matches("^a[\\+\\-].*")) {
             return "Away";
         }
-
-        // No explicit team side found
         return null;
     }
 
@@ -676,6 +991,24 @@ public class MSportMarketSearchUtils {
         POINT_HANDICAP,   // Handicap markets - similar structure to O/U
         BOTH_TEAMS_SCORE, // Yes/No markets
         UNKNOWN           // Fallback
+    }
+
+
+    public static class MarketBlockResult {
+        public final Locator block;
+        public final String markerId;
+        public final String title;
+
+        public MarketBlockResult(Locator block, String markerId, String title) {
+            this.block = block;
+            this.markerId = markerId;
+            this.title = title;
+        }
+
+        // Refresh if needed
+        public Locator refresh(Page page) {
+            return page.locator("[data-pw-market-marker='" + markerId + "']").first();
+        }
     }
 
 

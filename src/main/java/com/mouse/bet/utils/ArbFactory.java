@@ -93,8 +93,7 @@ public class ArbFactory {
                     MarketCategory category = entry.getKey();
                     List<NormalizedOutcome> outcomes = entry.getValue()
                             .stream()
-                            .filter(normalizedOutcome -> normalizedOutcome.getOutcomeStatus().equals(OutcomeStatus.SUSPENDED)
-                            )
+                            .filter(outcome -> outcome.getOutcomeStatus() != OutcomeStatus.SUSPENDED)
                             .toList();
 
                     log.debug("{} Processing category={} with {} outcomes",
