@@ -4,6 +4,8 @@ package com.mouse.bet.converter;
 
 import com.mouse.bet.entity.BetLeg;
 import com.mouse.bet.enums.BetLegStatus;
+import com.mouse.bet.enums.BookMaker;
+import com.mouse.bet.interfaces.MarketType;
 import com.mouse.bet.model.NormalizedOutcome;
 
 import java.math.BigDecimal;
@@ -25,7 +27,7 @@ public class ModelConverter {
                 .awayTeam(outcome.getAwayTeam())
                 .league(outcome.getLeague())
                 .sportEnum(outcome.getSportEnum())
-
+                .betLegId(createBetLegId(outcome.getMarketType(), outcome.getNormalEventId(), outcome.getBookmaker()))
                 .odds(outcome.getOdds())
                 .outcomeId(outcome.getOutcomeId())
                 .outcomeDescription(outcome.getOutcomeDescription())
@@ -46,6 +48,11 @@ public class ModelConverter {
 
 
                 .build();
+    }
+
+    private static String createBetLegId(MarketType marketType, String eventId, BookMaker bookMaker) {
+        return eventId + marketType.toString() + bookMaker;
+//        log.info("{} Created arbId: {}", EMOJI_INFO, arbId);
     }
 
     /**

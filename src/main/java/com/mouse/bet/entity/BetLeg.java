@@ -25,6 +25,7 @@ import java.time.Instant;
                 @UniqueConstraint(name = "uq_arb_leg_role", columnNames = {"arb_id", "isPrimaryLeg"})
         }
 )
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,8 +35,9 @@ import java.time.Instant;
 public class BetLeg {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "betLegId", length = 128, nullable = false)
+
+    private String betLegId;
 
     @Version
     private Integer version;
@@ -244,11 +246,6 @@ public class BetLeg {
                 bookmaker != null ? bookmaker : "Unknown Bookmaker");
     }
 
-    public BetLeg withUpdatedOdds(BigDecimal newOdds) {
-        BetLeg copy = this.toBuilder().id(null).version(null).build();
-        copy.setOdds(newOdds);
-        copy.updatePotentialPayout();
-        return copy;
-    }
+
 
 }

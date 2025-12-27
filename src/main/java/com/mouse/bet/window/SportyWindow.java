@@ -18,10 +18,11 @@ import com.mouse.bet.manager.ProfileManager;
 import com.mouse.bet.manager.WindowSyncManager;
 import com.mouse.bet.model.profile.UserAgentProfile;
 import com.mouse.bet.service.ArbPollingService;
-import com.mouse.bet.service.BetLegRetryService;
+import com.mouse.bet.service.BetLegService;
 import com.mouse.bet.service.BettingMetricsService;
 import com.mouse.bet.tasks.LegTask;
 import com.mouse.bet.utils.SportyLoginUtils;
+import com.mouse.bet.utils.WindowUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.Builder;
 import lombok.Data;
@@ -101,7 +102,7 @@ public class SportyWindow implements BettingWindow, Runnable {
     private final ScraperConfig scraperConfig;
     private final ArbPollingService arbPollingService;
     private final ArbOrchestrator arbOrchestrator;
-//    private final BetLegRetryService betRetryService;
+    private final BetLegService betLegService;
     private final WindowSyncManager syncManager;
     private final SportyLoginUtils sportyLoginUtils;
     private final BettingMetricsService bettingMetricsService;
@@ -164,7 +165,7 @@ public class SportyWindow implements BettingWindow, Runnable {
         try {
             playwright = Playwright.create();
             browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(true)
+                    .setHeadless(false)
                     .setArgs(scraperConfig.getBROWSER_FlAGS())
                     .setSlowMo(0));
 
@@ -267,7 +268,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             log.info("🚀 SIMULTANEOUS BETTING | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
 
             // Verify bet deployment
-            boolean deployedBet = deployBet(page, task.getLeg());
+            boolean deployedBet = deployBet(page, task.getLeg(),arbId);
 
             if (!deployedBet) {
                 log.warn("❌ Bet deployment failed | ArbId: {} | Bookmaker: {}", arbId, BOOK_MAKER);
@@ -2134,10 +2135,10 @@ public class SportyWindow implements BettingWindow, Runnable {
         }
     }
 
-    private boolean selectAndVerifyBet(Page page, BetLeg leg) {
+    private boolean selectAndVerifyBet(Page page, BetLeg leg, String arbId) {
         String market = leg.getProviderMarketTitle().trim();
         String outcome = leg.getProviderMarketName().trim();
-        double expectedOdds = leg.getOdds().doubleValue();
+
         log.info("Selecting: {} → {}", market, outcome);
 
         try {
@@ -2248,10 +2249,12 @@ public class SportyWindow implements BettingWindow, Runnable {
                 return false;
             }
 
+            double expectedOdds = betLegService.findBetLegByArbIdAndBookmaker(arbId, BOOK_MAKER).getOdds().doubleValue();
+
             // Odds check
             if (!isOddsAcceptable(expectedOdds, actualOddsStr)) {
                 log.warn("Odds drifted: expected ≥ {} → got {}", expectedOdds, actualOddsStr);
-                return false; // Fail on odds drift
+//                return false; // Fail on odds drift//todo
             }
 
             // Re-query cell for reliability
@@ -2345,7 +2348,7 @@ public class SportyWindow implements BettingWindow, Runnable {
     }
 
     // Step 4: Complete deployment flow
-    public boolean deployBet(Page page, BetLeg leg) {
+    public boolean deployBet(Page page, BetLeg leg, String arbId) {
         log.info("{} {} Starting bet deployment for: {}",
                 EMOJI_START, EMOJI_TARGET, leg.getProviderMarketTitle());
 
@@ -2360,7 +2363,7 @@ public class SportyWindow implements BettingWindow, Runnable {
 //        }
 
         // 3. Select and verify bet
-        if (!selectAndVerifyBet(page, leg)) {
+        if (!selectAndVerifyBet(page, leg, arbId)) {
             return false;
         }
 
@@ -2485,29 +2488,31 @@ public class SportyWindow implements BettingWindow, Runnable {
 
     private boolean placeBet(Page page, Arb arb, BetLeg leg) {
         BigDecimal stake = leg.getStake();
-        BigDecimal expectedOdds = leg.getOdds();
+//        BetLeg betLeg;
+        String arbId = arb.getArbId();
         long startTime = System.currentTimeMillis();
+
+        // ── CONFIGURABLE MAX DURATION (change this value as needed) ──
+        final long MAX_DURATION_MS = 12 * 60 * 1000L; // 12 minutes
+        final long deadline = startTime + MAX_DURATION_MS;
 
         log.info("─────────────────────────────────────────────────────────────");
         log.info("START placeBet() → {} → {} @ {} | Stake: {} | {}",
-                leg.getProviderMarketTitle(), leg.getProviderMarketName(), expectedOdds, stake,
+                leg.getProviderMarketTitle(), leg.getProviderMarketName(), betLegService.findBetLegByArbIdAndBookmaker(arbId, BOOK_MAKER).getOdds().doubleValue(), stake,
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")));
 
         try {
             // ── 1. ENTER STAKE ─────────────────────────────────────
             log.info("[1/6] Entering stake...");
             Locator stakeInput = page.locator("#j_stake_0 input.m-input, .m-input[placeholder*='min']").first();
-
             if (stakeInput.count() == 0) {
                 log.error("Stake input missing");
                 return false;
             }
 
-            // Fast: no scroll/focus/delay needed
             stakeInput.fill(""); // Clear
-            stakeInput.fill(stake.toPlainString()); // Type stake directly
+            stakeInput.fill(String.valueOf(betLegService.findBetLegByArbIdAndBookmaker(arbId, BOOK_MAKER).getStake())); // Type stake directly
             stakeInput.press("Enter");
-
             log.info("[OK] Stake entered");
 
             // ── 2. WAIT FOR BET IN SLIP ─────────────────────────────────
@@ -2523,13 +2528,13 @@ public class SportyWindow implements BettingWindow, Runnable {
 
             // ── 3. UNKILLABLE LOOP + FULL POPUP HANDLING ─────────────────────
             log.info("[3/6] Starting UNKILLABLE placement loop...");
+
             boolean betConfirmed = false;
             boolean permanentFailure = false;
-            int cycle = 0;
 
-            while (!betConfirmed && !permanentFailure && cycle < MAX_CYCLES) {
-                cycle++;
-                log.info("[Cycle {}/{}] Checking state...", cycle, MAX_CYCLES);
+            while (!betConfirmed && !permanentFailure && System.currentTimeMillis() < deadline) {
+                long elapsedMs = System.currentTimeMillis() - startTime;
+                log.info("[Elapsed: {}s / {}s max] Checking state...", elapsedMs / 1000, MAX_DURATION_MS / 1000);
 
                 // ── A. CRITICAL ODDS NOT ACCEPTABLE POPUP ──
                 Locator oddsChangePopup = page.locator("div.m-dialog-wrapper p:has-text('Odds not acceptable')").first();
@@ -2539,9 +2544,10 @@ public class SportyWindow implements BettingWindow, Runnable {
                     break;
                 }
 
-                // ── B. MONITOR BETSLIP STATUS ──
-                BetslipStatus status = monitorAndHandleOddsInBetslip(page, expectedOdds);
+                BigDecimal expectedFreshOdds = betLegService.findBetLegByArbIdAndBookmaker(arbId, BOOK_MAKER).getOdds();
 
+                // ── B. MONITOR BETSLIP STATUS ──
+                BetslipStatus status = monitorAndHandleOddsInBetslip(page, expectedFreshOdds);
                 switch (status) {
                     case UNAVAILABLE:
                         log.error("❌ MARKET UNAVAILABLE → Game over → ABORTING");
@@ -2557,7 +2563,6 @@ public class SportyWindow implements BettingWindow, Runnable {
                         log.info("✅ Odds acceptable in betslip → Proceeding");
                         break;
                 }
-
                 if (permanentFailure) break;
 
                 // ── C. FINAL CONFIRM POPUP ──
@@ -2576,7 +2581,6 @@ public class SportyWindow implements BettingWindow, Runnable {
                 }
 
                 Locator btn = page.locator("button.af-button--primary >> visible=true").first();
-
                 if (btn.count() == 0) {
                     log.info("Primary button gone → likely success");
                     continue;
@@ -2585,14 +2589,22 @@ public class SportyWindow implements BettingWindow, Runnable {
                 String text = btn.innerText().trim();
                 log.info("Main button: \"{}\" | Disabled: {}", text, btn.isDisabled());
 
+                // ── STEP 1: ALWAYS HANDLE "ACCEPT CHANGES" FIRST ──
                 if (text.matches(".*(Accept Changes|Accept|Confirm Changes).*")) {
-                    log.warn("→ Clicking 'Accept Changes' (cycle {})", cycle);
+                    log.warn("→ Clicking 'Accept Changes'");
                     btn.click(new Locator.ClickOptions().setForce(true).setNoWaitAfter(true));
-                    continue;
+                    continue; // Loop again to recheck odds and button state
                 }
 
+                // ── STEP 2: RE-ENTER STAKE BEFORE FINAL PLACE BET ──
+                stakeInput.fill("");
+                stakeInput.fill(stake.toPlainString());
+                stakeInput.press("Enter");
+                randomHumanDelay(200, 500); // Small delay after re-entering
+
+                // ── STEP 3: ONLY NOW CLICK "PLACE BET" ──
                 if (text.matches(".*(Place Bet|Bet Now|Confirm Bet|Place bet).*") && !btn.isDisabled()) {
-                    log.info("→ Clicking 'Place Bet' (cycle {})", cycle);
+                    log.info("→ Clicking 'Place Bet'");
                     btn.click(new Locator.ClickOptions().setForce(true).setNoWaitAfter(true));
 
                     // Check rejection right after
@@ -2643,11 +2655,11 @@ public class SportyWindow implements BettingWindow, Runnable {
             }
 
             if (!betConfirmed) {
-                log.error("FAILED after {} cycles → Timeout (odds never became acceptable)", MAX_CYCLES);
+                log.error("FAILED → Timeout after {} minutes (odds never became acceptable)", MAX_DURATION_MS / 60000);
                 return false;
             }
 
-            log.info("[OK] Bet placed after {} cycle(s)", cycle);
+            log.info("[OK] Bet placed successfully");
 
             // ── FINAL SUCCESS VERIFICATION (kept exactly as original) ──
             try {
@@ -2674,7 +2686,7 @@ public class SportyWindow implements BettingWindow, Runnable {
             } catch (Exception ignored) {}
 
             long duration = System.currentTimeMillis() - startTime;
-            log.info("placeBet() COMPLETED | SUCCESS | {}ms | {} cycles", duration, cycle);
+            log.info("placeBet() COMPLETED | SUCCESS | {}ms", duration);
             log.info("─────────────────────────────────────────────────────────────");
             return true;
 

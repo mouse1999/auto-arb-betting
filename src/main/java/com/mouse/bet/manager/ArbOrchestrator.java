@@ -259,7 +259,7 @@ public class ArbOrchestrator {
             while ((task = queue.poll()) != null) {
                 removed++;
                 log.trace("{} Removed LegTask from {} queue | LegId: {}",
-                        EMOJI_REMOVED, bookMaker, task.getLeg().getId());
+                        EMOJI_REMOVED, bookMaker, task.getLeg().getBetLegId());
             }
 
             if (removed > 0) {
@@ -370,7 +370,7 @@ public class ArbOrchestrator {
             log.info("Preparing leg task | ArbId: {} | Bookmaker: {} | LegId: {} | Market: {} | Selection: {} | Odds: {} | Stake: {}",
                     arb.getArbId(),
                     bm,
-                    leg.getId(),
+                    leg.getBetLegId(),
                     leg.getProviderMarketTitle(),
                     leg.getProviderMarketName(),
                     leg.getOdds(),
@@ -393,7 +393,7 @@ public class ArbOrchestrator {
             q.put(task); // may block briefly if worker's queue is full
 
             log.info("Leg task dispatched successfully | ArbId: {} | Bookmaker: {} | LegId: {} | QueueSize: {}",
-                    arb.getArbId(), bm, leg.getId(), q.size());
+                    arb.getArbId(), bm, leg.getBetLegId(), q.size());
         }
 
         log.info("All leg tasks dispatched, waiting for completion | ArbId: {} | TotalLegs: {} | PhaserPhase: {}",

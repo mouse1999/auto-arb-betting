@@ -382,8 +382,9 @@ public class ArbService {
         target.setProfitPercentage(source.getProfitPercentage());
     }
 
+
     /**
-     * Upsert a bet leg
+     * Upsert a bet leg — works with separate betLegId PK + arb_id FK
      */
     private void upsertLeg(Arb arb, BetLeg incomingLeg, boolean isPrimary) {
         if (incomingLeg == null) return;
@@ -393,28 +394,35 @@ public class ArbService {
 
         Optional<BetLeg> maybeExisting = isPrimary ? arb.getLegA() : arb.getLegB();
 
-        if (maybeExisting.isEmpty()) {
+        if (maybeExisting.isPresent()) {
+            // ── UPDATE EXISTING LEG ──
+            BetLeg existing = maybeExisting.get();
+            log.debug("{} Merging {} | Old odds: {} | New odds: {}",
+                    EMOJI_UPDATE, legLabel,
+                    existing.getOdds(), incomingLeg.getOdds());
+
+            mergeLegFields(existing, incomingLeg);
+            existing.updatePotentialPayout();
+
+        } else {
+            // ── CREATE NEW LEG ──
             log.debug("{} {} Creating {} | Bookmaker: {} | Odds: {}",
                     EMOJI_NEW, EMOJI_SUCCESS, legLabel,
                     incomingLeg.getBookmaker(), incomingLeg.getOdds());
 
-            BetLeg clone = incomingLeg.toBuilder()
-                    .id(null)
-                    .version(null)
-                    .arb(null)
-                    .build();
-            clone.setPrimaryLeg(isPrimary);
+            BetLeg newLeg = new BetLeg();
 
-            arb.attachLeg(clone);
-            clone.updatePotentialPayout();
-            return;
+            mergeLegFields(newLeg, incomingLeg);
+
+            // CRITICAL: Set the foreign key and back-reference
+            newLeg.setArb(arb);  // This sets arb_id FK via the @ManyToOne
+
+            newLeg.setPrimaryLeg(isPrimary);
+            newLeg.updatePotentialPayout();
+
+            // Attach to Arb (your existing method)
+            arb.attachLeg(newLeg);
         }
-
-        BetLeg existingLeg = maybeExisting.get();
-        log.debug("{} Merging {} | Old odds: {} | New odds: {}",
-                EMOJI_UPDATE, legLabel, existingLeg.getOdds(), incomingLeg.getOdds());
-
-        mergeLegFields(existingLeg, incomingLeg);
     }
 
     /**

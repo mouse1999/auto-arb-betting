@@ -3,57 +3,36 @@ package com.mouse.bet.repository;
 import com.mouse.bet.entity.BetLeg;
 import com.mouse.bet.enums.BetLegStatus;
 import com.mouse.bet.enums.BookMaker;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface BetLegRepository extends JpaRepository<BetLeg, Long>, JpaSpecificationExecutor<BetLeg> {
+public interface BetLegRepository extends JpaRepository<BetLeg, String> {
 
-    List<BetLeg> findByStatus(BetLegStatus status);
+    // Find a specific leg by its own PK + bookmaker (useful for lookup)
+    Optional<BetLeg> findByBetLegId(String betLegId);
 
-    List<BetLeg> findByBookmakerAndStatus(BookMaker bookmaker, BetLegStatus status);
+    // All legs belonging to a given Arb
+    List<BetLeg> findByArb_ArbId(String arbId);
+    Optional<BetLeg> findByArb_ArbIdAndBookmaker(String arbId, BookMaker bookMaker);
 
-    Optional<BetLeg> findByOutcomeId(String outcomeId);
+    // Primary leg for an Arb
+    Optional<BetLeg> findByArb_ArbIdAndIsPrimaryLegTrue(String arbId);
 
-    @Query("select bl from BetLeg bl where bl.arb.arbId = :arbId and bl.isPrimaryLeg = true")
-    Optional<BetLeg> findPrimaryByArbId(String arbId);
+    // Status-based queries per Arb
+    List<BetLeg> findByArb_ArbIdAndStatusIn(String arbId, List<BetLegStatus> statuses);
 
-    @Query("select bl from BetLeg bl where bl.arb.arbId = :arbId and bl.isPrimaryLeg = false")
-    Optional<BetLeg> findSecondaryByArbId(String normalEveId);
+    List<BetLeg> findByArb_ArbIdAndStatus(String arbId, BetLegStatus status);
 
+    Page<BetLeg> findByArb_ArbIdAndStatus(String arbId, BetLegStatus status, Pageable pageable);
 
-    Optional<BetLeg> findByArb_ArbIdAndBookmaker(String arbId, BookMaker bookmaker);
+    // Counts
+    long countByArb_ArbIdAndStatus(String arbId, BetLegStatus status);
 
-    @Query("""
-        SELECT l FROM BetLeg l
-        WHERE l.arb.arbId = :arbId
-          AND l.status IN (BetLegStatus.FAILED)
-          AND l.attemptCount < :maxAttempts
-        ORDER BY l.lastAttemptAt NULLS FIRST
-    """)
-    List<BetLeg> findFailedBetForArb(@Param("arbId") String arbId,
-                                     @Param("maxAttempts") int maxAttempts,
-                                     Pageable page);
+    long countByArb_ArbIdAndStatusIn(String arbId, List<BetLegStatus> statuses);
 
-
-
-
-
-    @Query("""
-    SELECT COUNT(bl) FROM BetLeg bl
-    WHERE bl.arb.arbId = :arbId
-      AND bl.status = :status
-""")
-    long countLegsByStatus(
-            @Param("arbId") String arbId,
-            @Param("status") BetLegStatus status
-    );
-
-
-
+    long countByArb_ArbId(String arbId);
 }
